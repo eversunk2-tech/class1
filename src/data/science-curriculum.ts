@@ -54,12 +54,12 @@ export const scienceTerms: Term[] = [
         number: 1,
         title: "산과 염기",
         lessons: [
-          { id: "2", inquiry: 1, period: "2", title: "여러 가지 용액을 분류해 볼까?", science: "14~15", workbook: "6~7" },
+          { id: "2", inquiry: 1, period: "2", title: "여러 가지 용액을 분류해 볼까?", science: "14~15", workbook: "6~7", app: { id: "sci-6-1-1-1", kind: "sim" } },
           { id: "3", inquiry: 2, period: "3~4", title: "지시약으로 여러 가지 용액을 분류해 볼까?", science: "16~19", workbook: "8~10", app: { id: "sci-6-1-1-2", kind: "sim" } },
-          { id: "5", inquiry: 3, period: "5", title: "산성 용액과 염기성 용액의 성질을 비교해 볼까?", science: "20~21", workbook: "11" },
-          { id: "6", inquiry: 4, period: "6", title: "산성 용액과 염기성 용액을 섞으면 어떻게 될까?", science: "22~23", workbook: "12~13" },
-          { id: "7", inquiry: 5, period: "7", title: "산성 용액과 염기성 용액을 이용하는 예를 찾아라!", science: "24~25", workbook: "14~15" },
-          { id: "8", inquiry: 6, period: "8", title: "산성화가 환경에 미치는 영향을 알아볼까?", science: "26~27", workbook: "16~17" },
+          { id: "5", inquiry: 3, period: "5", title: "산성 용액과 염기성 용액의 성질을 비교해 볼까?", science: "20~21", workbook: "11", app: { id: "sci-6-1-1-3", kind: "sim" } },
+          { id: "6", inquiry: 4, period: "6", title: "산성 용액과 염기성 용액을 섞으면 어떻게 될까?", science: "22~23", workbook: "12~13", app: { id: "sci-6-1-1-4", kind: "sim" } },
+          { id: "7", inquiry: 5, period: "7", title: "산성 용액과 염기성 용액을 이용하는 예를 찾아라!", science: "24~25", workbook: "14~15", app: { id: "sci-6-1-1-5", kind: "guide" } },
+          { id: "8", inquiry: 6, period: "8", title: "산성화가 환경에 미치는 영향을 알아볼까?", science: "26~27", workbook: "16~17", app: { id: "sci-6-1-1-6", kind: "guide" } },
         ],
       },
       {

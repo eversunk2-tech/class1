@@ -41,6 +41,14 @@
  *     makeRecord: function (sel, observed) { return { … }; },  // observed: 고른 보기 문자열 | { fieldId: 숫자 }
  *     describeRecord: function (rec) { return "식초 + 푸른색 리트머스 → 붉은색으로 변함"; },
  *     miniTable: { title: "…", rows: [{ id, label }], cols: [{ id, label }], sel: function (row, col) { return {...}; } },  // 선택
+ *     skipCells: [                                          // 선택: 안전 등의 까닭으로 '관찰하지 않는' 조합
+ *       { cell: { sol: "묽은 염산", method: "냄새" },            //  - phases[].cells에 있어도 자동으로 빠진다(진행률·잠금 계산에서 제외)
+ *         title: "⚠️ 이 실험은 하지 않아요",                     //  - 이 조합을 고르면 실행 버튼 대신 안내 카드가 뜬다(애니메이션·기록 없음)
+ *         text: "묽은 염산은 자극성이 강해 냄새를 맡지 않아요.",   //  - 미니 표에는 🚫로 표시한다
+ *         why: "왜 그럴까요? …",                                 //  (선택) 한 번 더 생각해 볼 질문
+ *         runLabel: "🚫 안전을 위해 하지 않는 실험이에요",          //  (선택) 실행 버튼 글자
+ *         short: "관찰 안 함(안전)" },                            //  (선택) 미니 표·분석 표에 쓸 짧은 말
+ *     ],
  *     extras: [node],                                       // 선택: 패널 맨 아래(안전 수칙 등)
  *     toast: function (msg, ms) {},
  *     onRecorded: function (info) {},                       // { record, replaced, phaseCompleted: "A"|null, allDone }
@@ -50,6 +58,7 @@
  *   exp.activate()            → 실험하기 단계에 들어올 때 호출(처음 한 번 실험 화면을 만든다)
  *   exp.select(sel)           → 조건 고르기(분석 단계의 '다시 실험' 버튼 등)
  *   exp.phaseDone(id) / exp.allDone() / exp.progress() → { done, total }
+ *   exp.skipInfo(sel)         → 관찰하지 않는 조합이면 skipCells의 그 항목, 아니면 null
  *
  * 저장 키: "scene"(실험 화면에 남아 있는 결과), "view2d"(2D 보기 선택), "intro"(알아 두기 접힘)
  * 실행 버튼을 누르면 실험 화면이 보이도록 먼저 스크롤한 뒤(세로 화면·휴대폰) 애니메이션을 시작한다.
@@ -131,11 +140,32 @@
     var mounting = false;
     var can3D = o.can3D !== false && SciSim.Sim3D && SciSim.Sim3D.isWebGLAvailable() && !/[?&]no3d=1/.test(location.search);
 
+    /* ── 관찰하지 않는 조합(skipCells) ── */
+    var skips = (o.skipCells || []).filter(function (x) {
+      return x && x.cell;
+    });
+    function skipOf(s) {
+      if (!s) return null;
+      for (var i = 0; i < skips.length; i++) {
+        var c = skips[i].cell;
+        if (
+          Object.keys(c).every(function (k) {
+            return s[k] === c[k];
+          })
+        )
+          return skips[i];
+      }
+      return null;
+    }
+
     /* ── 단계(phase) ── */
     var phaseById = {};
     o.phases.forEach(function (p, i) {
       p.index = i;
       p.trials = p.trials || 1;
+      p.cells = p.cells.filter(function (c) {
+        return !skipOf(c); // 관찰하지 않는 조합은 채울 칸이 아니다
+      });
       phaseById[p.id] = p;
     });
     function cellPhase(s) {
@@ -256,6 +286,8 @@
     var nObs = CIRCLED[o.factors.length + 1];
     R.run = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", disabled: true });
     panel.appendChild(el("div", { class: "ss-card ss-step-card ss-run-card" }, [el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: nRun }), " " + (o.runTitle || "실험하기")]), R.run]));
+    R.skip = el("div", { class: "ss-card ss-skip-card", role: "note", "aria-live": "polite", hidden: true });
+    panel.appendChild(R.skip);
     R.obsQ = el("p", { class: "ss-observe-q" });
     R.obsBody = el("div", { class: "ss-observe-body" });
     R.obsChoices = el("div", { class: "ss-obs-input" });
@@ -347,14 +379,28 @@
         }, "");
         R.run.textContent = SciSim.josa(phrase, "을", "를") + " 골라요";
         R.run.disabled = true;
+      } else if (skipOf(sel)) {
+        R.run.textContent = skipOf(sel).runLabel || "🚫 안전을 위해 하지 않는 실험이에요";
+        R.run.disabled = true;
       } else {
         R.run.textContent = o.runLabel(Object.assign({}, sel));
         R.run.disabled = busy;
       }
+      drawSkip();
       var cp = currentPhase();
       R.lead.textContent = cp ? cp.lead : o.doneLead || "모든 실험을 기록했어요. 다시 해 보고 싶은 실험은 자유롭게 해 보세요.";
       drawProgress();
       drawMini();
+    }
+
+    function drawSkip() {
+      var sk = complete() ? skipOf(sel) : null;
+      R.skip.hidden = !sk;
+      R.skip.textContent = "";
+      if (!sk) return;
+      R.skip.appendChild(el("h3", { class: "ss-skip-title", text: sk.title || "⚠️ 이 실험은 하지 않아요" }));
+      if (sk.text) R.skip.appendChild(SciSim.rich(sk.text, "p"));
+      if (sk.why) R.skip.appendChild(el("p", { class: "ss-skip-why" }, [SciSim.rich(sk.why, "span")]));
     }
 
     function drawProgress() {
@@ -390,6 +436,26 @@
         var tr = el("tr", null, [el("th", { scope: "row", text: r.label })]);
         mt.cols.forEach(function (c) {
           var s = mt.sel(r, c);
+          var sk = skipOf(s);
+          if (sk) {
+            var isSelSk = sameSel(s, sel, factorIds);
+            tr.appendChild(
+              el("td", null, [
+                el("button", {
+                  type: "button",
+                  class: "ss-mini-cell is-skip" + (isSelSk ? " is-sel" : ""),
+                  "aria-label": r.label + ", " + c.label + ", " + (sk.short || "관찰하지 않음(안전)"),
+                  "aria-pressed": String(isSelSk),
+                  title: sk.short || "관찰하지 않음(안전)",
+                  text: "🚫",
+                  onclick: function () {
+                    select(s);
+                  },
+                }),
+              ])
+            );
+            return;
+          }
           var p = cellPhase(s);
           var n = records.countOf(o.cellKey(s));
           var need = p ? p.trials : 1;
@@ -422,6 +488,7 @@
         return;
       }
       var s = Object.assign({}, sel);
+      if (skipOf(s)) return; // 관찰하지 않는 조합은 실행하지 않는다
       var p = cellPhase(s);
       if (p && !phaseUnlocked(p)) return;
       setBusy(true);
@@ -711,7 +778,7 @@
       R.btnReset.hidden = kind !== "3d";
       Object.keys(scene).forEach(function (k) {
         var s = scene[k];
-        if (s && cellPhase(s)) v.showInstant(s);
+        if (s && cellPhase(s) && !skipOf(s)) v.showInstant(s);
       });
       v.highlight(Object.assign({}, sel));
       drawToggle();
@@ -733,6 +800,9 @@
       refresh: draw,
       phaseDone: phaseDone,
       allDone: allDone,
+      skipInfo: function (s) {
+        return skipOf(s);
+      },
       isBusy: function () {
         return busy;
       },

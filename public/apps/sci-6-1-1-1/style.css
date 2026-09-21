@@ -1,0 +1,113 @@
+/* sci-6-1-1-1 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.small-btn { min-height: 44px; padding: 0 12px; font-size: 0.9rem; }
+
+/* ── 용액·관찰 방법 아이콘 ── */
+.bottle-icon {
+  flex: none; width: 14px; height: 24px; border-radius: 4px 4px 5px 5px; border: 2px solid #8aa0b6;
+  background: linear-gradient(to top, var(--liq, #dfeaf2) 60%, transparent 60%); position: relative;
+}
+.bottle-icon.is-clear { background: linear-gradient(to top, rgba(170, 200, 225, 0.35) 60%, transparent 60%); }
+.bottle-icon::before { content: ""; position: absolute; left: 3px; top: -8px; width: 4px; height: 6px; background: #c9d3de; border-radius: 2px 2px 0 0; }
+.method-icon { flex: none; font-size: 1.2rem; width: 24px; text-align: center; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+
+/* ── 관찰 카드: 종이 앞의 점적병(모형). 종이는 실제 흰 종이라 다크모드에서도 흰색 ── */
+.ob-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ob-side { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.ob-side .ss-help { margin: 0; }
+.ob-name { margin: 0; font-weight: 700; }
+.ob-seen { margin: 6px 0; padding: 10px 12px; border-radius: 12px; background: var(--ss-surface-2); font-weight: 600; flex: 1 1 200px; }
+.ob-scene { position: relative; width: 150px; height: 120px; flex: none; }
+.ob-paper { position: absolute; inset: 0 0 8px 0; background: #fff; border: 2px solid #d5dbe3; border-radius: 6px; }
+.ob-letter { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 26px; font-weight: 800; color: #1a1a1a; line-height: 1; }
+.ob-bottle {
+  position: absolute; left: 50%; bottom: 0; width: 56px; height: 86px; margin-left: -28px;
+  border: 3px solid rgba(120, 140, 160, 0.75); border-radius: 10px 10px 12px 12px; background: rgba(255, 255, 255, 0.15); overflow: hidden;
+}
+.ob-bottle::before { content: ""; position: absolute; left: 50%; top: -3px; width: 18px; height: 8px; margin-left: -9px; background: #c9d3de; border-radius: 0 0 4px 4px; }
+.ob-floor { position: absolute; left: 22px; right: 22px; bottom: 0; height: 12px; background: #fff; border: 2px solid #d5dbe3; border-radius: 4px; }
+.ob-liq { position: absolute; left: 0; right: 0; bottom: 0; height: 66%; }
+.ob-liq.is-clear { background: rgba(200, 222, 240, 0.18); box-shadow: inset 0 2px 0 rgba(120, 150, 180, 0.45); }
+
+/* ── 2D 대체 화면 ── */
+.b2-wrap { display: flex; flex-direction: column; gap: 10px; }
+.b2-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.b2-pick {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 84px; padding: 6px 2px;
+  border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); cursor: pointer; touch-action: manipulation;
+}
+.b2-pick.is-sel { border-color: var(--ss-primary); background: color-mix(in srgb, var(--ss-primary) 14%, var(--ss-surface)); }
+.b2-mini { position: relative; width: 22px; height: 36px; border: 2px solid #8aa0b6; border-radius: 5px 5px 6px 6px; overflow: hidden; background: rgba(255, 255, 255, 0.2); }
+.b2-liq { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; }
+.b2-liq.is-clear { background: rgba(170, 200, 225, 0.3); }
+.b2-name { font-size: 0.72rem; font-weight: 700; line-height: 1.2; text-align: center; }
+.st-stage { position: relative; height: 210px; border-radius: 14px; background: #e9eef4; border: 2px solid #c9d3de; overflow: hidden; }
+@media (prefers-color-scheme: dark) { .st-stage { background: #2a3342; border-color: #3b475a; } }
+.st-paper {
+  position: absolute; left: 50%; top: 14px; width: 190px; height: 150px; margin-left: -95px; background: #fff;
+  border: 2px solid #d5dbe3; border-radius: 6px; opacity: 0; transform: translateY(-20px); transition: opacity 0.5s, transform 0.5s;
+}
+.st-paper.is-on { opacity: 1; transform: none; }
+/* 색깔 관찰: 점적병 바닥에 까는 흰 종이(지도서 113쪽) */
+.st-floor { position: absolute; left: 50%; bottom: 24px; width: 170px; height: 16px; margin-left: -85px; background: #fff; border: 2px solid #d5dbe3; border-radius: 4px; opacity: 0; transition: opacity 0.5s; }
+.st-stage.with-floor .st-floor { opacity: 1; }
+.st-letter { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); font-size: 32px; font-weight: 800; color: #1a1a1a; line-height: 1; }
+.st-paper.is-plain .st-letter { display: none; }
+.st-bottle {
+  position: absolute; left: 50%; bottom: 14px; width: 70px; height: 110px; margin-left: -35px; z-index: 2;
+  border: 3px solid rgba(110, 130, 150, 0.8); border-radius: 12px 12px 14px 14px; background: rgba(255, 255, 255, 0.12);
+  transition: transform 0.8s ease, bottom 0.8s ease;
+}
+.st-stage.at-paper .st-bottle { bottom: 36px; }
+.st-cap { position: absolute; left: 50%; top: -14px; width: 22px; height: 12px; margin-left: -11px; background: #c9d3de; border-radius: 4px 4px 0 0; }
+.st-liq { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; border-radius: 0 0 10px 10px; }
+.st-liq.is-clear { background: rgba(200, 222, 240, 0.18); box-shadow: inset 0 2px 0 rgba(120, 150, 180, 0.45); }
+.st-foam { position: absolute; left: 4px; right: 4px; bottom: 58%; height: 22px; display: flex; flex-wrap: wrap; align-content: flex-end; gap: 1px; transition: opacity 1.1s, transform 1.1s; }
+.st-foam.is-fading { opacity: 0; transform: scale(0.4); }
+.st-bubble { width: 12px; height: 12px; border-radius: 50%; background: #dbe9f7; border: 1px solid #7f9bb8; }
+.st-bottle.is-shaking { animation: st-shake 0.8s ease-in-out; }
+@keyframes st-shake {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-14deg) translateY(-6px); }
+  35% { transform: rotate(12deg); }
+  55% { transform: rotate(-10deg) translateY(-4px); }
+  75% { transform: rotate(8deg); }
+}
+.st-hand { position: absolute; left: 50%; top: 18px; margin-left: 28px; font-size: 40px; opacity: 0; z-index: 3; }
+.st-hand.is-fanning { opacity: 1; animation: fan 0.6s ease-in-out infinite alternate; }
+@keyframes fan { from { transform: rotate(-25deg) translateX(-6px); } to { transform: rotate(20deg) translateX(8px); } }
+.st-timer { position: absolute; right: 12px; top: 10px; font-weight: 800; font-size: 1.3rem; color: #1f2733; background: rgba(255, 255, 255, 0.85); border-radius: 10px; padding: 0 8px; }
+.st-timer:empty { display: none; }
+.st-caption { margin: 0; font-weight: 600; min-height: 1.6em; }
+
+/* ── 3D 위 안내(초시계·손 부채질) ── */
+.ov3d { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ov-timer { position: absolute; right: 12px; top: 10px; font-weight: 800; font-size: 1.5rem; color: #1f2733; background: rgba(255, 255, 255, 0.9); border-radius: 12px; padding: 2px 12px; }
+.ov-hand { position: absolute; left: 50%; top: 22%; font-size: 56px; margin-left: 30px; }
+.ov-hand.is-fanning { animation: fan 0.6s ease-in-out infinite alternate; }
+.ov-text {
+  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); max-width: 90%; text-align: center;
+  background: rgba(31, 39, 51, 0.82); color: #fff; font-weight: 700; font-size: 0.9rem; border-radius: 10px; padding: 4px 12px;
+}
+
+/* ── 분석 / 마치기 ── */
+.recheck { background: var(--ss-warn-bg); font-weight: 600; }
+.finish-card { text-align: center; }
+.mycrit-q + .mycrit-q { margin-top: 12px; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+#classify-root .ss-sorter { box-shadow: none; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .ss-obs-grid { grid-template-columns: 1fr 1fr; }
+  .b2-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .b2-pick { min-height: 72px; }
+  #classify-root { padding: 10px; }
+}

@@ -12,12 +12,12 @@
 | `stage-nav.js` | `SciSim.StageNav` | 단계 진행바(앞 단계는 언제든, 뒤 단계는 조건 통과 시) |
 | `lesson.js` | `SciSim.Lesson` | 앱 뼈대: 알림, 학습 시간, 단계 이동 연결·새로고침 복원, 마치기·결과 저장(실패 까닭별 문구), 처음부터 다시 |
 | `predict.js` | `SciSim.Predict` | 예상하기(직접 타이핑 + 한 단계씩 열리는 힌트, 최소 글자 수 안내) |
-| `experiment.js` | `SciSim.Experiment` | **실험하기 화면 틀 전체**: 3D/2D 화면 자리, 조건 고르기 버튼, 실험 단계 잠금·진행률, 실행 버튼(누르면 실험 화면이 보이게 스크롤한 뒤 실행), 관찰·기록 카드(보기 고르기 **또는 수치 입력**), 기록 한눈에 보기 표, 3D↔2D 전환(겹침 방지·렌더러 해제) |
+| `experiment.js` | `SciSim.Experiment` | **실험하기 화면 틀 전체**: 3D/2D 화면 자리, 조건 고르기 버튼, 실험 단계 잠금·진행률, 실행 버튼(누르면 실험 화면이 보이게 스크롤한 뒤 실행), 관찰·기록 카드(보기 고르기 **또는 수치 입력**), 기록 한눈에 보기 표, 3D↔2D 전환(겹침 방지·렌더러 해제), **안전상 관찰하지 않는 칸(`skipCells`)** |
 | `sim3d.js` | `SciSim.Sim3D` | three.js 3D 장면 도우미(카메라·조명·드래그 회전, 물체 팩토리, 트윈, `discard`, `dispose`로 WebGL 컨텍스트 반납) |
 | `record-store.js` | `SciSim.RecordStore` | 기록 저장(같은 칸 덮어쓰기 / `trial` 회차별 저장, 평균) |
 | `table-chart.js` | `SciSim.TableChart` | 색상 매트릭스 표, 수치 기록 표(평균 줄), **꺾은선그래프(수치 x축·여러 계열)**, **막대그래프(범주×계열)** — 축 제목에 단위, 범례, 계열마다 다른 점 모양 |
-| `sorter.js` | `SciSim.Sorter` | 분류하기 활동(탭하거나 끌어다 놓기) + 맞고 틀림 피드백 |
-| `quiz.js` | `SciSim.Quiz` | 보기 고르기 분석(정확 일치 또는 `grade` 함수, 보기별 피드백 `wrongBy`) |
+| `sorter.js` | `SciSim.Sorter` | 분류하기 활동(탭하거나 끌어다 놓기) + 맞고 틀림 피드백. **`renderRounds`: 같은 항목을 여러 기준으로 차례로 분류(라운드 탭)** |
+| `quiz.js` | `SciSim.Quiz` | 보기 고르기 분석(정확 일치 또는 `grade` 함수, 고른 오답 보기별 피드백 `wrongBy`, 빠뜨린 정답 보기별 피드백 `missBy`) |
 | `conclude.js` | `SciSim.Conclude` | 결론·발전 질문: 적고 제출해야 모범 답안이 나오고 나란히 비교 |
 | `curiosity.js` | `SciSim.Curiosity` | 더 탐구하고 싶은 점 |
 | `style-common.css` | — | 공통 스타일(태블릿 우선, 44px 이상 터치 영역, 다크모드, 실험 화면 틀·분류·그래프 스타일) |
@@ -82,6 +82,48 @@
 
 물체를 누르면 `ctx.onPick({ 조건id: 값, … })`을 부른다(일부 조건만 줘도 된다). 3D 컨텍스트를 잃으면 `ctx.onLost`가 2D로 바꾼다. 잠깐 쓰는 물체(방울·스포이트)는 `v.discard(obj)`로 빼야 GPU 메모리가 쌓이지 않는다.
 
+### 추가 기능(6-1-1-1에서 확장, 기존 차시 앱과 하위 호환)
+
+모두 **선택 옵션**이다. 넘기지 않으면 예전과 똑같이 동작한다(시범 앱 6-1-1-2는 코드 변경 없이 새 틀로 동작 확인).
+
+1. **관찰하지 않는 칸** — `SciSim.Experiment.create({ …, skipCells: [...] })`
+   ```js
+   skipCells: [{
+     cell: { sol: "묽은 염산", method: "냄새" },            // 조건 id → 값(일부 조건만 줘도 된다)
+     title: "⚠️ 묽은 염산은 냄새를 맡지 않아요",
+     text: "묽은 염산은 **자극성이 강해** 냄새를 맡지 않아요.",  // **굵게** 가능
+     why: "🤔 왜 그럴까요? …",                              // 선택: 한 번 더 생각해 볼 질문
+     runLabel: "🚫 안전을 위해 냄새를 맡지 않아요",           // 선택: 실행 버튼 글자(버튼은 비활성)
+     short: "관찰하지 않음(안전)",                           // 선택: 미니 표 aria-label·분석 표 문구
+   }]
+   ```
+   - `phases[].cells`에 그 조합이 있어도 **자동으로 빠진다**(진행률·단계 잠금·`allDone`은 나머지 칸만 센다. 예: 24칸 → 23칸).
+   - 그 조합을 고르면 실행 버튼 대신 빨간 안내 카드가 뜨고, 애니메이션·기록은 없다. 미니 표 칸은 🚫.
+   - `exp.skipInfo(sel)`로 그 칸인지 알 수 있다. 분석 표에서는 `renderMatrix`의 `cell`이 `{ text: "관찰하지 않음(안전)", icon: "🚫", muted: true }`를 돌려주면 흐리게 표시된다.
+   - 값이 없는 칸이므로 **config의 결과 표에도 값을 만들지 않는다**(지도서가 "-"로 둔 칸).
+
+2. **여러 기준으로 분류하기(다중 라운드)** — `SciSim.Sorter.renderRounds(el, cfg, store, onChange)`
+   ```js
+   var rounds = SciSim.Sorter.renderRounds($("classify-root"), {
+     id: "classify", title: "기준에 따라 용액 분류하기", intro: ["…"],
+     sequential: true,                         // 기본 true: 앞 라운드를 맞혀야 다음 라운드 탭이 열림(false면 자유)
+     rounds: [                                 // 각 라운드 = Sorter.render의 cfg와 같은 모양
+       { id: "transparent", tab: "투명한가?", title: "기준 1: 투명한가?", items, bins: [{ id: "yes", label: "그렇다" }, { id: "no", label: "그렇지 않다" }],
+         answer: { yes: [...], no: [...] }, correct: "…", wrong: "…", hintAfter: { tries: 2, text: "…" } },
+       { id: "foam", tab: "거품이 유지되는가?", … },
+     ],
+     allDone: ["모든 라운드를 맞혔을 때 보여 줄 문단(**굵게** 가능)"],   // 선택
+   }, store, lesson.refresh);
+   rounds.isDone() / rounds.roundDone("foam") / rounds.result() / rounds.show("foam")
+   ```
+   - 저장 키: 라운드마다 `classify.<라운드 id>`, 지금 보는 탭 `classify.tab`. 라운드를 맞히면 "다음 기준으로 분류하기 →" 버튼이 나온다. 탭은 방향키로도 옮길 수 있다.
+   - `result()` → `{ transparent: { groups, correct, tries }, foam: { … } }` (저장 detail에 그대로 넣는다).
+
+3. **그 밖의 작은 추가**
+   - `Quiz` 문항 `missBy: { 보기id: "그 정답 보기를 빠뜨렸을 때 피드백" }` (고른 오답의 `wrongBy`가 먼저).
+   - `TableChart.renderMatrix`의 칸 `icon`(글자 앞 아이콘 — 색 없이 모양으로도 구분), `muted`(흐린 칸).
+   - `Sim3D.create({ minDistance })`: 카메라가 다가갈 수 있는 가장 가까운 거리. 종이 앞 낮은 시점처럼 가까이에서 보는 연출이 화면 크기 변화 때 뒤로 밀려나지 않게 할 때 쓴다(기본은 예전처럼 화면 맞춤 거리의 45%).
+
 ## 3. config 예시
 
 ### (1) 색 관찰형 — 예: 6-1-1-2 지시약 (시범 앱 `public/apps/sci-6-1-1-2/`)
@@ -126,6 +168,24 @@ SciSim.Experiment.create({
   makeRecord: (sel, observed) => ({ solution: sel.sol, indicator: sel.ind, result: observed }),
   miniTable: { rows: 용액들, cols: 지시약들, sel: (r, c) => ({ sol: r.id, ind: c.id }) },
 });
+```
+
+### (1-2) 관찰 방법형 — 예: 6-1-1-1 여러 가지 용액 분류 (`public/apps/sci-6-1-1-1/`)
+
+조건 두 개(용액 × **관찰 방법**: 색깔/투명한 정도/흔들어 보기/냄새), 결과는 보기 고르기. 안전상 관찰하지 않는 칸(`skipCells`)이 있고,
+분석은 관찰 결과 표(색깔 칸만 색 칩, 나머지는 아이콘+글자) + 분류 기준 고르기(`Quiz`) + 두 기준으로 분류하기(`Sorter.renderRounds`).
+
+```js
+// data/lesson-config.js (요약)
+methods: [{ id: "색깔", name: "색깔 관찰", choices: ["노란색", "연한 노란색", "흰색", "무색"] }, { id: "투명도", … }, { id: "거품", … }, { id: "냄새", … }],
+results: { 식초: { 색깔: "노란색", 투명도: "투명하다", 거품: "유지되지 않는다", 냄새: "난다" }, …, "묽은 염산": { 색깔: "무색", 투명도: "투명하다", 거품: "유지되지 않는다" } },  // 냄새 값 없음
+skip: { cell: { sol: "묽은 염산", method: "냄새" }, title: "…", text: "…", why: "…", short: "관찰하지 않음(안전)" },
+classify: { id: "classify", rounds: [{ id: "transparent", … }, { id: "foam", … }], allDone: ["…"] },
+
+// app.js
+SciSim.Experiment.create({ …, factors: [{ id: "sol", … }, { id: "method", … }],
+  phases: [{ id: "M", name: "관찰", lead: "…", cells: /* 6 × 4 = 24 */ }], skipCells: [C.skip], … });   // 진행률 23칸
+var sorter = SciSim.Sorter.renderRounds($("classify-root"), C.classify, store, lesson.refresh);
 ```
 
 ### (2) 수치 측정형 — 예: 물체의 운동(이동 거리·걸린 시간·속력)

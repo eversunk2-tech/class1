@@ -8,6 +8,7 @@
  *       options: [{ id: "a", label: "…" }, …], answer: ["a", "c"],
  *       correct: "맞았을 때 피드백", wrong: "틀렸을 때 피드백(답을 직접 말하지 않고 다시 볼 곳을 알려 준다)",
  *       wrongBy: { "b": "보기 b를 골랐을 때만 보여 줄 피드백" },        // 선택
+ *       missBy: { "c": "정답 보기 c를 빠뜨렸을 때 보여 줄 피드백" },     // 선택(wrongBy가 먼저)
  *       grade: function (choiceIds) { return true | false; } },      // 선택: 정확 일치 대신 쓸 채점(예: '하나 이상 고르고 오답 보기는 없음')
  *   ], store, onChange);
  *   quiz.isDone()   → 모든 문항을 '확인'했는지
@@ -76,6 +77,12 @@
           if (!st.correct && q.wrongBy) {
             st.choice.some(function (id) {
               if (q.wrongBy[id]) special = q.wrongBy[id];
+              return !!special;
+            });
+          }
+          if (!st.correct && !special && q.missBy) {
+            (q.answer || []).some(function (id) {
+              if (st.choice.indexOf(id) < 0 && q.missBy[id]) special = q.missBy[id];
               return !!special;
             });
           }

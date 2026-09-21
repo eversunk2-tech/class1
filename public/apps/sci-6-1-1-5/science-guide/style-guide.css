@@ -1,0 +1,124 @@
+/*
+ * science-guide/style-guide.css — 조사 도우미 앱 전용 공통 스타일 (정본: scripts/templates/science-guide/)
+ * style-common.css(science-sim과 같은 파일) 다음에 불러온다. 참고 자료 카드·조사 팁·정리 틀·발표 준비·주제 고르기.
+ * 색은 보조 표시일 뿐이다(무리 이름·기호·글자가 주 정보).
+ */
+:root {
+  --sg-tone-a: #d0453b; /* 예: 산성 무리 테두리 */
+  --sg-tone-b: #2f6fd6; /* 예: 염기성 무리 테두리 */
+  --sg-tone-c: #1d8a52;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sg-tone-a: #ff8a80;
+    --sg-tone-b: #6ea0ff;
+    --sg-tone-c: #5fd394;
+  }
+}
+
+.sg-card-h { margin: 0 0 10px; font-size: 1.08rem; }
+.sg-source { font-size: 0.85rem; }
+.sg-lock-note { font-weight: 600; }
+
+/* ── 복습/개념 카드 ── */
+.sg-term { padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--ss-primary) 10%, var(--ss-surface)); border-left: 4px solid var(--ss-primary); margin: 0 0 14px; }
+.sg-term p { margin: 0; }
+.sg-term p + p { margin-top: 6px; }
+
+/* ── 참고 자료 카드(ref-cards.js) ── */
+.sg-ref > summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; gap: 6px; list-style: none; font-size: 1.05rem; }
+.sg-ref > summary::-webkit-details-marker { display: none; }
+.sg-ref > summary::after { content: "접기 ▴"; margin-left: auto; white-space: nowrap; flex: none; font-size: 0.85rem; font-weight: 600; color: var(--ss-muted); }
+.sg-ref:not([open]) > summary::after { content: "펼치기 ▾"; }
+.sg-ref.is-locked > summary { cursor: not-allowed; opacity: 0.7; }
+.sg-ref.is-locked > summary::after { content: "🔒"; }
+.sg-ref-lead { margin: 4px 0 10px; }
+.sg-ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.sg-ref-group { border: 2px solid var(--ss-border); border-left-width: 6px; border-radius: 12px; padding: 10px 12px; background: var(--ss-surface-2); }
+.sg-ref-group.sg-tone-a { border-left-color: var(--sg-tone-a); }
+.sg-ref-group.sg-tone-b { border-left-color: var(--sg-tone-b); }
+.sg-ref-group.sg-tone-c { border-left-color: var(--sg-tone-c); }
+.sg-ref-h { margin: 0 0 6px; font-size: 1rem; display: flex; align-items: center; gap: 6px; }
+.sg-ref-icon { font-size: 1.2rem; }
+.sg-ref-list { margin: 0; padding-left: 1.2em; }
+.sg-ref-list li { margin: 2px 0; }
+.sg-ref-group p { margin: 0; }
+
+/* ── 조사 팁(tips-panel.js) ── */
+.sg-tip-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.sg-tip { border: 1px solid var(--ss-border); border-radius: 12px; padding: 10px 12px; background: var(--ss-surface-2); }
+.sg-tip h4 { margin: 0 0 6px; font-size: 0.98rem; }
+.sg-tip p { margin: 0; }
+.sg-tip .ss-help { margin-top: 6px; }
+.sg-tip-warn { background: var(--ss-warn-bg); }
+.sg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sg-chip {
+  min-height: 44px; padding: 4px 14px; border-radius: 999px; border: 2px solid var(--ss-primary);
+  background: var(--ss-surface); color: var(--ss-text); font-weight: 700; cursor: pointer; touch-action: manipulation;
+}
+.sg-chip:active { background: color-mix(in srgb, var(--ss-primary) 15%, var(--ss-surface)); }
+.sg-link-list { margin: 0; padding-left: 0; list-style: none; }
+.sg-link-list li { margin: 4px 0; }
+.sg-link-list a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
+.sg-ext { font-weight: 500; font-size: 0.85rem; }
+.sg-link-note { color: var(--ss-muted); font-size: 0.92rem; }
+
+/* ── 정리 틀(worksheet.js) ── */
+.sg-ws-rows { display: grid; gap: 10px; }
+.sg-ws-row { margin: 0; border: 2px solid var(--ss-border); border-radius: 14px; padding: 10px 12px 12px; background: var(--ss-surface); min-width: 0; }
+.sg-ws-row.is-single { border: 0; padding: 0; }
+.sg-ws-row.is-single > .sg-ws-legend { display: none; }
+.sg-ws-legend { padding: 0 4px; }
+.sg-ws-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.6fr); gap: 10px 12px; align-items: start; }
+.sg-ws-row.is-single .sg-ws-grid,
+.sg-ws-grid:not(:has(.sg-ws-choice)) { grid-template-columns: 1fr; }
+@media (max-width: 900px), (orientation: portrait) { .sg-ws-grid { grid-template-columns: minmax(0, 1fr) auto; } .sg-ws-field.is-wide { grid-column: 1 / -1; } }
+@media (max-width: 560px) { .sg-ws-grid { grid-template-columns: 1fr; } }
+.sg-ws-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sg-ws-label { font-weight: 700; font-size: 0.92rem; }
+.sg-ws-input { width: 100%; min-height: 48px; padding: 8px 12px; border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); }
+.sg-ws-input:focus, .sg-ws-area:focus { border-color: var(--ss-primary); outline: none; }
+.sg-ws-area { min-height: 72px; }
+.sg-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.sg-seg-opt { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 14px; border: 2px solid var(--ss-border); border-radius: 12px; cursor: pointer; font-weight: 700; background: var(--ss-surface); }
+.sg-seg-input { width: 20px; height: 20px; margin: 0; accent-color: var(--ss-primary); }
+.sg-seg-opt:has(input:checked) { border-color: var(--ss-primary); background: color-mix(in srgb, var(--ss-primary) 12%, var(--ss-surface)); }
+.sg-seg-opt:has(input:focus-visible) { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+.sg-ws-tools { display: flex; justify-content: flex-end; margin-top: 6px; }
+.sg-ws-del { min-height: 44px; font-size: 0.9rem; padding: 0 12px; }
+.sg-ws-status { font-weight: 600; }
+.sg-ws-status.is-ok { color: var(--ss-good); }
+.sg-ws-compare .ss-row { margin-top: 0; }
+.sg-compare-body { margin-top: 12px; }
+.sg-cmp-table { min-width: 560px; }
+.sg-cmp-table td, .sg-cmp-table th { text-align: left; }
+.sg-mine { white-space: nowrap; color: var(--ss-muted); }
+.sg-mine.is-hit { color: var(--ss-good); font-weight: 700; }
+.sg-mine.is-diff { color: var(--ss-text); font-weight: 700; background: var(--ss-warn-bg); }
+.sg-cmp-warn { padding: 10px 12px; border-radius: 12px; background: var(--ss-warn-bg); color: var(--ss-text); }
+.sg-mine-sub { display: block; font-weight: 500; font-size: 0.82rem; color: var(--ss-muted); white-space: normal; }
+
+/* ── 발표 준비(share-prep.js) ── */
+.sg-summary-list { margin: 0; padding-left: 1.2em; }
+.sg-summary-list li { margin: 3px 0; }
+.sg-checklist legend { padding: 0; float: left; width: 100%; }
+.sg-checklist legend + * { clear: both; }
+.sg-check { margin-top: 8px; }
+.sg-talks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.sg-talk { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--ss-surface-2); border: 1px solid var(--ss-border); }
+.sg-talk-who { font-weight: 800; margin-bottom: 4px; }
+.sg-talk-text { margin: 0; font-size: 1.02rem; }
+.sg-etiquette { background: var(--ss-warn-bg); }
+.sg-etiquette p { margin: 0; }
+
+/* ── 주제 고르기(topic-picker.js) ── */
+.sg-topic legend { padding: 0; float: left; width: 100%; }
+.sg-topic legend + * { clear: both; }
+/* legend 뒤에 숨긴 잠김 안내가 먼저 오므로 목록에도 clear를 직접 건다(375px 가로 스크롤 방지) */
+.sg-topic .sg-lock-note, .sg-topic-grid { clear: both; }
+.sg-topic-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px; }
+.sg-topic-text { display: flex; flex-direction: column; }
+.sg-topic.is-locked .sg-topic-grid { opacity: 0.55; }
+
+/* ── 로그인 안내 링크(class1-record.js renderLoginHint): 태블릿에서 누르기 쉽게 터치 영역을 넓힌다 ── */
+#login-hint a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--ss-surface-2); font-weight: 700; }

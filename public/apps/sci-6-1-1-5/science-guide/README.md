@@ -1,0 +1,159 @@
+# science-guide — 과학 차시 조사 도우미 앱 공통 틀
+
+**실험이 없는 조사하기 차시**(`CLAUDE.md` 과학 차시 앱 규칙) 앱이 함께 쓰는 정본이다. 실험 시뮬레이션 앱의 `science-sim/`과 짝을 이룬다.
+각 앱은 이 폴더를 통째로 `science-guide/`에 **복사**해서 쓴다(앱은 자체 완결). 정본을 고치면 쓰고 있는 모든 앱 폴더에 다시 복사한다.
+
+첫 사례: `public/apps/sci-6-1-1-5/`(산성 용액과 염기성 용액을 이용하는 예를 찾아라!).
+3D·그래프가 없으므로 three.js를 불러오지 않는다(supabase-js만).
+
+단계 흐름(권장): **조사 시작하기(도입 질문+힌트) → 조사하기(참고 자료·조사 팁·정리 틀) → 발표(공유) 준비하기 → 정리 질문(보기 고르기+결론·발전 질문) → 궁금한 점**.
+단계 이름과 개수는 config의 `stages`로 바꿀 수 있다(진행바는 5칸 격자이므로 5단계를 권장).
+
+## 1. 파일
+
+### science-sim에서 가져온 것
+
+| 파일 | science-sim과 | 하는 일 |
+|---|---|---|
+| `persist.js` | **같음** | localStorage 임시 저장, `SciSim.el`·`rich`·`josa`·`debounce` |
+| `stage-nav.js` | 조금 다름 | 단계 진행바. **잠긴 단계에는 ✓(완료)를 보이지 않는다**(앞 단계를 비워 다시 잠겼을 때 표시 어긋남 방지) |
+| `predict.js` | **같음** | 도입 질문(직접 타이핑) + 한 단계씩 열리는 힌트. 조사 앱에서는 "조사 시작하기"에 쓴다 |
+| `conclude.js` | 조금 다름 | 적고 제출해야 모범 답안이 나오는 결론·발전 질문. **제출한 글(`sent`)만** 비교 칸과 `values()`에 쓴다. 제출 뒤 고치면 "다시 제출해야 반영돼요" 안내 |
+| `curiosity.js` | **같음** | 더 탐구하고 싶은 점 |
+| `style-common.css` | **같음** | 공통 스타일(색 변수·카드·버튼·다크모드·단계바·퀴즈·비교) |
+| `lesson.js` | 조금 다름 | `texts` 옵션 추가(마침 카드 제목·안내, 처음부터 다시 확인 문구, 너무 긴 글 문구). **기본 문구가 "조사"** |
+| `quiz.js` | 조금 다름 | 마지막 인자 `{ numLabel, key }` 추가(문항 앞 말 기본 "문제", 저장 키 기본 "analysis") |
+
+"같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity}.js scripts/templates/science-sim/style-common.css scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다).
+`stage-nav.js`·`conclude.js`는 2026-09 수정 1차에서 위 동작을 더해 달라졌으니 **덮어쓰지 말고** 차이를 옮긴다.
+"조금 다름" 파일은 덧붙인 옵션이 모두 선택(기본값 있음)이라 나중에 science-sim 쪽으로 합쳐도 실험 앱이 깨지지 않는다.
+
+### 조사 도우미 전용
+
+| 파일 | 전역 이름 | 하는 일 |
+|---|---|---|
+| `ref-cards.js` | `SciSim.RefCards` | 지도서 근거 **조사 참고 자료 카드**(접기/펼치기, 무리별 목록·글, 출처 표시, 펼침 상태 저장). `locked`로 "먼저 적은 뒤에 공개"도 된다 |
+| `tips-panel.js` | `SciSim.TipsPanel`, `SciSim.copyText` | **조사 팁**: 검색어 칩(누르면 **복사만**, 외부 검색으로 이동하지 않음), 지도서에 나온 누리집(새 창)·참고 도서, 출처 확인·인터넷 윤리·기기 안전 같은 팁 카드 |
+| `worksheet.js` | `SciSim.Worksheet` | **조사 결과 정리 틀**: 칸(fields)을 config로 정함(글·긴 글·보기 고르기), 줄 더하기/지우기 또는 `fixed` 한 벌, 최소 줄 수·무리별 최소 개수(`requireEach`) 검사, 다 채운 뒤에만 열리는 **"지도서 예시와 비교"** 표. 이름이 같고 `mineField`(예: 성질)도 같으면 "✔ 있어요", **`mineField`가 다르면 "⚠ 성질이 달라요"**(초록 ✔ 없음, 표 아래 경고). `ws.mismatches()`로 불일치 목록을 받아 요약·detail에 쓸 수 있다. `fixed` 틀은 완료 문구가 "✔ 정리 틀의 칸을 모두 채웠어요."(`doneText`로 바꿈) |
+| `share-prep.js` | `SciSim.SharePrep` | **발표(공유) 준비**: 내 조사 기록 요약, 발표 대본(선택: 템플릿으로 초안 만들기·복사하기), 확인할 점 체크리스트, 다른 모둠 예시 발표 → 새롭게 알게 된 점 적고 제출 → 예시 답 비교, 발표 태도 안내. 알게 된 점은 **제출한 글만** 비교·`values()`에 쓴다 |
+| `topic-picker.js` | `SciSim.TopicPicker` | 조사 **주제 하나 고르기**(바꿀 때 확인, `onChange(새, 이전)`로 앱이 딸린 입력을 지울지 정함) |
+| `style-guide.css` | — | 위 모듈 스타일. `style-common.css` **다음에** 불러온다. 로그인 안내 링크(`#login-hint a`) 터치 영역 44px도 여기서 준다 |
+
+### 고친 기록
+
+- **2026-09 수정 1차**(sci-6-1-1-5·6 review): ① `topic-picker` 375px 가로 스크롤 — 숨긴 잠김 안내가 legend 바로 뒤에 있어 `legend + * { clear: both }`가 목록에 닿지 않던 것을 `.sg-topic .sg-lock-note, .sg-topic-grid { clear: both }`로 고침(격자 최소 폭도 `min(200px, 100%)`). ② `worksheet` `fixed` 틀 완료 문구가 "줄을 더해 적어도 좋아요"로 나오던 것 → `doneText`. ③ 비교 표가 성질을 잘못 고른 기록에도 "✔ 있어요"를 붙이던 것 → "⚠ ○○이 달라요". ④ 제출 뒤 고친 글이 다시 제출하지 않아도 결과에 들어가던 것(`share-prep`·`conclude`). ⑤ 잠긴 단계의 ✓ 표시. 앱에서 따로 막던 임시 보완은 지울 것.
+
+각 파일 맨 위 주석에 자세한 사용법(옵션 전체, 돌려주는 함수, 저장 키)이 있다.
+학생 입력은 모두 `textContent`로만 넣는다(`innerHTML` 없음). `**굵게**`는 config 문구에서만 `SciSim.rich`로 처리한다.
+
+## 2. 새 조사 차시 앱 만드는 절차
+
+1. **지도서 분석** → 앱 `spec.md`에 조사 차시라는 판단과 근거 쪽수, 화면에 쓸 사실(참고 자료·예시·모범 답안) 표를 적는다. 화면의 사실은 **지도서 값만**.
+2. 폴더 만들기: `public/apps/sci-{학기}-{단원}-{탐구}/`
+   - `scripts/templates/science-guide/` → `science-guide/`로 **통째로 복사**
+   - `scripts/templates/class1-record.js` → 폴더 바로 아래로 복사
+   - `config.js`(SUPABASE_URL, anon key — 블로그와 같은 값. 시범 앱 것을 복사)
+3. `index.html`: `public/apps/sci-6-1-1-5/index.html`을 복사해 제목·설명·"← 차시로" 주소(`../../science/?term=…&unit=…&lesson=<science-curriculum.ts의 lesson id>`)와 단계 `section`만 바꾼다.
+   스크립트 순서: supabase-js(SRI) → `config.js` → `class1-record.js` → `science-guide/persist.js, stage-nav.js, lesson.js, predict.js, ref-cards.js, tips-panel.js, worksheet.js, share-prep.js, (topic-picker.js), quiz.js, conclude.js, curiosity.js` → `data/lesson-config.js` → `app.js`.
+   스타일: `science-guide/style-common.css` → `science-guide/style-guide.css` → `style.css`.
+4. `data/lesson-config.js`: 아래 3절 예시 중 알맞은 형을 골라 채운다.
+5. `app.js`: 아래처럼 연결한다(`sci-6-1-1-5/app.js`가 실제 예, 약 250줄).
+   ```js
+   var store = SciSim.createStore(C.storageKey);
+   var lesson = SciSim.Lesson.create({ appId: C.appId, store, toastEl: $("toast") });   // texts 기본값이 조사 문구
+   var predict = SciSim.Predict.render($("predict-root"), { questions: [...], hints: C.intro.hints, minLength: 5 }, store, lesson.refresh);
+   SciSim.RefCards.render($("ref-root"), C.research.referenceCards, store, { key: "refOpen" });
+   SciSim.TipsPanel.render($("tips-root"), { keywords, sources, book, items: [...] }, { toast: lesson.toast });
+   var ws = SciSim.Worksheet.render($("worksheet-root"), { fields, minRows, requireEach, compare: { columns, rows: C.research.modelExamples, matchField: "name" } }, store, lesson.refresh);
+   var share = SciSim.SharePrep.render($("share-root"), { script, samples, reflect, etiquette }, store, lesson.refresh, { summary: () => ws.rows().map(…), toast: lesson.toast });
+   var quiz = SciSim.Quiz.render($("quiz-root"), quizItems, store, onQuiz, { numLabel: "문제", key: "quiz" });
+   var conclude = SciSim.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh, { minLength: 10 });
+   var curiosity = SciSim.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+   lesson.finish({ button, msgEl, loginHintEl, doneEl, canFinish, detail, summary });   // nav보다 먼저
+   lesson.restart($("btn-restart"));
+   lesson.nav({ el: $("stage-nav"), stages: C.stages, prevBtn, nextBtn,
+                gates: { research: () => predict.isDone() || "…", share: () => ws.status() === true || ws.status(), … },
+                done: { … }, onEnter: { share: share.refresh } });
+   ```
+   `ws.status()`·`share.status()`는 `true` 또는 "못 넘어가는 까닭" 문자열을 돌려주므로 단계 조건(gates)에 그대로 쓸 수 있다.
+6. 저장 detail(`class1-record.js`, 16,000자 이하): 도입 답·열어 본 힌트 수, 정리 틀(`ws.rows()`), 비교 표를 열어 봤는지, 발표 대본·알게 된 점, 퀴즈 선택(보기 글자)·정답 여부·시도 횟수, 결론·발전 질문, 궁금한 점. 정리 틀은 `maxRows`와 칸별 `maxlength`로 크기를 제한한다.
+7. 확인: 태블릿 가로(1024×768)·세로(768×1024), 휴대폰 375px(가로 스크롤 없음), 다크모드, 새로고침 복원, 앞 단계로 돌아가 정리 틀 고치기(고쳐서 조건이 깨지면 뒤 단계가 다시 잠김), 처음부터 다시, 비로그인 흐름·저장 호출(가짜 응답), 콘솔 오류 0.
+
+## 3. config 예시
+
+### (1) 여러 예를 모아 적는 형 — 예: 6-1-1-5 산·염기 이용 예 (`public/apps/sci-6-1-1-5/`)
+
+정리 틀: 한 줄에 하나(용액 이름 / 성질 고르기 / 이용하는 예), 3줄 이상 + 산성·염기성 각 1개 이상. 다 적은 뒤 지도서 예시 8개와 비교.
+
+```js
+window.LessonConfig = {
+  appId: "sci-6-1-1-5", kind: "guide", storageKey: "sci6115guide:v1",
+  stages: [{ id: "intro", label: "조사 시작하기" }, { id: "research", label: "조사하기" }, { id: "share", label: "발표 준비하기" },
+           { id: "wrapup", label: "정리 질문" }, { id: "curiosity", label: "궁금한 점" }],
+  intro: { question: "생선 요리에 레몬이 같이 나오는 까닭은 무엇일까요? …", hints: ["답이 아닌 생각거리", "…"], minLength: 5 },
+  research: {
+    referenceCards: { title: "📚 조사 참고 자료", source: "지도서 149쪽",
+      groups: [{ id: "acid", label: "산성 용액", icon: "🍋", tone: "a", items: ["식초", …] },
+               { id: "base", label: "염기성 용액", icon: "🧼", tone: "b", items: ["손 세정제", …] }] },
+    tips: { keywords: ["산성 용액의 이용", …], sources: [{ label: "에듀넷", url: "https://www.edunet.net", note: "…" }], book: "…", … },
+    worksheet: { minRows: 3, maxRows: 10,
+      fields: [{ id: "name", label: "용액 이름", type: "text", maxlength: 40 },
+               { id: "property", label: "성질", type: "choice", options: ["산성", "염기성"] },
+               { id: "use", label: "이용하는 예", type: "textarea", maxlength: 200 }],
+      requireEach: [{ field: "property", value: "산성", message: "…" }, { field: "property", value: "염기성", message: "…" }] },
+    modelExamples: [{ name: "레몬즙", property: "산성", use: "…" }, …],   // 지도서 표 값만
+  },
+  share: { scriptPrompt: "…", minLength: 10, sampleTalks: [{ group: "1모둠", text: "…" }], reflectQuestion: "…", reflectModel: "…", etiquette: "…" },
+  quiz: [{ id: "q1", text: "…", options: ["…", "…"], answer: "…", correct: "…", wrong: "…" }],   // app.js에서 quiz.js 형식({id,label}, answer 배열)으로 바꾼다
+  conclude: [{ id: "conclusion", kind: "결론", prompt: "…", model: "…" }, { id: "ext1", kind: "발전 질문 1", … }],
+  curiosity: { prompt: "…", minLength: 5 },
+};
+```
+
+### (2) 주제 하나를 골라 깊게 조사하는 형 — 예: 6-1-1-6 산성화 피해(원인/피해/대책/출처)
+
+주제 고르기 → 주제별 참고 자료(적은 뒤 공개) → 칸이 정해진 정리 틀 한 벌 → 템플릿으로 발표 초안 → 체크리스트.
+
+```js
+// app.js 연결 예(모양만. 값은 그 차시 spec의 지도서 값을 쓴다)
+var topic = SciSim.TopicPicker.render($("topic-root"),
+  { title: "조사할 주제를 하나 골라요", choices: C.intro.topicChoices,
+    confirmChange: "주제를 바꾸면 조사하기에 적은 내용이 지워져요. 바꿀까요?",
+    locked: () => predict.isDone() || "먼저 도입 질문에 내 생각을 적어요." },
+  store, (id, prev) => { if (prev) { store.remove("research"); location.reload(); } });   // 주제에 딸린 입력 초기화 예
+
+var ws = SciSim.Worksheet.render($("worksheet-root"), {
+  title: "📝 조사 결과 정리하기", fixed: true, startRows: 1, incompleteText: "원인·피해·대책·출처를 모두 적어 주세요.",
+  fields: [{ id: "cause", label: "원인", type: "textarea" }, { id: "damage", label: "피해(현황)", type: "textarea" },
+           { id: "solution", label: "대책", type: "textarea" }, { id: "source", label: "어디서 찾았나요?(출처)", type: "text", maxlength: 100 }],
+}, store, onWs, { key: "research" });
+
+// 주제별 참고 자료: 정리 틀을 다 적은 뒤에 열린다(답 먼저 보기 방지). 주제가 바뀌면 다시 render 한다.
+var ref = SciSim.RefCards.render($("ref-root"), {
+  title: "📚 지도서 속 사실과 비교해 보기", source: "지도서 157쪽",
+  groups: [{ id: "cause", label: "원인", text: T.facts.cause }, { id: "damage", label: "피해", text: T.facts.damage }, { id: "solution", label: "대책", text: T.facts.solution }],
+  locked: () => ws.isDone() || "정리 틀을 먼저 채우면 열려요.",
+}, store, { key: "refOpen" });
+function onWs() { ref.refresh(); lesson.refresh(); }
+
+SciSim.TipsPanel.render($("tips-root"), { keywords: T.searchTerms, sources: C.tips.sources, items: [{ icon: "✅", title: "출처 확인", text: C.tips.checkSource }] }, { toast: lesson.toast });
+
+var share = SciSim.SharePrep.render($("share-root"), {
+  script: { template: "{topic|은|는} {cause} 때문에 생기고, {damage} 같은 피해를 줍니다. 이를 줄이려면 {solution}", minLength: 10, copy: true,
+            platformNote: "선생님이 안내한 모둠 공유 플랫폼에 옮겨 붙여 넣어요." },
+  checklist: { title: "✅ 발표할 때 확인할 점", items: ["…", "…", "…"] },
+}, store, lesson.refresh, { fill: () => Object.assign({ topic: topic.label() }, ws.allRows()[0] || {}), toast: lesson.toast });
+```
+
+보기 고르기와 서술형이 섞인 정리 질문은 `quiz.js`(보기)와 `conclude.js`(서술형)를 **같은 단계에 나란히** 두고, 퀴즈를 다 확인하면 서술형이 열리게 한다(`sci-6-1-1-5`의 `drawConcludeGate`). 빈칸 채우기도 `conclude.js` 한 문항(짧은 모범 답안)으로 처리할 수 있다.
+
+## 4. 지켜야 할 것
+
+- 화면의 사실(참고 자료·예시·모범 답안)은 **지도서 값만** 쓴다. 누리집·도서도 지도서에 나온 것만. 출처(쪽수)를 카드 아래에 적는다.
+- 학생이 조사해 적은 내용은 **채점하지 않는다**(자유 기록). 지도서 예시 비교는 "내 기록에도 있는지"와 "내가 고른 값"을 보여 주고, 고른 값이 지도서와 **다르면 긍정 표시 대신 다시 보라고 알린다**(오개념을 그대로 두지 않음).
+- 도입 질문에서는 답을 알려 주지 않는다. **힌트도 생각할 방향만** 준다(힌트 안에 성질 이름·정답 문장을 넣지 않는다). 발전 질문은 분석 질문·피드백에서 이미 답이 나온 내용을 되풀이하지 않는다. 지도서 예시(모범 답안이 되는 표)는 정리 틀을 채운 **뒤에만** 연다.
+- 검색어는 복사만 하고 외부 검색 결과로 자동 이동하지 않는다. 외부 링크는 새 창 + `rel="noopener noreferrer"` + "선생님과 함께" 안내.
+- 이 앱은 글을 올리거나 보내지 않는다(모둠 공유는 교실의 공유 플랫폼에서). 저장은 로그인했을 때 `class1-record.js`로만.
+- 색만으로 구분하지 않는다: 무리 카드는 이름·기호 + 테두리 색, 성질 고르기는 글자 버튼.
+- 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만.
+- 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.

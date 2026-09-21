@@ -8,6 +8,7 @@
  *     caption: "…", rowHeader: "용액",
  *     rows: [{ id, label }], cols: [{ id, label }],
  *     cell: function (row, col) { return { text: "붉은색으로 변함", color: "#d8434f"|null, flag: "…"|null, onFlag: fn } | null; },
+ *       // 선택: icon: "👃"(글자 앞 아이콘, 색 대신 모양으로도 구분), muted: true(관찰하지 않은 칸 등 흐리게)
  *     emptyText: "아직 기록 없음",
  *   });
  *
@@ -140,6 +141,8 @@
           td.appendChild(el("span", { class: "ss-cell-text", text: o.emptyText || "—" }));
         } else {
           var parts = [];
+          if (v.muted) td.className = "is-muted";
+          if (v.icon) parts.push(el("span", { class: "ss-cell-icon", "aria-hidden": "true", text: v.icon }));
           if (v.color) {
             var chip = el("span", { class: "ss-chip", "aria-hidden": "true" });
             chip.style.background = v.color;

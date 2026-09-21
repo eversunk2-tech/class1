@@ -1,0 +1,124 @@
+/* sci-6-1-1-3 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+
+/* ── 아이콘: 용액 병(두 용액 모두 색깔 없고 투명) / 재료 조각 ── */
+.bottle-icon {
+  flex: none; width: 14px; height: 24px; border-radius: 4px 4px 5px 5px; border: 2px solid #8aa0b6; position: relative;
+  background: linear-gradient(to top, rgba(170, 200, 225, 0.35) 60%, transparent 60%);
+}
+.bottle-icon::before { content: ""; position: absolute; left: 3px; top: -8px; width: 4px; height: 6px; background: #c9d3de; border-radius: 2px 2px 0 0; }
+
+.pc { flex: none; display: inline-block; width: 30px; height: 22px; border: 2px solid; }
+.pc-eggshell { background: #f1e6cf; border-color: #c9b894; border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%; }
+.pc-shell {
+  width: 30px; height: 26px; border-color: #b3aa99; border-radius: 50% 50% 12% 12% / 88% 88% 12% 12%;
+  background: repeating-linear-gradient(90deg, #ddd7cb 0 4px, #c7bfb0 4px 6px);
+}
+.pc-eggwhite { background: rgba(250, 250, 244, 0.95); border-color: #cfcfc4; border-radius: 46% 54% 50% 50% / 55% 50% 50% 45%; }
+.pc-chicken { width: 34px; height: 20px; background: #ecd0c0; border-color: #c9a08b; border-radius: 38% 44% 40% 36%; }
+
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+.melt-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--ss-warn-bg); font-weight: 600; line-height: 1.5; }
+
+/* ── 시간 빨리 감기 표시(실험 화면 위) ── */
+.ff-overlay {
+  position: absolute; top: 44px; right: 10px; z-index: 5; display: flex; flex-direction: column; gap: 6px;
+  width: min(260px, calc(100% - 20px)); padding: 10px 12px; border-radius: 14px;
+  background: rgba(31, 39, 51, 0.86); color: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
+}
+.ff-title { font-size: 0.95rem; }
+.ff-text { font-size: 0.88rem; }
+.ff-bar { display: block; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.ff-bar-fill { display: block; width: 0; height: 100%; background: #f2c46b; transition-property: width; transition-timing-function: linear; }
+
+/* ── 2D 대체 화면: 재료 접시 + 6홈판 2개(위에서 본 모형) ── */
+.p3-wrap { color: #1f2733; }
+.p3-dishes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.p3-dish {
+  min-height: 72px; border: 2px solid #c9d3de; border-radius: 12px; background: #f4f7fb; color: #1f2733; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 4px; font-weight: 700; font-size: 0.8rem; line-height: 1.2;
+}
+.p3-dish-plate { width: 48px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid #d7dee8; display: grid; place-items: center; }
+.p3-dish.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.p3-plates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.p3-plate { padding: 8px; border-radius: 14px; background: #fbfaf4; border: 2px solid #d8d2bf; }
+.p3-plate-head {
+  width: 100%; min-height: 48px; border: 2px solid transparent; border-radius: 10px; background: #e4ebf2; color: #1f2733; cursor: pointer;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 4px 6px; font-weight: 700; font-size: 0.86rem; line-height: 1.2;
+}
+.p3-plate-head.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.tw-tag { font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; }
+.tw-hcl { background: #b8571f; }
+.tw-naoh { background: #2b7a51; }
+.p3-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.p3-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.p3-cell-name { font-size: 0.74rem; font-weight: 600; color: #3d4757; text-align: center; line-height: 1.2; }
+.p3-well {
+  position: relative; width: 100%; max-width: 86px; aspect-ratio: 1; min-height: 56px; border-radius: 50%;
+  border: 3px solid #c3ceda; background: #e6ecf2; cursor: pointer; padding: 0; overflow: hidden;
+}
+.p3-well.is-target { box-shadow: 0 0 0 4px #f2a93b; }
+.p3-liquid { position: absolute; inset: 5px; border-radius: 50%; background: rgba(190, 215, 235, 0.5); box-shadow: inset 0 0 0 1px rgba(120, 150, 180, 0.35); }
+.p3-well.rippling .p3-liquid { animation: p3-ripple 0.9s ease-out; }
+.p3-liquid { transition: background-color 3.2s; }
+.p3-well.r-melt .p3-liquid { background: rgba(236, 240, 243, 0.9); }
+.p3-piece {
+  position: absolute; left: 50%; top: 50%; opacity: 0; transform: translate(-50%, -50%) scale(1);
+  transition: transform 2.8s ease-in-out, opacity 0.4s, filter 3s, border-radius 3s;
+}
+.p3-well.is-in .p3-piece { opacity: 1; }
+.p3-well.dropping .p3-piece { animation: p3-drop 0.6s ease-in; }
+.p3-well.r-fizz .p3-piece { transform: translate(-50%, -50%) scale(0.55); }
+.p3-well.r-melt .p3-piece { transform: translate(-50%, -50%) scale(1.08, 1.04); opacity: 0.6; filter: blur(0.6px); border-radius: 50% 40% 55% 45% / 45% 55% 40% 50%; transition-duration: 3.2s; }
+.p3-well.no-anim .p3-piece, .p3-well.no-anim .p3-liquid { transition: none !important; animation: none !important; }
+.p3-bubbles { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.p3-bubbles i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #fff; border: 1px solid #9fb3c6; }
+.p3-bubbles i:nth-child(1) { left: 38%; top: 40%; }
+.p3-bubbles i:nth-child(2) { left: 55%; top: 36%; }
+.p3-bubbles i:nth-child(3) { left: 46%; top: 58%; }
+.p3-bubbles i:nth-child(4) { left: 60%; top: 55%; }
+.p3-bubbles i:nth-child(5) { left: 34%; top: 54%; }
+.p3-well.r-fizz .p3-bubbles, .p3-well.r-bub .p3-bubbles { opacity: 1; }
+.p3-well.r-fizz .p3-piece { transition-duration: 2.4s; }
+.p3-well.fizzing .p3-bubbles i { animation: p3-bubble 0.7s ease-in infinite; }
+.p3-well.fizzing .p3-bubbles i:nth-child(2) { animation-delay: 0.15s; }
+.p3-well.fizzing .p3-bubbles i:nth-child(3) { animation-delay: 0.3s; }
+.p3-well.fizzing .p3-bubbles i:nth-child(4) { animation-delay: 0.45s; }
+.p3-well.fizzing .p3-bubbles i:nth-child(5) { animation-delay: 0.6s; }
+@keyframes p3-drop { from { transform: translate(-50%, -160%) scale(1); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+@keyframes p3-bubble { from { transform: translateY(6px) scale(0.6); opacity: 1; } to { transform: translateY(-22px) scale(1.1); opacity: 0; } }
+@keyframes p3-ripple { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 70% { transform: scale(0.97); } 100% { transform: scale(1); } }
+.p2-caption { margin: 8px 2px 0; font-size: 0.8rem; color: #5b6676; }
+@media (prefers-color-scheme: dark) {
+  .ss-view2d .p2-caption { color: #a6b1c2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .p3-piece { transition-duration: 0.01s !important; }
+  .p3-well.fizzing .p3-bubbles i, .p3-well.dropping .p3-piece, .p3-well.rippling .p3-liquid { animation: none; }
+}
+
+/* ── 분석 ── */
+#result-table .ss-matrix { min-width: 0; }
+#result-table .ss-matrix td { min-width: 120px; }
+.badge-note { margin: -6px 0 14px; }
+.recheck { background: var(--ss-warn-bg); font-weight: 600; }
+.comp-card .comp-h { margin: 0 0 4px; font-size: 1.02rem; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .ss-obs-grid { grid-template-columns: 1fr; }
+  .p3-dish { font-size: 0.72rem; min-height: 64px; }
+  .p3-dish-plate { width: 40px; height: 30px; }
+  .p3-plate { padding: 6px; }
+  .p3-plate-head { font-size: 0.78rem; }
+}

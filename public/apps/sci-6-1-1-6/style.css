@@ -1,0 +1,24 @@
+/* sci-6-1-1-6 전용 스타일(공통: science-guide/style-common.css, science-guide/style-guide.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+
+/* ── 조사 준비: 산성화 개념 카드 ── */
+.concept-card { border-left: 4px solid var(--ss-primary); background: color-mix(in srgb, var(--ss-primary) 8%, var(--ss-surface)); }
+.concept-card p { margin: 0 0 6px; font-size: 1.05rem; }
+.concept-card p.ss-help { margin: 8px 0 0; font-size: 0.9rem; }
+
+/* ── 정리하기: 빈칸 채우기는 짧은 답이라 입력칸을 낮게 ── */
+#fill-root .ss-textarea { min-height: 3.2em; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+}
+.sg-topic-card p { margin: 0; }

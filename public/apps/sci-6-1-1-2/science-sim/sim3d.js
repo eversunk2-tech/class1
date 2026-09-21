@@ -17,6 +17,8 @@
  *     container: document.getElementById("view3d"),
  *     frame: { width: 22, depth: 16, center: [0, 0, 0] },   // 화면에 꼭 들어와야 하는 범위(가로·세로 비율에 맞춰 카메라 거리 자동 조정)
  *     forceFallback: false,                                 // true면 3D를 쓰지 않는다(2D 대체 화면 테스트용)
+ *     minDistance: 2.5,                                     // 선택: 카메라가 다가갈 수 있는 가장 가까운 거리(기본: 화면 맞춤 거리의 45%).
+ *                                                           //  가까이에서 보는 연출(종이 앞 낮은 시점 등)이 화면 크기 변화 때 뒤로 밀려나지 않게 할 때
  *     onPick: function (pick) {},                           // userData.pick이 있는 물체를 탭하면 호출
  *     onLost: function () {},                               // WebGL 컨텍스트를 잃었을 때(→ 2D로 전환)
  *   }).then(function (v) { if (!v) show2DFallback(); else buildScene(v); });
@@ -126,7 +128,7 @@
       var dW = frame.width / 2 / Math.tan(hfov / 2);
       var dD = (frame.depth * 0.8) / 2 / Math.tan(vfov / 2);
       fitDistance = Math.max(dW, dD) * 1.04 + 0.5;
-      controls.minDistance = fitDistance * 0.45;
+      controls.minDistance = opts.minDistance != null ? Math.min(opts.minDistance, fitDistance * 0.45) : fitDistance * 0.45;
       controls.maxDistance = fitDistance * 1.8;
     }
     function resetView() {

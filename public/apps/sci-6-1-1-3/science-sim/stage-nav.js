@@ -1,0 +1,114 @@
+/*
+ * science-sim/stage-nav.js — 단계 진행바 + 단계 전환 (정본: scripts/templates/science-sim/)
+ *
+ *   var nav = SciSim.StageNav({
+ *     el: document.getElementById("stage-nav"),
+ *     stages: [{ id: "predict", label: "예상하기" }, ...],   // LessonConfig.stages
+ *     current: "predict",
+ *     // 그 단계로 들어갈 수 있는지. true면 이동, 문자열이면 그 문구를 안내하고 막는다.
+ *     canEnter: function (id) { return true; },
+ *     isDone: function (id) { return false; },               // 체크 표시용(선택)
+ *     onChange: function (id) { ... },                       // 단계가 바뀐 뒤 호출
+ *     onBlocked: function (message) { alert(message); },     // 막혔을 때(선택)
+ *   });
+ *   nav.go("experiment");  // 앞 단계는 언제든, 뒤 단계는 canEnter 통과 시
+ *   nav.next(); nav.prev(); nav.refresh(); nav.current();
+ *
+ * 각 단계의 화면은 <section data-stage="{id}">로 두고, 현재 단계만 보이게 한다(hidden 속성).
+ */
+(function () {
+  "use strict";
+  var SciSim = (window.SciSim = window.SciSim || {});
+
+  SciSim.StageNav = function (opts) {
+    var stages = opts.stages;
+    var cur = stages.some(function (s) {
+      return s.id === opts.current;
+    })
+      ? opts.current
+      : stages[0].id;
+    var list = SciSim.el("ol", { class: "ss-stepper" });
+    opts.el.textContent = "";
+    opts.el.appendChild(list);
+
+    function indexOf(id) {
+      for (var i = 0; i < stages.length; i++) if (stages[i].id === id) return i;
+      return -1;
+    }
+
+    // 앞 단계들을 모두 통과해야 들어갈 수 있다(건너뛰기 방지)
+    function check(id) {
+      var target = indexOf(id);
+      for (var i = 1; i <= target; i++) {
+        var r = opts.canEnter ? opts.canEnter(stages[i].id) : true;
+        if (r !== true) return { ok: false, message: typeof r === "string" ? r : "앞 단계를 먼저 마쳐 주세요." };
+      }
+      return { ok: true };
+    }
+
+    function render() {
+      list.textContent = "";
+      var ci = indexOf(cur);
+      stages.forEach(function (s, i) {
+        var reachable = i <= ci || check(s.id).ok;
+        var done = opts.isDone ? !!opts.isDone(s.id) : false;
+        var btn = SciSim.el(
+          "button",
+          {
+            type: "button",
+            class: "ss-step" + (s.id === cur ? " is-current" : "") + (done ? " is-done" : "") + (reachable ? "" : " is-locked"),
+            "aria-current": s.id === cur ? "step" : null,
+            "aria-label": i + 1 + "단계 " + s.label + (done ? " (완료)" : "") + (reachable ? "" : " (잠김)"),
+            onclick: function () {
+              api.go(s.id);
+            },
+          },
+          [SciSim.el("span", { class: "ss-step-num", text: done ? "✓" : String(i + 1) }), SciSim.el("span", { class: "ss-step-label", text: s.label })]
+        );
+        list.appendChild(SciSim.el("li", null, [btn]));
+      });
+      document.querySelectorAll("[data-stage]").forEach(function (sec) {
+        sec.hidden = sec.getAttribute("data-stage") !== cur;
+      });
+    }
+
+    var api = {
+      current: function () {
+        return cur;
+      },
+      go: function (id) {
+        if (indexOf(id) < 0) return false;
+        if (indexOf(id) > indexOf(cur)) {
+          var c = check(id);
+          if (!c.ok) {
+            if (opts.onBlocked) opts.onBlocked(c.message);
+            return false;
+          }
+        }
+        var changed = id !== cur;
+        cur = id;
+        render();
+        if (changed) {
+          try {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } catch (e) {
+            window.scrollTo(0, 0);
+          }
+        }
+        if (opts.onChange) opts.onChange(cur);
+        return true;
+      },
+      next: function () {
+        var i = indexOf(cur);
+        return i < stages.length - 1 ? api.go(stages[i + 1].id) : false;
+      },
+      prev: function () {
+        var i = indexOf(cur);
+        return i > 0 ? api.go(stages[i - 1].id) : false;
+      },
+      refresh: render,
+    };
+    render();
+    return api;
+  };
+})();

@@ -17,6 +17,22 @@
  *   }, store, onChange);
  *   sorter.isDone()   → 확인해서 맞았는지
  *   sorter.result()   → { groups: { acid: [...], base: [...] }, correct, tries }
+ *
+ * ▶ 여러 라운드(같은 항목을 서로 다른 기준으로 여러 번 분류) — SciSim.Sorter.renderRounds
+ *   var rounds = SciSim.Sorter.renderRounds(el, {
+ *     id: "classify",                                  // 저장 키 접두사(라운드마다 "classify.<라운드 id>", 지금 보는 탭은 "classify.tab")
+ *     title: "기준에 따라 분류하기", intro: ["…"],        // 선택: 라운드 탭 위 공통 제목·안내
+ *     sequential: true,                                // 기본 true: 앞 라운드를 맞혀야 다음 라운드가 열린다(false면 자유롭게 고름)
+ *     rounds: [                                        // 각 라운드는 위 render의 cfg와 같은 모양(id는 라운드 id)
+ *       { id: "transparent", tab: "투명한가?", title: "…", items: [...], bins: [...], answer: {...}, correct: "…", wrong: "…" },
+ *       { id: "foam", tab: "거품이 유지되는가?", … },
+ *     ],
+ *     allDone: "모든 라운드를 맞혔을 때 보여 줄 말(**굵게** 가능)",   // 선택
+ *   }, store, onChange);
+ *   rounds.isDone()          → 모든 라운드를 맞혔는지
+ *   rounds.roundDone(id)     → 그 라운드를 맞혔는지
+ *   rounds.result()          → { transparent: { groups, correct, tries }, foam: { … } }
+ *   rounds.show(id)          → 그 라운드 탭 열기(잠겨 있으면 false)
  */
 (function () {
   "use strict";
@@ -28,7 +44,175 @@
     return a.slice().sort().join("|") === b.slice().sort().join("|");
   }
 
+  // 여러 라운드: 라운드마다 render를 쓰고, 탭으로 오간다(앞 라운드를 맞히면 다음 라운드가 열림)
+  function renderRounds(root, cfg, store, onChange) {
+    var base = cfg.id || "sorter";
+    var rounds = cfg.rounds || [];
+    var sequential = cfg.sequential !== false;
+    var sorters = {};
+    var panels = {};
+    var tabs = {};
+    root.textContent = "";
+    var wrap = el("div", { class: "ss-rounds" });
+    if (cfg.title) wrap.appendChild(el("h3", { class: "ss-rounds-title", text: cfg.title }));
+    (cfg.intro || []).forEach(function (p) {
+      wrap.appendChild(SciSim.rich(p, "p"));
+    });
+    var tabList = el("div", { class: "ss-round-tabs", role: "tablist", "aria-label": cfg.tabsLabel || "분류 기준" });
+    wrap.appendChild(tabList);
+    var lockMsg = el("p", { class: "ss-help", "aria-live": "polite" });
+    var allMsg = el("div", { class: "ss-card ss-rounds-done", hidden: true });
+    root.appendChild(wrap);
+
+    function unlocked(i) {
+      if (!sequential) return true;
+      for (var j = 0; j < i; j++) if (!sorters[rounds[j].id].isDone()) return false;
+      return true;
+    }
+    var current = store.get(base + ".tab", rounds.length ? rounds[0].id : null);
+
+    rounds.forEach(function (r, i) {
+      var tab = el("button", {
+        type: "button",
+        class: "ss-round-tab",
+        role: "tab",
+        id: "ss-tab-" + base + "-" + r.id,
+        "aria-controls": "ss-panel-" + base + "-" + r.id,
+        onclick: function () {
+          show(r.id, true);
+        },
+      });
+      tabs[r.id] = tab;
+      tabList.appendChild(tab);
+      var panel = el("div", { class: "ss-round-panel", role: "tabpanel", id: "ss-panel-" + base + "-" + r.id, "aria-labelledby": "ss-tab-" + base + "-" + r.id });
+      panels[r.id] = panel;
+      wrap.appendChild(panel);
+      var nextBtn = null;
+      if (i < rounds.length - 1) {
+        nextBtn = el("button", {
+          type: "button",
+          class: "ss-btn ss-btn-primary ss-round-next",
+          text: "다음 기준으로 분류하기 →",
+          onclick: function () {
+            show(rounds[i + 1].id, true);
+            try {
+              tabs[rounds[i + 1].id].scrollIntoView({ block: "nearest", behavior: "smooth" });
+            } catch (e) {
+              /* 무시 */
+            }
+          },
+        });
+      }
+      var box = el("div");
+      panel.appendChild(box);
+      if (nextBtn) panel.appendChild(el("div", { class: "ss-row ss-round-next-row", hidden: true }, [nextBtn]));
+      sorters[r.id] = SciSim.Sorter.render(box, Object.assign({}, r, { id: base + "." + r.id }), store, function () {
+        draw();
+        if (onChange) onChange();
+      });
+    });
+    wrap.appendChild(lockMsg);
+    wrap.appendChild(allMsg);
+
+    function show(id, byUser) {
+      var i = -1;
+      rounds.forEach(function (r, k) {
+        if (r.id === id) i = k;
+      });
+      if (i < 0) return false;
+      if (!unlocked(i)) {
+        if (byUser) lockMsg.textContent = "🔒 앞의 기준으로 먼저 알맞게 분류하면 열려요.";
+        return false;
+      }
+      lockMsg.textContent = "";
+      current = id;
+      store.set(base + ".tab", id);
+      draw();
+      if (byUser) {
+        try {
+          tabs[id].focus({ preventScroll: true });
+        } catch (e) {
+          /* 무시 */
+        }
+      }
+      return true;
+    }
+
+    function draw() {
+      // 저장된 탭이 잠겨 있으면 열린 곳 중 마지막으로
+      var idx = -1;
+      rounds.forEach(function (r, k) {
+        if (r.id === current) idx = k;
+      });
+      if (idx < 0 || !unlocked(idx)) {
+        idx = 0;
+        for (var k = 0; k < rounds.length; k++) if (unlocked(k)) idx = k;
+        current = rounds.length ? rounds[idx].id : null;
+      }
+      rounds.forEach(function (r, k) {
+        var done = sorters[r.id].isDone();
+        var open = unlocked(k);
+        var on = r.id === current;
+        var t = tabs[r.id];
+        t.textContent = (done ? "✅ " : !open ? "🔒 " : "") + (k + 1) + ". " + (r.tab || r.title);
+        t.setAttribute("aria-selected", String(on));
+        t.setAttribute("tabindex", on ? "0" : "-1");
+        t.classList.toggle("is-done", done);
+        t.classList.toggle("is-locked", !open);
+        t.setAttribute("aria-disabled", String(!open));
+        panels[r.id].hidden = !on;
+        var nr = panels[r.id].querySelector(".ss-round-next-row");
+        if (nr) nr.hidden = !(done && k < rounds.length - 1);
+      });
+      var all = api.isDone();
+      allMsg.hidden = !(all && cfg.allDone);
+      allMsg.textContent = "";
+      if (all && cfg.allDone) [].concat(cfg.allDone).forEach(function (p) {
+        allMsg.appendChild(SciSim.rich(p, "p"));
+      });
+    }
+
+    // 방향키로 탭 이동(접근성)
+    tabList.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      var ids = rounds.map(function (r) {
+        return r.id;
+      });
+      var i = ids.indexOf(current);
+      var j = e.key === "ArrowRight" ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
+      if (j !== i) show(ids[j], true);
+      e.preventDefault();
+    });
+
+    var api = {
+      isDone: function () {
+        return rounds.every(function (r) {
+          return sorters[r.id].isDone();
+        });
+      },
+      roundDone: function (id) {
+        return !!(sorters[id] && sorters[id].isDone());
+      },
+      result: function () {
+        var out = {};
+        rounds.forEach(function (r) {
+          out[r.id] = sorters[r.id].result();
+        });
+        return out;
+      },
+      show: function (id) {
+        return show(id, false);
+      },
+      current: function () {
+        return current;
+      },
+    };
+    draw();
+    return api;
+  }
+
   SciSim.Sorter = {
+    renderRounds: renderRounds,
     render: function (root, cfg, store, onChange) {
       var key = cfg.id || "sorter";
       var st = store.get(key, null);
