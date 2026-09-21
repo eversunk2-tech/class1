@@ -7,11 +7,14 @@ export function EmptyState({
   title,
   description,
   action,
+  illustration,
   className,
 }: {
   title: string;
   description?: ReactNode;
   action?: ReactNode;
+  /** 제목 위에 놓는 장식 일러스트(선택). 예: <EmptyBoxIllustration className="size-32" /> */
+  illustration?: ReactNode;
   className?: string;
 }) {
   return (
@@ -21,6 +24,7 @@ export function EmptyState({
         className,
       )}
     >
+      {illustration}
       <p className="font-medium">{title}</p>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
@@ -31,10 +35,13 @@ export function EmptyState({
 export function ErrorState({
   message = "데이터를 불러오지 못했습니다.",
   onRetry,
+  illustration,
   className,
 }: {
   message?: string;
   onRetry?: () => void;
+  /** 기본 경고 아이콘 대신 보여 줄 장식 일러스트(선택). 예: <ErrorFaceIllustration className="size-24" /> */
+  illustration?: ReactNode;
   className?: string;
 }) {
   return (
@@ -45,7 +52,7 @@ export function ErrorState({
         className,
       )}
     >
-      <AlertCircleIcon className="size-5 text-destructive" aria-hidden />
+      {illustration ?? <AlertCircleIcon className="size-5 text-destructive" aria-hidden />}
       <p className="text-sm">{message}</p>
       {onRetry ? (
         <Button variant="outline" size="sm" onClick={onRetry}>

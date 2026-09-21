@@ -9,7 +9,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* 제목 전용 글꼴(Jua). layout.tsx의 --font-heading-kr 변수를 가리킨다. */
+  --font-heading: var(--font-heading-kr), var(--font-sans), "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  /* 메뉴별 accent 색. soft = 배경 틴트, strong = 아이콘·테두리·포인트 */
+  --color-home-soft: var(--home-soft);
+  --color-home-strong: var(--home-strong);
+  --color-games-soft: var(--games-soft);
+  --color-games-strong: var(--games-strong);
+  --color-science-soft: var(--science-soft);
+  --color-science-strong: var(--science-strong);
+  --color-math-soft: var(--math-soft);
+  --color-math-strong: var(--math-strong);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -72,7 +82,15 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 1rem;
+  --home-soft: oklch(0.94 0.03 235);
+  --home-strong: oklch(0.55 0.13 235);
+  --games-soft: oklch(0.94 0.03 330);
+  --games-strong: oklch(0.55 0.15 330);
+  --science-soft: oklch(0.94 0.04 165);
+  --science-strong: oklch(0.55 0.12 165);
+  --math-soft: oklch(0.94 0.04 80);
+  --math-strong: oklch(0.6 0.14 70);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -115,6 +133,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --home-soft: oklch(0.32 0.05 235);
+  --home-strong: oklch(0.78 0.12 235);
+  --games-soft: oklch(0.32 0.06 330);
+  --games-strong: oklch(0.8 0.13 330);
+  --science-soft: oklch(0.32 0.05 165);
+  --science-strong: oklch(0.78 0.12 165);
+  --math-soft: oklch(0.32 0.05 70);
+  --math-strong: oklch(0.8 0.13 75);
 }
 
 @layer base {
@@ -137,6 +163,99 @@ html {
     system-ui, sans-serif;
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+
+/* Jua는 weight 400 하나뿐이다. 굵게 지정된 제목에서 가짜 볼드가 합성되지 않게 한다. */
+.font-heading {
+  font-synthesis: none;
+  letter-spacing: 0;
+}
+
+/* ─────────────────────────────────────────────
+   사이드바 접힘 상태 (src/hooks/use-sidebar.ts)
+   <html data-sidebar="collapsed">를 hydration 전에 인라인 스크립트가 세팅하므로
+   React 상태가 아니라 CSS만으로 폭/라벨을 바꿔 첫 페인트 깜빡임을 없앤다.
+   ───────────────────────────────────────────── */
+.app-sidebar {
+  width: 15rem;
+  transition: width 200ms ease;
+}
+.app-sidebar .sidebar-label {
+  transition: opacity 150ms ease;
+}
+html[data-sidebar="collapsed"] .app-sidebar {
+  width: 4.5rem;
+}
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  opacity: 0;
+}
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-toggle-row {
+  justify-content: center;
+}
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-toggle-icon {
+  transform: rotate(180deg);
+}
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
+  display: none;
+}
+
+/* 모바일 드로어: 왼쪽에서 슬라이드 인 (base-ui data-starting-style / data-ending-style) */
+.nav-drawer {
+  transition: transform 220ms ease;
+}
+.nav-drawer[data-starting-style],
+.nav-drawer[data-ending-style] {
+  transform: translateX(-100%);
+}
+
+/* 일러스트의 작은 장식(별, 기포, 구름)이 살짝 떠다니는 효과 */
+@keyframes illo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes illo-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.illo-float {
+  animation: illo-float 3.6s ease-in-out infinite;
+}
+.illo-float-slow {
+  animation: illo-float 5s ease-in-out infinite;
+  animation-delay: -1.5s;
+}
+.illo-twinkle {
+  animation: illo-twinkle 2.4s ease-in-out infinite;
+}
+.illo-twinkle-late {
+  animation: illo-twinkle 2.4s ease-in-out infinite;
+  animation-delay: -1.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .app-sidebar .sidebar-label,
+  .app-sidebar .sidebar-toggle-icon,
+  .nav-drawer {
+    transition-duration: 0ms;
+  }
+  .illo-float,
+  .illo-float-slow,
+  .illo-twinkle,
+  .illo-twinkle-late {
+    animation: none;
+  }
 }
 
 /* ─────────────────────────────────────────────

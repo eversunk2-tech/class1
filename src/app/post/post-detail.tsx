@@ -9,7 +9,7 @@ import { CommentSection } from "@/components/comment-section";
 import { LikeButton } from "@/components/like-button";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { editPostHref } from "@/components/post-card";
-import { SITE_NAME } from "@/components/site-header";
+import { SITE_NAME } from "@/components/layout/topbar";
 import { EmptyState, ErrorState } from "@/components/states";
 import { TagList } from "@/components/tag-chip";
 import { ViewCounter } from "@/components/view-counter";

@@ -390,8 +390,8 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
     <form
       onSubmit={onSubmit}
       noValidate
-      // 넓은 화면에서는 본문 영역(max-w-3xl)을 벗어나 에디터를 넓게 쓴다.
-      className="flex w-full flex-col gap-6 lg:w-[min(72rem,calc(100vw-2rem))] lg:self-center"
+      // 폭은 page.tsx의 wrapper가 정한다(넓은 화면에서 72rem). 예전처럼 100vw 기준으로 넓히면 사이드바 밑으로 넘친다.
+      className="flex w-full flex-col gap-6"
     >
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" render={<Link href="/admin/" />} nativeButton={false}>
