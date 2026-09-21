@@ -98,7 +98,7 @@ export function PostEditorLoader() {
         description={`slug “${slug}”에 해당하는 글이 없습니다.`}
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="outline" render={<Link href="/admin/" />} nativeButton={false}>
+            <Button variant="outline" render={<Link href="/admin/posts/" />} nativeButton={false}>
               글 관리로
             </Button>
             <Button render={<Link href="/admin/write/" />} nativeButton={false}>
@@ -375,7 +375,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
     }
     setDeleteOpen(false);
     toast.success("글을 삭제했습니다.");
-    router.replace("/admin/");
+    router.replace("/admin/posts/");
   }
 
   function onSubmit(e: FormEvent) {
@@ -394,7 +394,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
       className="flex w-full flex-col gap-6"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" render={<Link href="/admin/" />} nativeButton={false}>
+        <Button variant="ghost" size="sm" render={<Link href="/admin/posts/" />} nativeButton={false}>
           <ArrowLeftIcon />
           글 관리
         </Button>

@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { AdminGuard } from "@/components/admin-guard";
 import { PostEditorLoader, PostEditorSkeleton } from "./post-editor";
 
 export const metadata: Metadata = { title: "글 작성", robots: { index: false, follow: false } };
@@ -12,11 +11,10 @@ export default function AdminWritePage() {
     // 기본 max-w-3xl, 넓은 화면(lg 이상)에서는 기존 에디터와 같이 72rem까지(나란히 보기용).
     // 사이드바를 뺀 본문 컬럼 안에서만 넓어지므로 화면 밖으로 넘치지 않는다.
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col lg:max-w-6xl">
-      <AdminGuard>
-        <Suspense fallback={<PostEditorSkeleton />}>
-          <PostEditorLoader />
-        </Suspense>
-      </AdminGuard>
+      {/* 관리자 가드는 상위 admin/layout.tsx가 담당한다. */}
+      <Suspense fallback={<PostEditorSkeleton />}>
+        <PostEditorLoader />
+      </Suspense>
     </div>
   );
 }

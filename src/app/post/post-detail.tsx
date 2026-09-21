@@ -10,6 +10,7 @@ import { LikeButton } from "@/components/like-button";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { editPostHref } from "@/components/post-card";
 import { SITE_NAME } from "@/components/layout/topbar";
+import { PostReadRecorder } from "@/components/post-read-recorder";
 import { EmptyState, ErrorState } from "@/components/states";
 import { TagList } from "@/components/tag-chip";
 import { ViewCounter } from "@/components/view-counter";
@@ -119,6 +120,8 @@ function PostView({ post }: { post: Post }) {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           <time dateTime={date}>{formatDate(date)}</time>
           <ViewCounter postId={post.id} slug={post.slug} published={post.published} />
+          {/* 로그인 사용자의 읽기 기록(학습활동). 화면에는 아무것도 그리지 않는다. */}
+          <PostReadRecorder postId={post.id} published={post.published} />
           {isAdmin ? <AdminActions post={post} /> : null}
         </div>
         <TagList tags={post.tags} />

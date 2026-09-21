@@ -30,6 +30,8 @@
 * anon key만 클라이언트에 노출한다. service_role key는 절대 코드/저장소에 넣지 않는다.
 * 모든 테이블에 RLS를 켜고 정책을 작성한다. 보안은 클라이언트 가드가 아니라 RLS로 보장한다.
 * 블로그 공용 테이블: `profiles`(role: admin/user), `posts`, `comments`, `likes`, `views`.
+* 학습 테이블: `member_directory`, `app_results`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks` (설계: `docs/admin/spec.md`).
+* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다.
 * 웹앱 전용 테이블은 `app_{앱이름}_` 접두사를 붙인다.
 * 스키마 변경은 `supabase/migrations/`에 SQL 파일로 남긴다.
 
@@ -66,6 +68,7 @@
 * 순수 HTML, CSS, JavaScript로 만든다. React/Next.js/빌드 도구를 쓰지 않는다.
 * 외부 라이브러리 사용을 최소화한다. CDN은 허용한다.
 * Supabase가 필요하면 CDN의 supabase-js를 쓰고, URL과 anon key는 앱 폴더 안 `config.js`에 둔다.
+* 학습 결과를 기록하는 앱은 `scripts/templates/class1-record.js`를 앱 폴더로 복사해 사용한다(`app_results` 테이블). 점수는 클라이언트 기록이라 참여 확인용이다.
 * 모바일에서도 사용할 수 있어야 한다.
 
 

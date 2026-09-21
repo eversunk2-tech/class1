@@ -77,3 +77,19 @@ export function authErrorMessage(message: string | undefined | null): string {
   if (m.includes("rate limit")) return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
   return `로그인 중 오류가 발생했습니다. (${message})`;
 }
+
+/** 새 비밀번호 저장(supabase.auth.updateUser) 오류를 한국어로 바꾼다. */
+export function passwordUpdateErrorMessage(message: string | undefined | null, code?: string | null): string {
+  const m = (message ?? "").toLowerCase();
+  if (code === "same_password" || m.includes("different from the old password"))
+    return "지금 쓰고 있는 비밀번호와 같아요. 다른 비밀번호를 입력해 주세요.";
+  if (code === "weak_password" || m.includes("weak") || m.includes("should be at least") || m.includes("pwned"))
+    return "비밀번호가 너무 짧거나 쉬워요. 영문·숫자를 섞어 더 길게 만들어 주세요.";
+  if (code === "reauthentication_needed" || m.includes("reauthenticat"))
+    return "보안을 위해 다시 로그인한 뒤 비밀번호를 바꿔 주세요.";
+  if (m.includes("session") && (m.includes("missing") || m.includes("expired")))
+    return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+  if (m.includes("failed to fetch") || m.includes("network")) return "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+  if (m.includes("rate limit")) return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+  return message ? `비밀번호를 바꾸지 못했습니다. (${message})` : "비밀번호를 바꾸지 못했습니다.";
+}

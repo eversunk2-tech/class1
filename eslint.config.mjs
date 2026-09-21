@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Supabase Edge Functions는 Deno 런타임 코드라 Next 빌드·lint 대상에서 뺀다.
+    "supabase/functions/**",
   ]),
 ]);
 

@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
-import { toast } from "sonner";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -31,7 +30,12 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   });
   const [attempt, setAttempt] = useState(0);
 
-  const wasAllowed = allowedUserId !== null;
+  // 같은 브라우저에서 다른 사용자로 바뀌면 이전 통과 기록을 버린다(review #9).
+  // 새 사용자는 is_admin 확인을 처음부터 다시 통과해야 한다.
+  if (userId && allowedUserId && userId !== allowedUserId) {
+    setAllowedUserId(null);
+  }
+  const wasAllowed = allowedUserId !== null && (!userId || userId === allowedUserId);
 
   useEffect(() => {
     if (loading) return;
@@ -47,13 +51,8 @@ export function AdminGuard({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.rpc("is_admin");
       if (!active) return;
       if (error) {
-        if (wasAllowed) {
-          // 이미 관리자 화면을 쓰던 중이면 화면을 유지하고 알리기만 한다. 실제 쓰기 권한은 RLS가 판단한다.
-          toast.error("관리자 권한을 확인하지 못했습니다. 네트워크 상태를 확인해 주세요.");
-          setAllowedUserId(userId);
-        } else {
-          setCheck({ userId, state: "error" });
-        }
+        // 확인에 실패하면 (이전에 다른 사용자가 통과했더라도) 통과시키지 않는다.
+        setCheck({ userId, state: "error" });
         return;
       }
       if (data === true) setAllowedUserId(userId);

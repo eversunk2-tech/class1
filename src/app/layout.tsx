@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Jua } from "next/font/google";
+import { ForcePasswordChangeGate } from "@/components/force-password-change-gate";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SITE_NAME, Topbar } from "@/components/layout/topbar";
 import { SiteFooter } from "@/components/site-footer";
@@ -49,6 +50,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col">
         <SessionProvider>
+          {/* 임시 비밀번호로 로그인한 계정을 /reset-password/로 보낸다(docs/admin/spec.md §7). */}
+          <ForcePasswordChangeGate />
           <TooltipProvider>
             <Topbar />
             <div className="flex flex-1">

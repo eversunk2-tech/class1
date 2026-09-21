@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutListIcon, LogOutIcon, PenSquareIcon, UserPenIcon } from "lucide-react";
+import {
+  GraduationCapIcon,
+  KeyRoundIcon,
+  LayoutDashboardIcon,
+  LayoutListIcon,
+  LogOutIcon,
+  PenSquareIcon,
+  SproutIcon,
+  UserPenIcon,
+  UsersIcon,
+} from "lucide-react";
+import { UnreadCount } from "@/components/learning/learning-ui";
 import { ProfileDialog } from "@/components/profile-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -18,12 +29,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { displayNameOf, useSession } from "@/hooks/use-session";
+import { useUnreadFeedback } from "@/hooks/use-unread-feedback";
+import { userHasPasswordLogin } from "@/lib/admin";
 import { signOut } from "@/lib/auth";
 
 export function UserMenu() {
   const { loading, user, profile, isAdmin } = useSession();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
+  // 학생: 선생님이 보낸 안 읽은 메시지 / 관리자: 학생이 보낸 안 읽은 메시지
+  const unread = useUnreadFeedback();
 
   if (loading) return <Skeleton className="size-8 rounded-full" />;
 
@@ -42,15 +57,23 @@ export function UserMenu() {
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon" className="rounded-full" aria-label="사용자 메뉴" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative rounded-full"
+              aria-label={unread > 0 ? `사용자 메뉴 (안 읽은 피드백 ${unread}개)` : "사용자 메뉴"}
+            />
           }
         >
           <Avatar size="sm">
             {profile?.avatar_url ? <AvatarImage src={profile.avatar_url} alt="" /> : null}
             <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
           </Avatar>
+          {unread > 0 ? (
+            <span className="absolute top-0.5 right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-background" aria-hidden />
+          ) : null}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuGroup>
             <DropdownMenuLabel>
               <span className="block truncate text-sm text-foreground">{name}</span>
@@ -59,22 +82,49 @@ export function UserMenu() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => router.push("/me/learning/")}>
+              <SproutIcon />
+              내 학습 활동
+              {!isAdmin ? <UnreadCount count={unread} className="ml-auto" /> : null}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setProfileOpen(true)}>
               <UserPenIcon />
               프로필 수정
             </DropdownMenuItem>
-            {isAdmin ? (
-              <>
+            {userHasPasswordLogin(user) ? (
+              <DropdownMenuItem onClick={() => router.push("/reset-password/")}>
+                <KeyRoundIcon />
+                비밀번호 변경
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuGroup>
+          {isAdmin ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
                 <DropdownMenuItem onClick={() => router.push("/admin/")}>
+                  <LayoutDashboardIcon />
+                  관리자 대시보드
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/admin/posts/")}>
                   <LayoutListIcon />
                   글 관리
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/admin/write/")}>
                   <PenSquareIcon />새 글 작성
                 </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => router.push("/admin/members/")}>
+                  <UsersIcon />
+                  회원 관리
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/admin/learning/")}>
+                  <GraduationCapIcon />
+                  학습 현황
+                  <UnreadCount count={unread} className="ml-auto" />
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={async () => {
