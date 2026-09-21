@@ -6,14 +6,15 @@
 * 블로그 본체: Next.js 16 (App Router) + Tailwind + shadcn/ui, 정적 export
 * 웹앱: HTML, CSS, JavaScript로 만든 독립 정적 앱 (`/public/apps/{앱이름}/`)
 * Supabase 기반 백엔드 데이터 서버 (글, 댓글, 좋아요, 조회수, 로그인, 웹앱 데이터)
-* 배포: GitHub Pages 사용자 사이트 (`{username}.github.io`, basePath 없음)
+* 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`)
 * 언어/디자인: 한국어 UI, 미니멀 스타일, 다크모드 지원
 
 
 ## 기술 결정 사항
 
 ### 정적 export 제약 (GitHub Pages)
-* `next.config.ts`에 `output: 'export'`, `images: { unoptimized: true }`를 유지한다.
+* `next.config.ts`에 `output: 'export'`, `basePath: '/class1'`, `images: { unoptimized: true }`를 유지한다.
+* 내부 링크는 `next/link`를 쓴다. `next/image` src, iframe, `/apps/...` 링크, OAuth redirectTo 등 basePath가 자동으로 붙지 않는 곳은 `process.env.NEXT_PUBLIC_BASE_PATH`를 앞에 붙인다. 절대경로를 하드코딩하지 않는다.
 * 서버 기능을 쓰지 않는다: Server Actions, Route Handlers, middleware/proxy, 동적 SSR, `@supabase/ssr` 서버 쿠키 세션 금지.
 * Supabase 호출은 모두 브라우저(Client Component)에서 `@supabase/supabase-js`로 한다.
 * 동적 경로(예: 글 상세)는 쿼리스트링(`/post?slug=...`)이나 클라이언트 라우팅으로 처리한다. `generateStaticParams`로 DB 글을 빌드 타임에 고정하지 않는다.
@@ -35,7 +36,9 @@
 ### 로그인 (Auth)
 * 관리자(나): 글 작성·수정·삭제 권한. `profiles.role = 'admin'`으로 판별한다.
 * 방문자: 가입/로그인 후 댓글 작성, 웹앱 데이터 저장 가능. 읽기와 조회수는 비로그인도 가능.
-* OAuth/매직링크 redirect URL은 `https://{username}.github.io`와 `http://localhost:3000`을 등록한다.
+* 로그인 방식: 이메일/비밀번호(사전 생성 계정, 공개 가입 없음), GitHub OAuth, Google OAuth.
+* 사전 계정은 관리자가 로컬 스크립트(service_role key 사용, 클라이언트에 포함 금지)로 생성한다.
+* redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`를 등록한다.
 
 
 ## 작업 사이클
@@ -56,7 +59,8 @@
 
 ## 웹앱 규칙
 
-* 모든 웹앱은 `/public/apps/{앱이름}/` 폴더 안에 자체 완결된다. (배포 URL: `/apps/{앱이름}/`)
+* 모든 웹앱은 `/public/apps/{앱이름}/` 폴더 안에 자체 완결된다. (배포 URL: `/class1/apps/{앱이름}/`)
+* 웹앱 내부의 파일 참조는 상대경로만 사용한다(`./style.css`). `/`로 시작하는 절대경로 금지.
 * `spec.md`, `review.md`, 서브에이전트 지침 파일도 해당 앱 폴더에 둔다.
 * 순수 HTML, CSS, JavaScript로 만든다. React/Next.js/빌드 도구를 쓰지 않는다.
 * 외부 라이브러리 사용을 최소화한다. CDN은 허용한다.
