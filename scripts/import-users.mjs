@@ -3,14 +3,17 @@
  * 사전 발급 계정 일괄 생성 스크립트 (spec §5.1) — 관리자가 로컬에서 1회 실행한다.
  *
  * 준비
- *   1. 구글시트를 CSV로 내보낸다(파일 > 다운로드 > CSV). 기본 열 이름: id,password (선택: name)
- *      CSV에는 비밀번호가 들어 있으므로 커밋하지 말고, 작업 후 삭제하는 것을 권장한다.
+ *   1. 구글시트를 CSV(파일 > 다운로드 > CSV) 또는 엑셀 .xlsx로 내보낸다. .xlsx는 첫 번째 시트만 읽는다.
+ *      열 이름: id/아이디/학번, password/비밀번호/초기비밀번호 (선택: name/이름)
+ *      파일에는 비밀번호가 들어 있으므로 커밋하지 말고, 작업 후 삭제하는 것을 권장한다.
  *   2. .env.local 에 아래 두 값을 넣는다(서비스 롤 키는 Supabase 대시보드 > Project Settings > API).
  *        NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
  *        SUPABASE_SERVICE_ROLE_KEY=<service role key>   ← 절대 공유/커밋 금지
  *
  * 사용법 (프로젝트 루트에서)
- *   node scripts/import-users.mjs <CSV 경로> [옵션]
+ *   node scripts/import-users.mjs <CSV 또는 XLSX 경로> [옵션]
+ *
+ *   node scripts/import-users.mjs ~/Downloads/users.xlsx --dry-run
  *
  *   node scripts/import-users.mjs scripts/users.csv --dry-run   # 확인만(네트워크 요청 없음)
  *   node scripts/import-users.mjs scripts/users.csv             # 실제 생성
@@ -37,6 +40,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { inflateRawSync } from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
 
 const LOGIN_EMAIL_DOMAIN = "class1.local"; // src/lib/auth.ts 의 LOGIN_EMAIL_DOMAIN 과 같아야 한다.
@@ -78,10 +82,10 @@ if (opts.help) {
   printHelp();
   process.exit(0);
 }
-if (positionals.length !== 1) fail("CSV 파일 경로를 하나 지정하세요. 예: node scripts/import-users.mjs users.csv --dry-run");
+if (positionals.length !== 1) fail("CSV 또는 XLSX 파일 경로를 하나 지정하세요. 예: node scripts/import-users.mjs users.xlsx --dry-run");
 
 const csvPath = resolve(positionals[0]);
-if (!existsSync(csvPath)) fail(`CSV 파일을 찾을 수 없습니다: ${csvPath}`);
+if (!existsSync(csvPath)) fail(`파일을 찾을 수 없습니다: ${csvPath}`);
 
 // ─────────────────────────────────────────────
 // CSV 파서 (RFC 4180: 따옴표, "" 이스케이프, 따옴표 안 줄바꿈, CRLF, BOM)
@@ -131,6 +135,112 @@ function parseCsv(text) {
 }
 
 // ─────────────────────────────────────────────
+// XLSX 파서 (첫 번째 시트만, 추가 패키지 없이 zip + XML 직접 해석)
+// ─────────────────────────────────────────────
+function unzipEntries(buf) {
+  // End of central directory 레코드를 뒤에서부터 찾는다.
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error("xlsx(zip) 형식이 아닙니다.");
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const entries = new Map();
+  for (let n = 0; n < count; n++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error("zip 중앙 디렉터리가 손상되었습니다.");
+    const method = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const localOffset = buf.readUInt32LE(p + 42);
+    const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
+    entries.set(name, { method, compSize, localOffset });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return (name) => {
+    const e = entries.get(name);
+    if (!e) return null;
+    const start = e.localOffset + 30 + buf.readUInt16LE(e.localOffset + 26) + buf.readUInt16LE(e.localOffset + 28);
+    const data = buf.subarray(start, start + e.compSize);
+    if (e.method === 0) return data.toString("utf8");
+    if (e.method === 8) return inflateRawSync(data).toString("utf8");
+    throw new Error(`지원하지 않는 zip 압축 방식(${e.method})`);
+  };
+}
+
+function xmlText(s) {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&amp;/g, "&");
+}
+
+/** 셀 안의 모든 <t> 텍스트를 이어 붙인다(서식이 섞인 rich text 포함). */
+function joinT(xml) {
+  return Array.from(xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>|<t(?:\s[^>]*)?\/>/g), (m) => xmlText(m[1] ?? "")).join("");
+}
+
+function colIndex(ref) {
+  const letters = ref.replace(/\d+/g, "");
+  let n = 0;
+  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+function parseXlsx(buf) {
+  const read = unzipEntries(buf);
+  const shared = [];
+  const ssXml = read("xl/sharedStrings.xml");
+  if (ssXml) for (const m of ssXml.matchAll(/<si>([\s\S]*?)<\/si>/g)) shared.push(joinT(m[1]));
+
+  // 첫 번째 시트 경로: workbook.xml의 첫 sheet → rels에서 target 찾기
+  const wb = read("xl/workbook.xml") ?? "";
+  const rid = wb.match(/<sheet\b[^>]*\br:id="([^"]+)"/)?.[1];
+  const rels = read("xl/_rels/workbook.xml.rels") ?? "";
+  let target = rid && rels.match(new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`))?.[1];
+  if (!target && rid) target = rels.match(new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${rid}"`))?.[1];
+  const sheetPath = target ? (target.startsWith("/") ? target.slice(1) : `xl/${target}`) : "xl/worksheets/sheet1.xml";
+  const sheet = read(sheetPath);
+  if (!sheet) throw new Error("첫 번째 시트를 찾을 수 없습니다.");
+
+  const rows = [];
+  const numericCells = [];
+  for (const rm of sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>|<row\b[^>]*\/>/g)) {
+    const row = [];
+    for (const cm of (rm[1] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const attrs = cm[1];
+      const body = cm[2] ?? "";
+      const ref = attrs.match(/\br="([A-Z]+\d+)"/)?.[1];
+      const type = attrs.match(/\bt="([^"]+)"/)?.[1];
+      const v = body.match(/<v>([\s\S]*?)<\/v>/)?.[1];
+      let value = "";
+      if (type === "s") value = shared[Number(v)] ?? "";
+      else if (type === "inlineStr") value = joinT(body);
+      else if (v !== undefined) {
+        value = xmlText(v);
+        if (type === undefined || type === "n") {
+          // 숫자 셀: 1.2E+7 같은 표기를 정수 문자열로. 앞자리 0은 엑셀이 이미 지웠을 수 있다(경고).
+          if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(value) && Number.isInteger(Number(value))) value = BigInt(Number(value)).toString();
+          if (ref) numericCells.push(ref);
+        }
+      }
+      row[ref ? colIndex(ref) : row.length] = value;
+    }
+    rows.push(Array.from(row, (x) => x ?? ""));
+  }
+  return { rows: rows.filter((r) => r.some((v) => String(v).trim() !== "")), numericCells };
+}
+
+// ─────────────────────────────────────────────
 // .env 파일 읽기 (값은 출력하지 않는다)
 // ─────────────────────────────────────────────
 function readEnvFile(path) {
@@ -159,18 +269,43 @@ function toEmail(id) {
 // CSV 검사
 // ─────────────────────────────────────────────
 let table;
+let numericCells = [];
+const isXlsx = /\.xlsx$/i.test(csvPath);
 try {
-  table = parseCsv(readFileSync(csvPath, "utf8"));
+  if (isXlsx) ({ rows: table, numericCells } = parseXlsx(readFileSync(csvPath)));
+  else table = parseCsv(readFileSync(csvPath, "utf8"));
 } catch (e) {
-  fail(`CSV를 읽지 못했습니다: ${e.message}`);
+  fail(`${isXlsx ? "엑셀" : "CSV"} 파일을 읽지 못했습니다: ${e.message}`);
 }
-if (table.length < 2) fail("CSV에 헤더와 데이터 행이 필요합니다.");
+if (table.length < 2) fail("파일에 헤더와 데이터 행이 필요합니다.");
 
-const header = table[0].map((h) => h.trim().toLowerCase());
-const col = (name) => header.indexOf(name.trim().toLowerCase());
-const idIdx = col(opts["id-column"]);
-const pwIdx = col(opts["password-column"]);
-const nameIdx = col(opts["name-column"]);
+const header = table[0].map((h) => String(h).replace(/\s+/g, "").toLowerCase());
+// 옵션으로 지정하지 않았으면 한국어 열 이름도 찾는다.
+const ALIASES = {
+  "id-column": ["id", "아이디", "학번", "loginid"],
+  "password-column": ["password", "비밀번호", "초기비밀번호", "초기비번", "비번"],
+  "name-column": ["name", "이름", "성명"],
+};
+const col = (option) => {
+  const given = String(opts[option]).replace(/\s+/g, "").toLowerCase();
+  const isDefault = given === ALIASES[option][0];
+  for (const cand of isDefault ? ALIASES[option] : [given]) {
+    const i = header.indexOf(cand);
+    if (i >= 0) return i;
+  }
+  return -1;
+};
+const idIdx = col("id-column");
+const pwIdx = col("password-column");
+const nameIdx = col("name-column");
+// 숫자 셀로 저장된 아이디/비밀번호는 앞자리 0이 사라졌을 수 있다.
+const numericIdPw = numericCells.filter((ref) => [idIdx, pwIdx].includes(colIndex(ref)) && !/^[A-Z]+1$/.test(ref));
+if (numericIdPw.length) {
+  console.log(
+    `주의: 숫자 형식 셀 ${numericIdPw.length}개(${numericIdPw.slice(0, 6).join(", ")}${numericIdPw.length > 6 ? " …" : ""}). ` +
+      "엑셀에서 0으로 시작하던 값이면 앞자리 0이 빠졌을 수 있으니 원본과 비교하세요.",
+  );
+}
 if (idIdx < 0) fail(`아이디 열 "${opts["id-column"]}"이 없습니다. 헤더: ${table[0].join(", ")} (--id-column 으로 지정)`);
 if (pwIdx < 0) fail(`비밀번호 열 "${opts["password-column"]}"이 없습니다. 헤더: ${table[0].join(", ")} (--password-column 으로 지정)`);
 
@@ -200,7 +335,7 @@ table.slice(1).forEach((cells, i) => {
   users.push({ line, email, password, name });
 });
 
-console.log(`CSV: ${csvPath}`);
+console.log(`파일: ${csvPath}`);
 console.log(`유효한 행 ${users.length}개, 잘못된 행 ${invalid.length}개`);
 for (const { line, reason } of invalid) console.log(`  - ${line}행: ${reason}`);
 if (truncated.length) {
