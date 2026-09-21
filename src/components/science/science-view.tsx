@@ -9,6 +9,7 @@ import {
   BookOpenIcon,
   ChevronRightIcon,
   ClockIcon,
+  FlaskConicalIcon,
   NotebookPenIcon,
   SearchXIcon,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
   type Term,
   type Unit,
 } from "@/data/science-curriculum";
+import { withBasePath } from "@/lib/base-path";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { cn } from "@/lib/utils";
 
@@ -344,8 +346,18 @@ function LessonMeta({ lesson, className }: { lesson: Lesson; className?: string 
         <NotebookPenIcon className="size-3.5" aria-hidden />
         실험관찰 {pagesText(lesson.workbook)}
       </span>
+      {lesson.app ? (
+        <span className={cn("inline-flex items-center gap-1 font-medium", colors.strongText)}>
+          <FlaskConicalIcon className="size-3.5" aria-hidden />
+          {appLabel(lesson.app.kind)}
+        </span>
+      ) : null}
     </span>
   );
+}
+
+function appLabel(kind: "sim" | "guide") {
+  return kind === "sim" ? "실험 앱" : "조사 도우미";
 }
 
 function UnitView({ term, unit }: { term: Term; unit: Unit }) {
@@ -411,6 +423,17 @@ function LessonView({ term, unit, lesson }: { term: Term; unit: Unit; lesson: Le
           <PageTile icon={<BookOpenIcon className="size-5" aria-hidden />} label="교과서" pages={lesson.science} />
           <PageTile icon={<NotebookPenIcon className="size-5" aria-hidden />} label="실험관찰" pages={lesson.workbook} />
         </dl>
+
+        {lesson.app ? (
+          // 차시 앱은 public/ 아래 정적 앱이라 next/link가 아닌 <a>로 연다(basePath 수동 부착).
+          <a
+            href={withBasePath(`/apps/${lesson.app.id}/`)}
+            className={cn(buttonVariants(), "h-12 rounded-2xl px-5 text-base")}
+          >
+            <FlaskConicalIcon aria-hidden />
+            {lesson.app.kind === "sim" ? "실험 시뮬레이션 시작하기" : "조사 도우미 열기"}
+          </a>
+        ) : null}
       </article>
 
       <nav aria-label="차시 이동" className="grid gap-3 sm:grid-cols-2">

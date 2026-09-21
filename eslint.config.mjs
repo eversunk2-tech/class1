@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Supabase Edge Functions는 Deno 런타임 코드라 Next 빌드·lint 대상에서 뺀다.
     "supabase/functions/**",
+    // 정적 웹앱(순수 HTML/CSS/JS, CLAUDE.md 웹앱 규칙)과 그 공통 틀은 Next/React 규칙 대상이 아니다.
+    "public/apps/**",
+    "scripts/templates/**",
   ]),
 ]);
 

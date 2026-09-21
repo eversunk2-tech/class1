@@ -1,0 +1,196 @@
+# science-sim — 과학 차시 실험 시뮬레이션 앱 공통 틀
+
+과학 차시 앱(`public/apps/sci-{학기}-{단원}-{탐구}/`)이 함께 쓰는 정본이다. 각 앱은 이 폴더를 통째로 `science-sim/`에 **복사**해서 쓴다(앱은 자체 완결). 정본을 고치면 쓰고 있는 모든 앱 폴더에 다시 복사한다.
+
+단계 흐름: **예상하기 → 실험하기 → 기록·분석하기 → 정리하기 → 궁금한 점** (`CLAUDE.md`의 "과학 차시 앱 규칙").
+
+## 1. 파일
+
+| 파일 | 전역 이름 | 하는 일 |
+|---|---|---|
+| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce` | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사 |
+| `stage-nav.js` | `SciSim.StageNav` | 단계 진행바(앞 단계는 언제든, 뒤 단계는 조건 통과 시) |
+| `lesson.js` | `SciSim.Lesson` | 앱 뼈대: 알림, 학습 시간, 단계 이동 연결·새로고침 복원, 마치기·결과 저장(실패 까닭별 문구), 처음부터 다시 |
+| `predict.js` | `SciSim.Predict` | 예상하기(직접 타이핑 + 한 단계씩 열리는 힌트, 최소 글자 수 안내) |
+| `experiment.js` | `SciSim.Experiment` | **실험하기 화면 틀 전체**: 3D/2D 화면 자리, 조건 고르기 버튼, 실험 단계 잠금·진행률, 실행 버튼(누르면 실험 화면이 보이게 스크롤한 뒤 실행), 관찰·기록 카드(보기 고르기 **또는 수치 입력**), 기록 한눈에 보기 표, 3D↔2D 전환(겹침 방지·렌더러 해제) |
+| `sim3d.js` | `SciSim.Sim3D` | three.js 3D 장면 도우미(카메라·조명·드래그 회전, 물체 팩토리, 트윈, `discard`, `dispose`로 WebGL 컨텍스트 반납) |
+| `record-store.js` | `SciSim.RecordStore` | 기록 저장(같은 칸 덮어쓰기 / `trial` 회차별 저장, 평균) |
+| `table-chart.js` | `SciSim.TableChart` | 색상 매트릭스 표, 수치 기록 표(평균 줄), **꺾은선그래프(수치 x축·여러 계열)**, **막대그래프(범주×계열)** — 축 제목에 단위, 범례, 계열마다 다른 점 모양 |
+| `sorter.js` | `SciSim.Sorter` | 분류하기 활동(탭하거나 끌어다 놓기) + 맞고 틀림 피드백 |
+| `quiz.js` | `SciSim.Quiz` | 보기 고르기 분석(정확 일치 또는 `grade` 함수, 보기별 피드백 `wrongBy`) |
+| `conclude.js` | `SciSim.Conclude` | 결론·발전 질문: 적고 제출해야 모범 답안이 나오고 나란히 비교 |
+| `curiosity.js` | `SciSim.Curiosity` | 더 탐구하고 싶은 점 |
+| `style-common.css` | — | 공통 스타일(태블릿 우선, 44px 이상 터치 영역, 다크모드, 실험 화면 틀·분류·그래프 스타일) |
+
+각 파일 맨 위 주석에 자세한 사용법이 있다.
+
+## 2. 새 차시 앱 만드는 절차
+
+1. **지도서 분석** → 앱 `spec.md`에 실험 차시인지(시뮬레이션) 조사 차시인지와 근거 쪽수, 색·수치·용어 표를 적는다. 화면에 쓰는 값은 모두 지도서 값만.
+2. 폴더 만들기: `public/apps/sci-{학기}-{단원}-{탐구}/`
+   - `scripts/templates/science-sim/` → `science-sim/`로 **통째로 복사**
+   - `scripts/templates/class1-record.js` → 폴더 바로 아래로 복사
+   - `config.js`(SUPABASE_URL, anon key — 블로그와 같은 값)
+3. `index.html`: 시범 앱(`public/apps/sci-6-1-1-2/index.html`)을 복사해 제목·설명·"← 차시로" 주소만 바꾼다. 필요한 칸은 아래뿐이다.
+   ```html
+   <header class="ss-header"> … <nav id="stage-nav"></nav></header>
+   <main class="ss-main">
+     <section data-stage="predict"><div id="predict-root"></div></section>
+     <section data-stage="experiment" hidden><div id="experiment-root"></div></section>
+     <section data-stage="analyze" hidden><div id="result-root"></div><div id="quiz-root"></div></section>
+     <section data-stage="conclude" hidden><div id="conclude-root"></div></section>
+     <section data-stage="curiosity" hidden><div id="curiosity-root"></div> 마치기 버튼·메시지·done-card·다시 하기 버튼</section>
+   </main>
+   <nav class="ss-footer-nav"><button id="btn-prev">…</button><button id="btn-next">…</button></nav>
+   <div class="ss-toast" id="toast" role="status" hidden></div>
+   ```
+   스크립트 순서: importmap(three, SRI) → supabase-js(SRI) → `config.js` → `class1-record.js` → `science-sim/persist.js, stage-nav.js, lesson.js, predict.js, record-store.js, table-chart.js, sorter.js, quiz.js, conclude.js, curiosity.js, sim3d.js, experiment.js` → `data/lesson-config.js` → `app.js`.
+   3D를 쓰지 않는 차시는 importmap과 `sim3d.js`를 빼도 된다(2D만 씀).
+4. `data/lesson-config.js`: 아래 3절 예시 중 알맞은 형(색 관찰형 / 수치 측정형)을 골라 채운다.
+5. `app.js`: 아래 순서로 연결한다(시범 앱 `app.js`가 실제 예).
+   ```js
+   var store = SciSim.createStore(C.storageKey);
+   var lesson = SciSim.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
+   var records = SciSim.RecordStore(store, { key: "records", keyOf: …, onChange: lesson.refresh });
+   var predict = SciSim.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
+   var exp = SciSim.Experiment.create({ root: $("experiment-root"), store, records, toast: lesson.toast,
+                                        factors, phases, cellKey, runLabel, view: { build3D, build2D }, observe, makeRecord, … });
+   var quiz = SciSim.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
+   var conclude = SciSim.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+   var curiosity = SciSim.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+   lesson.finish({ button, msgEl, loginHintEl, doneEl, canFinish, detail, summary });   // nav보다 먼저
+   lesson.restart($("btn-restart"));
+   lesson.nav({ el: $("stage-nav"), stages: C.stages, prevBtn, nextBtn,
+                gates: { experiment: …, analyze: () => exp.allDone() || "…", conclude: …, curiosity: … },
+                done: { … }, onEnter: { experiment: exp.activate, analyze: drawResults } });
+   ```
+   차시 앱이 직접 만드는 것은 **실험 장면**(`build3D`, `build2D` — 같은 인터페이스), **관찰 카드 내용**(`observe`), **분석 표/그래프 그리기**뿐이다.
+6. 확인: 태블릿 가로·세로, 휴대폰 375px, 다크모드, 새로고침 복원, `?no3d=1`(2D 대체), 3D↔2D 여러 번 전환, 콘솔 오류 0, `npm run build`.
+7. 공통 틀을 고칠 때는 **정본을 먼저 고치고** 앱 폴더에 다시 복사한다(`cp scripts/templates/science-sim/* public/apps/{앱}/science-sim/`). CDN 버전을 바꾸면 SRI를 다시 계산한다: `curl -s <src> | openssl dgst -sha384 -binary | openssl base64 -A`.
+
+### 실험 화면(view) 인터페이스
+
+`build3D(container, ctx)`는 `Promise<view | null>`(null이면 자동으로 2D), `build2D(container, ctx)`는 `view`를 돌려준다.
+
+| view 메서드 | 할 일 |
+|---|---|
+| `highlight(sel)` | 고른 조건을 표시(고리·테두리 등) |
+| `run(sel)` → Promise | 실험 애니메이션. 끝나면 결과가 보이는 상태여야 한다 |
+| `showInstant(sel)` | 애니메이션 없이 결과만(새로고침·화면 전환 뒤 복원) |
+| `clear()` / `resetView()` / `dispose()` | 비우기 / 처음 시점 / 해제(3D는 `v.dispose` 그대로) |
+| `whenVisible(ms)` (선택) | 3D에서는 `v.whenVisible`을 그대로 넘긴다 |
+
+물체를 누르면 `ctx.onPick({ 조건id: 값, … })`을 부른다(일부 조건만 줘도 된다). 3D 컨텍스트를 잃으면 `ctx.onLost`가 2D로 바꾼다. 잠깐 쓰는 물체(방울·스포이트)는 `v.discard(obj)`로 빼야 GPU 메모리가 쌓이지 않는다.
+
+## 3. config 예시
+
+### (1) 색 관찰형 — 예: 6-1-1-2 지시약 (시범 앱 `public/apps/sci-6-1-1-2/`)
+
+조건 두 개(용액 × 지시약), 결과는 보기 고르기, 분석은 색상 매트릭스 표 + 분류하기 + 보기 고르기.
+
+```js
+window.LessonConfig = {
+  appId: "sci-6-1-1-2", storageKey: "sci611sim2:v1",
+  stages: [{ id: "predict", label: "예상하기" }, { id: "experiment", label: "실험하기" },
+           { id: "analyze", label: "기록·분석하기" }, { id: "conclude", label: "정리하기" }, { id: "curiosity", label: "궁금한 점" }],
+  predict: { minLength: 5, questions: [{ id: "q1", text: "…" }], hints: ["답이 아닌 생각거리", "…"] },
+  solutions: [{ id: "식초", name: "식초", look: { color: "#e9cf6a", opacity: 0.55, name: "노란색, 투명" } }, …],
+  indicators: [{ id: "리트머스파랑", name: "푸른색 리트머스 시험지", phase: "A", kind: "paper", color: "#3b6fd1" }, …],
+  results: { 식초: { 리트머스파랑: { text: "붉은색으로 변함", color: "#d8434f", colorName: "붉은색" }, … }, … },  // 지도서 표 값만
+  observeChoices: { A: ["붉은색으로 변함", "푸른색으로 변함", "변화 없음"], B: ["붉은색", "푸른색", "노란색"] },
+  phases: { A: { name: "실험 A", lead: "…" }, B: { name: "실험 B", lead: "…" } },
+  classify: { items: [...], bins: [{ id: "acid", label: "산성 용액" }, …], answer: { acid: [...], base: [...] }, correct: "…", wrong: "…" },
+  quiz: [{ id: "q1", text: "…", multi: true, options: [...], answer: [...], correct: "…", wrong: "…", wrongBy: { look: "…" } }],
+  conclude: [{ id: "conclusion", kind: "결론", prompt: "…", model: "…" }, { id: "ext1", kind: "발전 질문 1", … }],
+  curiosity: { prompt: "…", minLength: 5 },
+};
+```
+
+`app.js`에서 실험 화면 틀에 넘기는 부분:
+
+```js
+SciSim.Experiment.create({
+  root: $("experiment-root"), store, records, toast: lesson.toast,
+  factors: [
+    { id: "sol", title: "용액 고르기", short: "용액", columns: 3, options: C.solutions.map(s => ({ id: s.id, label: s.name })) },
+    { id: "ind", title: "지시약 고르기", short: "지시약", options: C.indicators.map(d => ({ id: d.id, label: d.name })) },
+  ],
+  phases: [
+    { id: "A", name: "실험 A", lead: "…", cells: /* 6 용액 × 지시약 3 */ [{ sol: "식초", ind: "리트머스파랑" }, …] },
+    { id: "B", name: "실험 B", lead: "…", cells: [{ sol: "식초", ind: "붉은양배추" }, …] },   // A를 다 기록해야 열림
+  ],
+  cellKey: sel => sel.sol + "|" + sel.ind,
+  runLabel: sel => "▶ " + sel.sol + "에 … 넣기",
+  view: { build3D, build2D },
+  observe: sel => ({ question: "…색깔은 어떻게 되었나요?", body: 색견본노드, type: "choice", choices: C.observeChoices[phaseOf(sel)] }),
+  makeRecord: (sel, observed) => ({ solution: sel.sol, indicator: sel.ind, result: observed }),
+  miniTable: { rows: 용액들, cols: 지시약들, sel: (r, c) => ({ sol: r.id, ind: c.id }) },
+});
+```
+
+### (2) 수치 측정형 — 예: 물체의 운동(이동 거리·걸린 시간·속력)
+
+조건 두 개(물체 × 이동 거리), 같은 조건을 **3번** 재고(`trials: 3`), 결과는 **숫자 입력**. 분석은 수치 표(평균 줄) + 꺾은선그래프 + 막대그래프.
+(아래 수치는 틀 사용법을 보이기 위한 모양일 뿐이다. 실제 차시에서는 지도서의 조건·값을 쓴다.)
+
+```js
+window.LessonConfig = {
+  appId: "sci-x-x-x-x", storageKey: "scixxxsimx:v1",
+  objects: [{ id: "car", name: "장난감 자동차" }, { id: "ball", name: "공" }],
+  distances: [1, 2, 3],                       // m
+  measure: { field: "time", label: "걸린 시간", unit: "초", step: 0.01, min: 0, max: 60 },
+  chart: {
+    line: { caption: "이동 거리에 따른 걸린 시간(평균)", xLabel: "이동 거리", xUnit: "m", yLabel: "걸린 시간", yUnit: "초" },
+    bar:  { caption: "물체별 평균 속력", xLabel: "물체", yLabel: "속력", yUnit: "m/s", digits: 2 },
+  },
+  // stages, predict, quiz, conclude, curiosity는 (1)과 같은 모양
+};
+```
+
+```js
+var records = SciSim.RecordStore(store, { key: "records", keyOf: r => r.object + "|" + r.distance });
+var exp = SciSim.Experiment.create({
+  root: $("experiment-root"), store, records, toast: lesson.toast,
+  factors: [
+    { id: "obj", title: "물체 고르기", short: "물체", options: C.objects.map(o => ({ id: o.id, label: o.name })) },
+    { id: "dist", title: "이동 거리 고르기", short: "이동 거리", options: C.distances.map(d => ({ id: String(d), label: d + " m" })) },
+  ],
+  phases: [{ id: "M", name: "측정", lead: "물체와 이동 거리를 바꿔 가며 걸린 시간을 3번씩 재어 기록해요.", trials: 3,
+             cells: /* 물체 × 거리 */ [{ obj: "car", dist: "1" }, …] }],
+  cellKey: sel => sel.obj + "|" + sel.dist,
+  runLabel: sel => "▶ 출발! (" + sel.dist + " m)",
+  view: { build3D, build2D },                              // run(sel)에서 물체를 움직이고 스톱워치 값을 view.lastTime에 남긴다
+  observe: sel => ({
+    question: "스톱워치에 나온 걸린 시간을 확인하고 기록해요.",
+    type: "numeric",
+    fields: [{ id: "time", label: "걸린 시간", unit: "초", step: 0.01, min: 0, max: 60, value: view.lastTime }],  // 값을 미리 넣거나 비워 두고 학생이 입력
+  }),
+  makeRecord: (sel, v) => ({ object: sel.obj, distance: Number(sel.dist), time: v.time }),   // trial은 틀이 자동으로 붙인다(1~3)
+  miniTable: { rows: 물체들, cols: 거리들, sel: (r, c) => ({ obj: r.id, dist: c.id }) },   // 칸에 "2/3"처럼 회차 수가 보인다
+});
+
+// 기록·분석하기: 표 + 그래프
+var T = SciSim.TableChart, mean = (o, d) => records.mean(o + "|" + d, "time");
+T.renderTable($("table-root"), {
+  caption: "걸린 시간 기록",
+  columns: [{ id: "object", label: "물체" }, { id: "distance", label: "이동 거리", unit: "m" },
+            { id: "t1", label: "1회", unit: "초", digits: 2 }, { id: "t2", label: "2회", unit: "초", digits: 2 },
+            { id: "t3", label: "3회", unit: "초", digits: 2 }, { id: "avg", label: "평균", unit: "초", digits: 2 }],
+  rows: /* 물체×거리마다 */ [{ object: "장난감 자동차", distance: 1, t1: 1.02, t2: 0.98, t3: 1.01, avg: mean("car", 1) }, …],
+});
+T.renderLine($("line-root"), Object.assign({}, C.chart.line, {
+  series: C.objects.map(o => ({ name: o.name, points: C.distances.map(d => ({ x: d, y: mean(o.id, d) })) })),
+}));
+T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
+  categories: C.objects.map(o => o.name),
+  series: [{ name: "평균 속력", values: C.objects.map(o => /* 거리 ÷ 평균 시간 */ 3 / mean(o.id, 3)) }],
+}));
+```
+
+## 4. 지켜야 할 것
+
+- 화면의 값·색·용어는 **지도서 값만** 쓴다. 단순화한 곳은 화면에 "모형"이라고 밝힌다(`modelNote`, 3D 화면 "모형" 배지).
+- 예상하기에서는 답을 알려 주지 않는다. 힌트도 생각거리만. 새 용어·개념 설명은 예상하기 **뒤**(실험하기 `intro` 또는 분석 단계)에 둔다.
+- 색만으로 구분하지 않는다: 색 칩 옆에 항상 글자, 그래프는 점 모양·선 무늬·범례.
+- 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI.
+- 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
