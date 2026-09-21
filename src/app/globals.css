@@ -375,3 +375,10 @@ html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
 .hljs-strong { font-weight: 600; }
 .hljs-addition { color: var(--hl-tag); background: var(--hl-addition-bg); }
 .hljs-deletion { color: var(--hl-keyword); background: var(--hl-deletion-bg); }
+
+/* 사이드바 하위 트리(과학수업 학기 → 단원): 레일(접힘) 상태에서는 숨긴다.
+   hydration 전 첫 페인트에서도 숨도록 React 상태가 아니라 <html data-sidebar>로 처리한다. */
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-subtree,
+html[data-sidebar="collapsed"] .app-sidebar .sidebar-subtree-toggle {
+  display: none;
+}

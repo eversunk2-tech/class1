@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronsLeftIcon, SparklesIcon } from "lucide-react";
+import { ScienceNavTree } from "@/components/layout/science-nav-tree";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { isMenuActive, menuItems } from "@/data/menu";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
  * 메뉴 링크 목록. 데스크톱 사이드바와 모바일 드로어가 함께 쓴다.
  * - `collapsed`: 레일(아이콘만) 상태. 라벨은 CSS로 숨기고 tooltip으로 이름을 알려 준다.
  * - `onNavigate`: 링크를 누른 직후 호출(드로어 닫기용).
+ * - 과학수업 항목에는 학기 → 단원 하위 트리(ScienceNavTree)가 붙는다. 레일 상태에서는 숨긴다.
  */
 export function NavMenuList({
   collapsed = false,
@@ -29,8 +31,9 @@ export function NavMenuList({
         const active = isMenuActive(item, pathname);
         const colors = menuColorClasses[item.color];
         const Icon = item.icon;
+        const hasSubtree = item.id === "science" && !collapsed;
         return (
-          <li key={item.id}>
+          <li key={item.id} className={hasSubtree ? "relative" : undefined}>
             <Tooltip disabled={!collapsed}>
               <TooltipTrigger
                 render={
@@ -42,6 +45,8 @@ export function NavMenuList({
                       "sidebar-link group/nav flex h-12 items-center gap-3 rounded-2xl px-2 text-foreground outline-none transition-colors focus-visible:ring-3",
                       colors.focusRing,
                       active ? colors.softBg : "hover:bg-muted",
+                      // 하위 메뉴 펼침 버튼 자리
+                      hasSubtree && "pr-11",
                     )}
                   />
                 }
@@ -62,6 +67,7 @@ export function NavMenuList({
                 {item.label}
               </TooltipContent>
             </Tooltip>
+            {hasSubtree ? <ScienceNavTree onSciencePage={active} onNavigate={onNavigate} /> : null}
           </li>
         );
       })}
