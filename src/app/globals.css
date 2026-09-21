@@ -128,3 +128,131 @@
     @apply font-sans;
   }
 }
+/* ─────────────────────────────────────────────
+   한국어 글꼴 폴백
+   ───────────────────────────────────────────── */
+html {
+  font-family:
+    var(--font-sans), "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic",
+    system-ui, sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* ─────────────────────────────────────────────
+   마크다운 본문 (MarkdownViewer)
+   ───────────────────────────────────────────── */
+.markdown-body {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--foreground);
+  overflow-wrap: break-word;
+}
+.markdown-body > :first-child { margin-top: 0; }
+.markdown-body > :last-child { margin-bottom: 0; }
+.markdown-body :where(p, ul, ol, blockquote, pre, table, figure, hr) { margin: 1.1em 0; }
+.markdown-body :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.8em 0 0.6em;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.markdown-body h1 { font-size: 1.75em; }
+.markdown-body h2 { font-size: 1.45em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+.markdown-body h3 { font-size: 1.2em; }
+.markdown-body h4 { font-size: 1.05em; }
+.markdown-body a { text-decoration: underline; text-underline-offset: 3px; color: var(--foreground); }
+.markdown-body a:hover { color: var(--muted-foreground); }
+.markdown-body :where(ul, ol) { padding-left: 1.5em; }
+.markdown-body ul { list-style: disc; }
+.markdown-body ol { list-style: decimal; }
+.markdown-body li + li { margin-top: 0.3em; }
+.markdown-body li > :where(ul, ol) { margin: 0.3em 0; }
+.markdown-body li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.3em; }
+.markdown-body blockquote {
+  padding: 0.2em 1em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.markdown-body :where(blockquote, li) > :first-child { margin-top: 0; }
+.markdown-body :where(blockquote, li) > :last-child { margin-bottom: 0; }
+.markdown-body hr { border: 0; border-top: 1px solid var(--border); }
+.markdown-body img { max-width: 100%; height: auto; border-radius: var(--radius); }
+.markdown-body :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border-radius: 0.35em;
+  background: var(--muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+}
+.markdown-body pre {
+  overflow-x: auto;
+  padding: 1em 1.1em;
+  border-radius: var(--radius);
+  background: var(--hl-bg);
+  border: 1px solid var(--border);
+  font-size: 0.875em;
+  line-height: 1.65;
+}
+.markdown-body pre code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  background: none;
+  padding: 0;
+  color: var(--hl-fg);
+}
+.markdown-body table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.925em;
+}
+.markdown-body :where(th, td) { padding: 0.45em 0.8em; border: 1px solid var(--border); }
+.markdown-body th { background: var(--muted); font-weight: 600; }
+
+/* ─────────────────────────────────────────────
+   highlight.js 토큰 색상 (라이트/다크, GitHub 계열)
+   CDN 테마 CSS 대신 .dark 클래스에 맞춰 직접 정의한다.
+   ───────────────────────────────────────────── */
+:root {
+  --hl-bg: #f6f8fa;
+  --hl-fg: #24292e;
+  --hl-keyword: #d73a49;
+  --hl-title: #6f42c1;
+  --hl-attr: #005cc5;
+  --hl-string: #032f62;
+  --hl-built-in: #e36209;
+  --hl-comment: #6a737d;
+  --hl-tag: #22863a;
+  --hl-deletion-bg: #ffeef0;
+  --hl-addition-bg: #f0fff4;
+}
+.dark {
+  --hl-bg: #161b22;
+  --hl-fg: #c9d1d9;
+  --hl-keyword: #ff7b72;
+  --hl-title: #d2a8ff;
+  --hl-attr: #79c0ff;
+  --hl-string: #a5d6ff;
+  --hl-built-in: #ffa657;
+  --hl-comment: #8b949e;
+  --hl-tag: #7ee787;
+  --hl-deletion-bg: #490202;
+  --hl-addition-bg: #04260f;
+}
+.hljs { color: var(--hl-fg); background: transparent; }
+.hljs-doctag, .hljs-keyword, .hljs-meta .hljs-keyword, .hljs-template-tag,
+.hljs-template-variable, .hljs-type, .hljs-variable.language_ { color: var(--hl-keyword); }
+.hljs-title, .hljs-title.class_, .hljs-title.class_.inherited__, .hljs-title.function_ { color: var(--hl-title); }
+.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta, .hljs-number, .hljs-operator,
+.hljs-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id { color: var(--hl-attr); }
+.hljs-regexp, .hljs-string, .hljs-meta .hljs-string { color: var(--hl-string); }
+.hljs-built_in, .hljs-symbol { color: var(--hl-built-in); }
+.hljs-comment, .hljs-code, .hljs-formula { color: var(--hl-comment); }
+.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo { color: var(--hl-tag); }
+.hljs-subst { color: var(--hl-fg); }
+.hljs-section { color: var(--hl-attr); font-weight: 600; }
+.hljs-bullet { color: var(--hl-built-in); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-addition { color: var(--hl-tag); background: var(--hl-addition-bg); }
+.hljs-deletion { color: var(--hl-keyword); background: var(--hl-deletion-bg); }

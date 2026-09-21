@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.local.example
+
+# 계정 import용 CSV (비밀번호 포함)
+scripts/*.csv
+*.csv

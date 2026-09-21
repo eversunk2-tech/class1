@@ -36,7 +36,8 @@
 ### 로그인 (Auth)
 * 관리자(나): 글 작성·수정·삭제 권한. `profiles.role = 'admin'`으로 판별한다.
 * 방문자: 가입/로그인 후 댓글 작성, 웹앱 데이터 저장 가능. 읽기와 조회수는 비로그인도 가능.
-* 로그인 방식: 이메일/비밀번호(사전 생성 계정, 공개 가입 없음), GitHub OAuth, Google OAuth.
+* 로그인 방식: 이메일/비밀번호(사전 생성 계정, 사이트에 가입 폼 없음), GitHub OAuth, Google OAuth.
+* 가입 정책: Supabase 가입 허용 유지(OAuth 방문자는 첫 로그인 시 일반 사용자로 자동 가입), Confirm email 켬.
 * 사전 계정은 관리자가 로컬 스크립트(service_role key 사용, 클라이언트에 포함 금지)로 생성한다.
 * redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`를 등록한다.
 
