@@ -1,0 +1,198 @@
+/* sci-6-2-2-3 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+.wide { width: 100%; }
+
+/* 실험하기 맨 위 안전 안내(늘 보임) */
+.safety-note {
+  margin: 0 0 12px; padding: 12px 16px; font-weight: 700; line-height: 1.5;
+  background: var(--ss-warn-bg); border-left: 6px solid #d9622b;
+}
+
+/* 가로 화면: 3D 장면 + 시간 바가 한 화면에 들어오게 장면 높이를 줄인다 */
+@media (min-width: 901px) and (orientation: landscape) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: clamp(280px, calc(100vh - var(--ss-header-h) - 300px), 540px); min-height: 280px; }
+}
+@media (orientation: portrait) and (min-width: 641px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: min(40vh, 460px); }
+}
+@media (max-width: 520px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: 250px; }
+}
+
+/* ── 장면 위 상태 표시(3D·2D 공통) ── */
+.hud {
+  position: absolute; top: 8px; right: 8px; z-index: 3; max-width: calc(100% - 84px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none;
+}
+.hud-line {
+  padding: 3px 10px; border-radius: 10px; background: rgba(20, 30, 45, 0.86); color: #fff;
+  font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.hud-line.is-sel { box-shadow: 0 0 0 3px #f2a93b; }
+.hud-line.is-off { background: rgba(70, 76, 88, 0.92); color: #e4e8ee; }
+.hud-ff {
+  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 3; white-space: nowrap;
+  padding: 5px 12px; border-radius: 999px; background: rgba(183, 121, 31, 0.95); color: #fff; font-weight: 800;
+  font-size: 0.9rem; pointer-events: none;
+}
+.hud-ff[hidden] { display: none; }
+.ss-exp-view.is-2d .ss-view2d { padding-top: 70px; }
+.ss-exp-view.is-2d .hud-ff { bottom: auto; top: 44px; }
+
+/* ── 시간 바(실험해요 1) ── */
+.tb-card { margin: 8px 0; padding: 6px 12px 8px; }
+.tb-card[hidden] { display: none; }
+.tb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tb-title { margin: 0; font-size: 1rem; }
+.tb-ff { min-height: 44px; font-size: 0.92rem; }
+.tb-track { position: relative; height: 50px; touch-action: none; cursor: pointer; border-radius: 14px; user-select: none; -webkit-user-select: none; }
+.tb-track:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+.tb-track.is-off { cursor: not-allowed; opacity: 0.55; }
+.tb-rail { position: absolute; left: 22px; right: 22px; top: 50%; height: 12px; margin-top: -6px; border-radius: 999px; background: var(--ss-surface-2); border: 1px solid var(--ss-border); }
+.tb-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #f7c86a, #e0782b); }
+.tb-mark { position: absolute; top: -9px; width: 3px; height: 28px; margin-left: -1.5px; background: var(--ss-muted); border-radius: 2px; }
+.tb-mark[hidden] { display: none; }
+.tb-mark.is-b::after { content: "㉡ 꺼짐"; }
+/* 시간 바 안의 두 촛불 상태 */
+.tb-stat { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 6px 0 2px; }
+.tb-st { padding: 2px 10px; border-radius: 10px; background: #1f2733; color: #fff; font-weight: 700; font-size: 0.86rem; }
+.tb-st.is-off { background: #5b6270; }
+.tb-mark::after {
+  content: "㉠ 꺼짐"; position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+  font-size: 0.72rem; font-weight: 700; color: var(--ss-muted); white-space: nowrap;
+}
+.tb-thumb {
+  position: absolute; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+  background: #fff; border: 4px solid #d9622b; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  display: grid; place-items: center;
+}
+.tb-thumb::after { content: "⏱"; font-size: 18px; line-height: 1; }
+.tb-track.is-drag .tb-thumb { transform: scale(1.08); }
+@media (prefers-color-scheme: dark) { .tb-thumb { background: #2a3140; } }
+.tb-ends { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.82rem; font-weight: 700; color: var(--ss-muted); }
+.tb-msg { margin: 4px 0 0; font-weight: 600; font-size: 0.95rem; }
+.tb-card.is-wait { border: 3px solid var(--ss-primary); }
+.tb-card.is-wait .tb-thumb { animation: tb-pulse 1.2s ease-in-out infinite; }
+@keyframes tb-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(47, 111, 214, 0.55); } 50% { box-shadow: 0 0 0 10px rgba(47, 111, 214, 0); } }
+.tb-card.is-flash { animation: tb-flash 0.7s ease-in-out 2; }
+@keyframes tb-flash { 50% { background: var(--ss-warn-bg); } }
+@media (prefers-reduced-motion: reduce) {
+  .tb-card.is-wait .tb-thumb, .tb-card.is-flash { animation: none; }
+}
+
+/* 실험해요 2 안전 문구(장면 바로 아래) */
+.plate-note { margin: 8px 0; padding: 8px 12px; border-radius: 12px; background: var(--ss-warn-bg); font-weight: 700; }
+.plate-note[hidden] { display: none; }
+
+/* ── 관찰 카드: 지금 모습 ── */
+.obs-chip {
+  margin: 0 0 6px; padding: 10px 14px; border-radius: 14px; background: #1f2733; color: #fff;
+  border: 3px solid #ffd166; font-size: 1rem; line-height: 1.5;
+}
+.obs-chip strong { font-weight: 700; opacity: 0.92; }
+.chip-tx { font-weight: 800; }
+
+/* ── 내 기록(2×2) ── */
+.my-records .ss-step-h { margin-bottom: 6px; }
+.mine-row { display: grid; grid-template-columns: 5.2em 1fr 1fr; gap: 6px; align-items: stretch; margin-top: 6px; }
+.mine-ph { align-self: center; font-weight: 700; font-size: 0.88rem; color: var(--ss-muted); }
+.mine-cell {
+  min-height: 52px; padding: 6px 8px; border-radius: 12px; border: 2px solid var(--ss-border); background: var(--ss-surface);
+  color: var(--ss-text); font: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.mine-name { font-size: 0.82rem; font-weight: 700; }
+.mine-val { font-size: 0.9rem; font-weight: 800; }
+.mine-cell.is-rec { border-color: var(--ss-good); background: var(--ss-good-bg); }
+.mine-cell.is-sel { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ss-accent) 60%, transparent); }
+.mine-cell.is-locked { opacity: 0.6; }
+
+/* ── 2D 장면(SVG, 옆에서 본 모습) ── */
+.d2-wrap { display: grid; }
+.d2-svg { display: block; width: 100%; height: auto; }
+.d2-bg { fill: #eef3f8; }
+.d2-table { fill: #d9c7a3; }
+.d2-pick { cursor: pointer; }
+.d2-selring { fill: none; stroke: #f2a93b; stroke-width: 5; }
+.d2-dish { fill: #b8c0c8; }
+.d2-candle { fill: #f6f1e6; stroke: #b9b2a3; stroke-width: 1.5; }
+.d2-wick { stroke: #222; stroke-width: 3; }
+.d2-glow { fill: #ffc861; opacity: 0.28; }
+.d2-flame-out { fill: #ff9a2e; }
+.d2-flame-in { fill: #fff3b0; }
+.d2-smoke { fill: #c9ced6; }
+.d2-liquid { fill: #e2bf62; opacity: 0.8; }
+.d2-glass { fill: rgba(223, 241, 255, 0.25); stroke: #7fa3c2; stroke-width: 2.5; }
+.d2-bubble { fill: #fff; stroke: #9bb6cc; stroke-width: 1; }
+.d2-box { fill: rgba(207, 234, 255, 0.25); stroke: #5d9ccc; stroke-width: 3; }
+.d2-name { font: 800 17px system-ui, sans-serif; fill: #1f2733; }
+.d2-small { font: 600 14px system-ui, sans-serif; fill: #33404f; }
+.d2-leg { stroke: #6c737c; stroke-width: 5; }
+.d2-leg-back { opacity: 0.55; }
+.d2-plate { fill: #8a929c; }
+.d2-lamp { fill: rgba(191, 224, 255, 0.55); stroke: #7fa3c2; stroke-width: 2.5; }
+.d2-neck { fill: #b8c0c8; }
+.d2-lampflame { fill: #6ea8ff; opacity: 0.8; }
+.d2-mid { stroke: #1f2733; stroke-width: 2; }
+.d2-dist { stroke: #1f2733; stroke-width: 2; stroke-dasharray: 6 5; }
+.d2-head { stroke: #5a1416; stroke-width: 1.5; }
+.d2-wood { stroke: #6b5332; stroke-width: 1.5; }
+.d2-sand { fill: #d8c28f; stroke: #a8925f; stroke-width: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .d2-bg { fill: #1b2230; }
+  .d2-table { fill: #6b5d45; }
+  .d2-name { fill: #e8edf4; }
+  .d2-small { fill: #c9d2de; }
+  .d2-mid, .d2-dist { stroke: #e8edf4; }
+  .d2-box { fill: rgba(120, 170, 220, 0.14); stroke: #8fc0e8; }
+}
+
+/* ── 분석 ── */
+#result-table-1 table, #result-table-2 table { min-width: 0; }
+
+/* ── 정리: 오개념 카드, 선택 읽을거리 ── */
+.misc-card { border-left: 6px solid var(--ss-accent); background: var(--ss-warn-bg); }
+.misc-title { margin: 0 0 6px; font-size: 1.05rem; }
+.misc-card p { margin: 0; line-height: 1.6; }
+.more-note summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.more-note p { margin: 6px 0 0; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+/* 궁금한 점은 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .hud-line { font-size: 0.74rem; padding: 2px 8px; }
+  .hud { max-width: calc(100% - 70px); }
+  .hud-ff { font-size: 0.78rem; bottom: 50px; }
+  .tb-card { padding: 6px 8px 8px; }
+  .tb-title { font-size: 0.92rem; }
+  .mine-row { grid-template-columns: 1fr 1fr; }
+  .mine-ph { grid-column: 1 / -1; }
+}
+
+/* fix-1: 휴대폰 — 시간 바를 끄는 동안 장면이 함께 보이게 장면·시간 바를 줄인다 */
+@media (max-width: 520px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: 210px; }
+  .tb-head { flex-wrap: nowrap; }
+  .tb-title { font-size: 0.85rem; }
+  .tb-ff { min-height: 44px; padding: 0 10px; font-size: 0.8rem; white-space: nowrap; }
+  .tb-ends { display: none; }
+  .tb-msg { font-size: 0.82rem; }
+  .tb-st { font-size: 0.74rem; padding: 2px 7px; }
+  .tb-mark::after { font-size: 0.66rem; }
+}
+@media (max-width: 520px) {
+  .ss-view3d ~ .hud-ff, .hud-ff { bottom: auto; top: 40px; left: 10px; transform: none; }
+}

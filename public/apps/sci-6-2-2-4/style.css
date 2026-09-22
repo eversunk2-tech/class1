@@ -1,0 +1,114 @@
+/* sci-6-2-2-4 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+.small-btn { min-height: 44px; padding: 0 12px; font-size: 0.9rem; }
+.wide { width: 100%; }
+
+/* 실험 아이콘(모양으로 구분: 종이 조각 / 유리병) */
+.exp-icon { flex: none; width: 30px; height: 30px; }
+.ei-paper { fill: #3b6fd1; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
+.ei-tape { fill: rgba(255, 255, 255, 0.7); stroke: #9aa4b1; stroke-width: 0.8; }
+.ei-jar { fill: rgba(200, 225, 245, 0.35); stroke: #6f8398; stroke-width: 1.5; }
+.ei-lime { fill: rgba(170, 205, 230, 0.55); }
+.ei-lid { fill: #3a4250; }
+
+/* ── 실험 화면 상태 표시(3D·2D 공통) ── */
+.hud {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 12px; border-radius: 12px;
+  background: rgba(20, 30, 45, 0.86); color: #fff; font-weight: 700; font-size: 0.92rem; pointer-events: none;
+}
+.hud-flame { color: #ffd166; }
+.hud-step[hidden] { display: none; }
+.hud-ff {
+  padding: 5px 12px; border-radius: 999px; background: rgba(47, 111, 214, 0.92); color: #fff; font-weight: 800;
+  font-size: 0.9rem; pointer-events: none;
+}
+.hud-ff[hidden] { display: none; }
+.ss-view3d .hud { position: absolute; top: 10px; right: 10px; z-index: 3; max-width: calc(100% - 90px); justify-content: flex-end; }
+.ss-view3d .hud-ff { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 3; white-space: nowrap; }
+
+/* ── 관찰 카드 견본 ── */
+.swatch-row { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px; border-radius: 12px; background: var(--ss-surface-2); flex-wrap: wrap; }
+.swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; text-align: center; }
+.swatch-chip { width: 56px; height: 56px; border-radius: 14px; border: 2px solid rgba(0, 0, 0, 0.18); }
+.swatch-chip.is-clear { background: repeating-conic-gradient(#e7edf3 0 25%, #ffffff 0 50%) 0 0 / 14px 14px; }
+.swatch-chip.is-milky { background: radial-gradient(circle at 30% 30%, #ffffff 0 20%, transparent 45%), #dfe3e8 !important; }
+.swatch-label { font-size: 0.8rem; color: var(--ss-muted); font-weight: 600; }
+.swatch-name { display: none; font-weight: 700; font-size: 0.88rem; }
+.swatch-name.is-on { display: block; }
+.arrow { font-size: 1.5rem; color: var(--ss-muted); }
+.swatch-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+/* 관찰 카드 속 '방금 한 실험 화면' 사진(fix-1) */
+.obs-photo { margin: 0 0 10px; }
+.obs-photo .photo-img, .obs-photo .photo-svg { display: block; width: 100%; max-height: 230px; object-fit: contain; border-radius: 12px; background: var(--ss-surface-2); }
+.obs-photo figcaption { margin-top: 4px; }
+
+/* ── 2D 대체 화면: 옆에서 본 모습 ── */
+.s2-wrap { position: relative; }
+.s2-head { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; min-height: 34px; margin-bottom: 6px; }
+.side-svg { display: block; width: 100%; height: auto; max-height: 52vh; background: var(--ss-surface-2); border-radius: 14px; }
+.s2-caption { margin: 6px 2px 0; font-size: 0.85rem; color: var(--ss-muted); }
+.s2-table { fill: #e3d4b4; }
+.s2-clear-a { fill: #ffffff; }
+.s2-clear-b { fill: #e7edf3; }
+.s2-cup-fill { fill: rgba(190, 220, 250, 0.16); }
+.s2-cup-line { fill: none; stroke: #6f94ba; stroke-width: 3; }
+.s2-cup-shine { stroke: rgba(255, 255, 255, 0.8); stroke-width: 4; stroke-linecap: round; }
+.s2-paper { fill: #3b6fd1; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1; }
+.s2-tape { fill: rgba(255, 255, 255, 0.55); stroke: #9aa4b1; stroke-width: 1; }
+.s2-dish { fill: #a9b2bd; }
+.s2-candle { fill: #f6f0de; stroke: #c9bfa4; stroke-width: 1.5; }
+.s2-wick { stroke: #2a2a2a; stroke-width: 3; }
+.s2-flame { fill: #ffb938; opacity: 0.92; }
+.s2-flame-core { fill: #fff3c4; }
+.s2-flame-base { fill: #4a7bd6; opacity: 0.75; }
+.s2-flicker { transform-box: fill-box; transform-origin: 50% 100%; animation: s2-flick 0.35s ease-in-out infinite alternate; }
+@keyframes s2-flick { from { transform: scale(1, 0.94); } to { transform: scale(0.96, 1.05); } }
+@media (prefers-reduced-motion: reduce) { .s2-flicker { animation: none; } }
+.s2-jar { fill: rgba(200, 225, 245, 0.25); stroke: #6f8398; stroke-width: 2.5; }
+.s2-jar-neck { fill: none; stroke: #6f8398; stroke-width: 2; }
+.s2-lime { fill: url(#s6224-clear); fill-opacity: 0.25; }
+.s2-lime.is-milky { stroke: #b9c0ca; stroke-width: 1; }
+.s2-lid { fill: #3a4250; }
+.s2-lbl { font: 700 16px system-ui, sans-serif; fill: var(--ss-text); }
+.s2-lbl-s { font: 700 13px system-ui, sans-serif; fill: var(--ss-text); }
+.s2-lbl-xs { font: 600 12px system-ui, sans-serif; fill: var(--ss-muted); }
+@media (prefers-color-scheme: dark) {
+  .s2-table { fill: #4d4436; }
+}
+
+/* 진행 막대 이름("🔒 석회수 실험")이 줄바꿈되지 않게 */
+.ss-prow { grid-template-columns: 7.6em 1fr 3.2em; }
+
+/* ── 분석 ── */
+.know-card { border-left: 6px solid var(--ss-primary); line-height: 1.6; }
+#result-table .ss-matrix { min-width: 0; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+/* 궁금한 점은 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .hud { font-size: 0.78rem; padding: 4px 8px; }
+  .ss-view3d .hud { max-width: calc(100% - 70px); }
+  .ss-view3d .hud-ff { font-size: 0.78rem; bottom: 52px; }
+  .side-svg { max-height: none; }
+  #result-table .ss-matrix { font-size: 0.85rem; }
+  #result-table .ss-matrix th, #result-table .ss-matrix td { padding: 6px 4px; }
+  #result-table .ss-cell { gap: 4px; }
+  #result-table .ss-chip { width: 18px; height: 18px; }
+  .swatch { min-width: 80px; }
+  .swatch-chip { width: 48px; height: 48px; }
+}
