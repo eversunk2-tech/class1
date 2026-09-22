@@ -24,7 +24,7 @@ import {
 /** SQL 실행 전 안내(문구 편집 불가, 기본 문구로 보내기는 가능) */
 export function PraiseMissingNotice() {
   return (
-    <p role="status" className="rounded-lg border border-math-strong/30 bg-math-strong/5 px-3 py-2 text-xs leading-5">
+    <p role="status" className="rounded-lg border border-board-strong/30 bg-board-strong/5 px-3 py-2 text-xs leading-5">
       <span className="font-medium">SQL 실행 필요 · </span>
       {PRAISE_MISSING_MESSAGE}
     </p>

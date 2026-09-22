@@ -50,7 +50,7 @@ function LearningStatTiles() {
   const tiles: { label: string; unit: string; icon: LucideIcon; color: MenuColor; value: number | null }[] = [
     { label: "전체 회원", unit: "명", icon: UsersIcon, color: "games", value: v?.totalMembers ?? null },
     { label: "오늘 학습 결과", unit: "건", icon: Gamepad2Icon, color: "home", value: v?.resultsToday ?? null },
-    { label: "검토 대기 제출", unit: "건", icon: ClipboardCheckIcon, color: "math", value: v?.pendingSubmissions ?? null },
+    { label: "검토 대기 제출", unit: "건", icon: ClipboardCheckIcon, color: "board", value: v?.pendingSubmissions ?? null },
     { label: "안 읽은 피드백", unit: "개", icon: MessageCircleIcon, color: "science", value: v?.unreadFeedback ?? null },
   ];
 
@@ -219,7 +219,7 @@ export function AdminOverview() {
               <ShortcutLink href="/admin/members/" label="회원 관리" description="검색 · 비밀번호 초기화" icon={UsersIcon} color="games" />
             </li>
             <li>
-              <ShortcutLink href="/admin/learning/" label="학습 현황" description="웹앱 결과 · 참여 · 피드백" icon={GraduationCapIcon} color="math" />
+              <ShortcutLink href="/admin/learning/" label="학습 현황" description="웹앱 결과 · 참여 · 피드백" icon={GraduationCapIcon} color="board" />
             </li>
             <li>
               <ShortcutLink

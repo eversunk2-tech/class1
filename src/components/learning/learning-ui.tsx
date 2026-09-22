@@ -71,7 +71,7 @@ export function SubmissionStatusBadge({ status }: { status: SubmissionStatus | n
 /** §14 Q1 지각 배지 */
 export function LateBadge() {
   return (
-    <Badge variant="outline" className="border-math-strong/40 text-math-strong" title="마감 시각 이후에 처음 제출했어요">
+    <Badge variant="outline" className="border-board-strong/40 text-board-strong" title="마감 시각 이후에 처음 제출했어요">
       <AlarmClockIcon aria-hidden />
       지각
     </Badge>

@@ -1,8 +1,8 @@
 import type { ComponentType, SVGProps } from "react";
-import { FlaskConicalIcon, Gamepad2Icon, HouseIcon, RulerIcon, type LucideIcon } from "lucide-react";
+import { FlaskConicalIcon, Gamepad2Icon, HouseIcon, MessageSquareIcon, type LucideIcon } from "lucide-react";
+import { BoardIllustration } from "@/components/illustrations/board-illustration";
 import { GameIllustration } from "@/components/illustrations/game-illustration";
 import { HomeIllustration } from "@/components/illustrations/home-illustration";
-import { MathIllustration } from "@/components/illustrations/math-illustration";
 import { ScienceIllustration } from "@/components/illustrations/science-illustration";
 
 /**
@@ -16,7 +16,7 @@ import { ScienceIllustration } from "@/components/illustrations/science-illustra
  *    @theme inline 매핑을 추가하고, src/lib/menu-colors.ts의 고정 클래스 매핑에도 항목을 추가한다.
  * 사이드바와 대시보드 카드는 이 배열을 순회할 뿐이라 따로 고칠 필요가 없다.
  */
-export type MenuColor = "home" | "games" | "science" | "math";
+export type MenuColor = "home" | "games" | "science" | "board";
 
 export type MenuItem = {
   /** 고유 key */
@@ -52,7 +52,7 @@ export const menuItems: MenuItem[] = [
     icon: Gamepad2Icon,
     illustration: GameIllustration,
     color: "games",
-    description: "직접 만든 게임을 해봐요",
+    description: "게임을 올리고 해봐요",
   },
   {
     id: "science",
@@ -64,13 +64,13 @@ export const menuItems: MenuItem[] = [
     description: "과학 시간에 배운 것들",
   },
   {
-    id: "math",
-    label: "수학수업",
-    href: "/math/",
-    icon: RulerIcon,
-    illustration: MathIllustration,
-    color: "math",
-    description: "수학 시간에 배운 것들",
+    id: "board",
+    label: "자유게시판",
+    href: "/board/",
+    icon: MessageSquareIcon,
+    illustration: BoardIllustration,
+    color: "board",
+    description: "하고 싶은 이야기를 나눠요",
   },
 ];
 

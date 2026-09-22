@@ -105,7 +105,7 @@ export function Sidebar() {
       {/* 펼침 상태에서만 보이는 작은 응원 카드 */}
       <div className="sidebar-extra mt-auto rounded-2xl bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
         <p className="flex items-center gap-1.5 font-heading text-sm text-foreground">
-          <SparklesIcon className="size-4 text-math-strong" aria-hidden />
+          <SparklesIcon className="size-4 text-board-strong" aria-hidden />
           오늘도 즐겁게!
         </p>
         <p className="mt-1">궁금한 건 언제든 찾아보고, 직접 해 봐요.</p>

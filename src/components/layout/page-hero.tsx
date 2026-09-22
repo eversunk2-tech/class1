@@ -4,7 +4,7 @@ import { menuColorClasses } from "@/lib/menu-colors";
 import { cn } from "@/lib/utils";
 
 /**
- * 화면 맨 위 히어로 패널(홈 · 학습게임활동 · 과학수업 · 수학수업 공용).
+ * 화면 맨 위 히어로 패널(홈 · 학습게임활동 · 과학수업 · 자유게시판 공용).
  * 파스텔 soft 배경 위에 제목(Jua)과 큰 일러스트를 놓는다. 글자는 항상 foreground 계열을 쓴다.
  */
 export function PageHero({

@@ -60,7 +60,7 @@ export function CompletedMark({ completed }: { completed: boolean }) {
 export function SuspiciousMark({ result }: { result: Pick<AppResult, "score" | "max_score" | "duration_seconds"> }) {
   if (!isSuspiciousResult(result)) return null;
   return (
-    <span title="만점 초과 · 0초 만점 등 확인이 필요한 기록" className="ml-1 inline-flex align-middle text-math-strong">
+    <span title="만점 초과 · 0초 만점 등 확인이 필요한 기록" className="ml-1 inline-flex align-middle text-board-strong">
       <AlertTriangleIcon className="size-3.5" aria-hidden />
       <span className="sr-only">확인 필요</span>
     </span>

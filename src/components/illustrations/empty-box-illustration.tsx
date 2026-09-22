@@ -6,14 +6,14 @@ const ACCENT_STRONG: Record<MenuColor, string> = {
   home: "var(--home-strong)",
   games: "var(--games-strong)",
   science: "var(--science-strong)",
-  math: "var(--math-strong)",
+  board: "var(--board-strong)",
 };
 
 const ACCENT_SOFT: Record<MenuColor, string> = {
   home: "var(--home-soft)",
   games: "var(--games-soft)",
   science: "var(--science-soft)",
-  math: "var(--math-soft)",
+  board: "var(--board-soft)",
 };
 
 /** 빈 상태 공통: 뚜껑 열린 상자 안을 들여다보는 동글이. accent로 리본 색만 바뀐다. */
@@ -93,7 +93,7 @@ export function EmptyBoxIllustration({
         </text>
       </g>
       <Sparkle x={38} y={40} size={5.5} fill={strong} className="illo-twinkle" />
-      <Sparkle x={176} y={112} size={4.5} fill="var(--math-strong)" className="illo-twinkle-late" />
+      <Sparkle x={176} y={112} size={4.5} fill="var(--board-strong)" className="illo-twinkle-late" />
       <Sparkle x={22} y={118} size={4} fill="var(--home-strong)" className="illo-twinkle-late" />
     </svg>
   );

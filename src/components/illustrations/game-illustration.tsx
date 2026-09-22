@@ -12,8 +12,8 @@ export function GameIllustration(props: IllustrationProps) {
       <ellipse cx="120" cy="158" rx="72" ry="7" fill="var(--foreground)" opacity="0.08" />
 
       {/* 별 */}
-      <Star x={46} y={42} r={12} rotate={-12} fill="var(--math-strong)" className="illo-twinkle" />
-      <Star x={198} y={38} r={9.5} rotate={10} fill="var(--math-strong)" className="illo-twinkle-late" />
+      <Star x={46} y={42} r={12} rotate={-12} fill="var(--board-strong)" className="illo-twinkle" />
+      <Star x={198} y={38} r={9.5} rotate={10} fill="var(--board-strong)" className="illo-twinkle-late" />
       <Star x={160} y={22} r={5.5} fill="var(--home-strong)" className="illo-twinkle" />
       <Star x={24} y={104} r={5} rotate={8} fill="var(--science-strong)" className="illo-twinkle-late" />
 
@@ -46,7 +46,7 @@ export function GameIllustration(props: IllustrationProps) {
         {/* 네 가지 색 버튼 */}
         <circle cx="160" cy="82" r="7" fill="var(--home-strong)" />
         <circle cx="175" cy="96" r="7" fill="var(--science-strong)" />
-        <circle cx="145" cy="96" r="7" fill="var(--math-strong)" />
+        <circle cx="145" cy="96" r="7" fill="var(--board-strong)" />
         <circle cx="160" cy="110" r="7" fill="var(--games-strong)" />
 
         {/* 얼굴 · 시작 버튼 */}
@@ -59,7 +59,7 @@ export function GameIllustration(props: IllustrationProps) {
       <Sparkle x={222} y={84} size={6} fill="var(--games-strong)" className="illo-twinkle" />
       <Sparkle x={92} y={26} size={5} fill="var(--games-strong)" className="illo-twinkle-late" />
       <Sparkle x={210} y={150} size={4.5} fill="var(--home-strong)" className="illo-twinkle" />
-      <Sparkle x={34} y={148} size={5} fill="var(--math-strong)" className="illo-twinkle" />
+      <Sparkle x={34} y={148} size={5} fill="var(--board-strong)" className="illo-twinkle" />
     </svg>
   );
 }

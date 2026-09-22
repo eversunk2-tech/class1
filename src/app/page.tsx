@@ -1,18 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import {
-  ArrowRightIcon,
-  FlameIcon,
-  FlaskConicalIcon,
-  Gamepad2Icon,
-  NewspaperIcon,
-  RulerIcon,
-  type LucideIcon,
-} from "lucide-react";
-import { AppGrid } from "@/components/apps/app-grid";
+import { ArrowRightIcon, FlaskConicalIcon, Gamepad2Icon, MessageSquareIcon, type LucideIcon } from "lucide-react";
 import { TaggedPostList } from "@/components/class/tagged-post-list";
+import { CommunityPostList } from "@/components/community/community-post-list";
 import { MenuShortcutCard } from "@/components/dashboard/menu-shortcut-card";
-import { PopularPosts } from "@/components/dashboard/popular-posts";
+import { ScienceAppStatus } from "@/components/dashboard/science-app-status";
 import { StatTiles } from "@/components/dashboard/stat-tile";
 import { HomeIllustration } from "@/components/illustrations/home-illustration";
 import { PageHero } from "@/components/layout/page-hero";
@@ -66,7 +58,7 @@ function DashboardSection({
   );
 }
 
-// 홈 대시보드(spec §4.1, §12). 각 섹션은 독립적으로 데이터를 불러오므로 하나가 실패해도 나머지는 그대로 보인다.
+// 홈 대시보드(docs/community/spec.md §6: 최근 과학 수업 · 최근 자유게시판 · 학습게임 미리보기). 각 섹션은 독립적으로 데이터를 불러오므로 하나가 실패해도 나머지는 그대로 보인다.
 export default function Home() {
   const shortcuts = menuItems.filter((item) => item.href !== "/");
 
@@ -104,55 +96,42 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="grid gap-10 xl:grid-cols-2 xl:gap-8">
-        <DashboardSection
-          id="recent-heading"
-          title="최근 소식"
-          icon={NewspaperIcon}
-          color="home"
-          moreHref="/search/"
-          moreLabel="전체 글 더 보기"
-        >
-          <TaggedPostList limit={5} accent="home" emptyTitle="아직 올라온 소식이 없어요" />
-        </DashboardSection>
-        <DashboardSection id="popular-heading" title="인기 글" icon={FlameIcon} color="games">
-          <PopularPosts limit={3} />
-        </DashboardSection>
-      </div>
-
-      <div className="grid gap-10 xl:grid-cols-2 xl:gap-8">
-        <DashboardSection
-          id="science-heading"
-          title="최근 과학 수업"
-          icon={FlaskConicalIcon}
-          color="science"
-          moreHref="/science/"
-          moreLabel="과학 수업 글 더 보기"
-        >
-          <TaggedPostList tag="과학" limit={3} accent="science" />
-        </DashboardSection>
-        <DashboardSection
-          id="math-heading"
-          title="최근 수학 수업"
-          icon={RulerIcon}
-          color="math"
-          moreHref="/math/"
-          moreLabel="수학 수업 글 더 보기"
-        >
-          <TaggedPostList tag="수학" limit={3} accent="math" />
-        </DashboardSection>
-      </div>
-
       <DashboardSection
-        id="games-heading"
-        title="학습게임 미리보기"
-        icon={Gamepad2Icon}
-        color="games"
-        moreHref="/games/"
-        moreLabel="학습게임 더 보기"
+        id="science-heading"
+        title="최근 과학 수업"
+        icon={FlaskConicalIcon}
+        color="science"
+        moreHref="/science/"
+        moreLabel="과학 수업 더 보기"
       >
-        <AppGrid limit={3} />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8">
+          <ScienceAppStatus />
+          <TaggedPostList tag="과학" limit={3} accent="science" emptyTitle="아직 과학 수업 글이 없어요" />
+        </div>
       </DashboardSection>
+
+      <div className="grid grid-cols-1 gap-10 xl:grid-cols-2 xl:gap-8">
+        <DashboardSection
+          id="board-heading"
+          title="최근 자유게시판"
+          icon={MessageSquareIcon}
+          color="board"
+          moreHref="/board/"
+          moreLabel="자유게시판 더 보기"
+        >
+          <CommunityPostList kind="board" limit={3} />
+        </DashboardSection>
+        <DashboardSection
+          id="games-heading"
+          title="학습게임 미리보기"
+          icon={Gamepad2Icon}
+          color="games"
+          moreHref="/games/"
+          moreLabel="학습게임 더 보기"
+        >
+          <CommunityPostList kind="game" limit={3} />
+        </DashboardSection>
+      </div>
     </div>
   );
 }

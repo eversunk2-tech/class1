@@ -50,13 +50,13 @@ export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
     chip: "bg-science-soft text-science-strong",
     focusRing: "focus-visible:ring-science-strong/50",
   },
-  math: {
-    softBg: "bg-math-soft",
-    strongText: "text-math-strong",
-    strongBg: "bg-math-strong",
-    border: "border-math-strong/25",
-    hoverBorder: "hover:border-math-strong/60",
-    chip: "bg-math-soft text-math-strong",
-    focusRing: "focus-visible:ring-math-strong/50",
+  board: {
+    softBg: "bg-board-soft",
+    strongText: "text-board-strong",
+    strongBg: "bg-board-strong",
+    border: "border-board-strong/25",
+    hoverBorder: "hover:border-board-strong/60",
+    chip: "bg-board-soft text-board-strong",
+    focusRing: "focus-visible:ring-board-strong/50",
   },
 };

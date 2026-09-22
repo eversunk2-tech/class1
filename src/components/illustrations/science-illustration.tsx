@@ -66,7 +66,7 @@ export function ScienceIllustration(props: IllustrationProps) {
       <g className="illo-float-slow">
         <g transform="rotate(-18 186 50)">
           <ellipse cx="186" cy="50" rx="33" ry="9" stroke="var(--science-strong)" strokeWidth="3.5" />
-          <circle cx="186" cy="50" r="20" fill="var(--math-strong)" />
+          <circle cx="186" cy="50" r="20" fill="var(--board-strong)" />
           <path d="M170 42c5-5 11-8 18-8" stroke="var(--card)" strokeWidth="3.5" strokeLinecap="round" opacity="0.4" />
           <circle cx="196" cy="62" r="3" fill="var(--card)" opacity="0.3" />
           <path d="M153 50a33 9 0 0 0 66 0" stroke="var(--science-strong)" strokeWidth="3.5" strokeLinecap="round" />
@@ -84,7 +84,7 @@ export function ScienceIllustration(props: IllustrationProps) {
       <Sparkle x={187} y={122} size={6} fill="var(--home-strong)" className="illo-twinkle" />
 
       {/* 반짝이 */}
-      <Sparkle x={58} y={26} size={5} fill="var(--math-strong)" className="illo-twinkle-late" />
+      <Sparkle x={58} y={26} size={5} fill="var(--board-strong)" className="illo-twinkle-late" />
       <Sparkle x={150} y={22} size={4.5} fill="var(--games-strong)" className="illo-twinkle" />
       <Sparkle x={34} y={124} size={5.5} fill="var(--science-strong)" className="illo-twinkle-late" />
     </svg>

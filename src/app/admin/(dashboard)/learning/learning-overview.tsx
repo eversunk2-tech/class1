@@ -198,7 +198,7 @@ export function RecentActivitySection({ limit, compact = false }: { limit: numbe
         }
       >
         <span id={`recent-activity-${limit}`} className="inline-flex items-center gap-2">
-          <ClipboardCheckIcon className="size-5 text-math-strong" aria-hidden />
+          <ClipboardCheckIcon className="size-5 text-board-strong" aria-hidden />
           최근 학습활동
         </span>
       </SectionTitle>
@@ -239,7 +239,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
       ) : (
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span className="inline-flex min-w-0 items-center gap-1.5">
-            <ClipboardCheckIcon className="size-4 shrink-0 text-math-strong" aria-hidden />
+            <ClipboardCheckIcon className="size-4 shrink-0 text-board-strong" aria-hidden />
             {item.assignment ? (
               <Link
                 href={`/admin/learning/?tab=assignments&assignment=${item.assignment.id}`}

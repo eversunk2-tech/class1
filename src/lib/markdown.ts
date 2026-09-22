@@ -29,6 +29,30 @@ const SANITIZE_CONFIG = {
   FORBID_ATTR: ["style"],
 };
 
+/**
+ * 학생이 쓴 글(자유게시판 등, ugc)용 설정. 위 설정에 더해 외부 이미지·미디어·프레임을 막는다
+ * (이미지 첨부는 1차 제외 — 외부 이미지로 접속 기록을 모으는 것도 막는다).
+ */
+const UGC_SANITIZE_CONFIG = {
+  ...SANITIZE_CONFIG,
+  FORBID_TAGS: [
+    ...SANITIZE_CONFIG.FORBID_TAGS,
+    "img",
+    "picture",
+    "source",
+    "video",
+    "audio",
+    "track",
+    "iframe",
+    "frame",
+    "object",
+    "embed",
+    "link",
+    "meta",
+  ],
+  FORBID_ATTR: [...SANITIZE_CONFIG.FORBID_ATTR, "srcset", "id", "name"],
+};
+
 type MarkedGlobal = {
   parse: (src: string, options?: { async?: false; gfm?: boolean; breaks?: boolean }) => string;
 };
@@ -57,7 +81,7 @@ export function isMarkdownReady(): boolean {
  * highlight.js가 로드되어 있으면 코드 블록에 하이라이트를 적용한다.
  * 반환값은 항상 DOMPurify.sanitize를 거친 HTML이다.
  */
-export function renderMarkdown(md: string): string | null {
+export function renderMarkdown(md: string, options: { ugc?: boolean } = {}): string | null {
   if (!isMarkdownReady()) return null;
   const { marked, DOMPurify, hljs } = window;
   const raw = marked!.parse(md, { async: false, gfm: true, breaks: false });
@@ -77,5 +101,15 @@ export function renderMarkdown(md: string): string | null {
     html = tpl.innerHTML;
   }
 
-  return DOMPurify!.sanitize(html, SANITIZE_CONFIG);
+  if (!options.ugc) return DOMPurify!.sanitize(html, SANITIZE_CONFIG);
+
+  const clean = DOMPurify!.sanitize(html, UGC_SANITIZE_CONFIG);
+  // 정화된 HTML의 링크는 새 탭 + opener/referrer 차단(비활성 template 안에서만 고친다).
+  const tpl = document.createElement("template");
+  tpl.innerHTML = clean;
+  tpl.content.querySelectorAll("a[href]").forEach((a) => {
+    a.setAttribute("target", "_blank");
+    a.setAttribute("rel", "noopener noreferrer nofollow ugc");
+  });
+  return tpl.innerHTML;
 }

@@ -30,7 +30,7 @@ async function fetchPosts(tag: string | undefined, offset: number, size: number)
 }
 
 /**
- * 태그별 글 목록(과학수업 · 수학수업 · 홈 대시보드 미리보기 공용, spec §4.3).
+ * 태그별 글 목록(과학수업 · 홈 대시보드 미리보기 공용, spec §4.3).
  * - `tag`가 없으면 태그와 상관없이 전체 글("최근 소식").
  * - `limit`이 없으면 "더 보기" 페이지네이션, 있으면 위에서 N개만 보여 주고 `moreHref` 링크를 단다.
  */

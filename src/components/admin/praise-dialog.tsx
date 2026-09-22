@@ -228,7 +228,7 @@ function PraiseFlow({
             </p>
           ) : null}
           {resendCount ? (
-            <p className="inline-flex items-start gap-1.5 text-sm text-math-strong">
+            <p className="inline-flex items-start gap-1.5 text-sm text-board-strong">
               <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
               이 가운데 {resendCount}명은 이 활동에서 이미 선생님 메시지를 받은 학생이에요(다시 한 결과 포함).
             </p>

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FlaskConicalIcon, Gamepad2Icon, NewspaperIcon, RotateCwIcon, RulerIcon, type LucideIcon } from "lucide-react";
-import { webApps } from "@/data/apps";
+import { FlaskConicalIcon, Gamepad2Icon, MessageSquareIcon, NewspaperIcon, RotateCwIcon, type LucideIcon } from "lucide-react";
+import { scienceAppCount } from "@/components/dashboard/science-app-status";
 import type { MenuColor } from "@/data/menu";
 import { formatCount } from "@/lib/format";
+import { countCommunityPosts, isSetupMissing, type CommunityKind } from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-type Status = "loading" | "ready" | "error";
+type Status = "loading" | "ready" | "error" | "setup";
 
 /** 통계 타일 1개(표시 전용). 숫자는 제목 글꼴로 크게, 라벨은 본문 색으로 보여 준다. */
 export function StatTile({
@@ -39,6 +40,10 @@ export function StatTile({
         <span className="truncate text-xs text-muted-foreground sm:text-sm">{label}</span>
         {status === "loading" ? (
           <span className="h-7 w-12 animate-pulse rounded-md bg-muted" aria-label={`${label} 불러오는 중`} role="status" />
+        ) : status === "setup" ? (
+          <span className="text-sm text-muted-foreground" title="SQL 실행 후 열려요">
+            준비 중
+          </span>
         ) : status === "error" ? (
           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
             {/* 타일이 좁아(모바일 2열 · 데스크톱 4열) 긴 문구는 줄바꿈되므로 짧게 보여 주고, 전체 문장은 보조기기에만 전한다. */}
@@ -78,15 +83,18 @@ async function fetchPostCount(tag?: string): Promise<number> {
   return count ?? 0;
 }
 
-/** 글 수를 스스로 불러오는 통계 타일. 타일마다 독립적으로 로딩/오류 상태를 갖는다. */
+/** 개수를 스스로 불러오는 통계 타일. 타일마다 독립적으로 로딩/오류 상태를 갖는다. */
 function PostCountTile({
   label,
   tag,
+  community,
   icon,
   color,
 }: {
   label: string;
   tag?: string;
+  /** 있으면 posts 대신 community_posts(kind)의 숨기지 않은 글 수를 센다. */
+  community?: CommunityKind;
   icon: LucideIcon;
   color: MenuColor;
 }) {
@@ -96,19 +104,19 @@ function PostCountTile({
 
   useEffect(() => {
     let active = true;
-    fetchPostCount(tag)
+    (community ? countCommunityPosts(community) : fetchPostCount(tag))
       .then((n) => {
         if (!active) return;
         setCount(n);
         setStatus("ready");
       })
-      .catch(() => {
-        if (active) setStatus("error");
+      .catch((error: unknown) => {
+        if (active) setStatus(community && isSetupMissing(error) ? "setup" : "error");
       });
     return () => {
       active = false;
     };
-  }, [tag, attempt]);
+  }, [tag, community, attempt]);
 
   function retry() {
     setStatus("loading");
@@ -119,24 +127,24 @@ function PostCountTile({
 }
 
 /**
- * 홈 대시보드 통계 타일 4개(전체 글 · 과학 글 · 수학 글 · 학습게임).
+ * 홈 대시보드 통계 타일 4개(과학 차시 앱 · 자유게시판 · 학습게임 · 선생님 글).
+ * 과학 카드는 차시 앱 개수(src/data/science-curriculum.ts, 로컬 계산)를 센다(spec §6).
  * 아이콘 컴포넌트는 서버 컴포넌트에서 props로 넘길 수 없으므로 이 클라이언트 컴포넌트 안에서 조립한다.
- * 학습게임 수는 Supabase가 아니라 로컬 데이터(src/data/apps.ts)에서 센다.
  */
 export function StatTiles() {
   return (
     <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <li>
-        <PostCountTile label="전체 글" icon={NewspaperIcon} color="home" />
+        <StatTile label="과학 차시 앱" value={scienceAppCount()} icon={FlaskConicalIcon} color="science" />
       </li>
       <li>
-        <PostCountTile label="과학 글" tag="과학" icon={FlaskConicalIcon} color="science" />
+        <PostCountTile label="자유게시판 글" community="board" icon={MessageSquareIcon} color="board" />
       </li>
       <li>
-        <PostCountTile label="수학 글" tag="수학" icon={RulerIcon} color="math" />
+        <PostCountTile label="학습게임" community="game" icon={Gamepad2Icon} color="games" />
       </li>
       <li>
-        <StatTile label="학습게임" value={webApps.length} icon={Gamepad2Icon} color="games" />
+        <PostCountTile label="선생님 글" icon={NewspaperIcon} color="home" />
       </li>
     </ul>
   );

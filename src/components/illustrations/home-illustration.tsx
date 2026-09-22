@@ -16,10 +16,10 @@ export function HomeIllustration(props: IllustrationProps) {
 
       {/* 해 */}
       <g className="illo-twinkle">
-        <circle cx="196" cy="44" r="13" fill="var(--math-strong)" opacity="0.85" />
+        <circle cx="196" cy="44" r="13" fill="var(--board-strong)" opacity="0.85" />
         <path
           d="M196 22v5M196 61v5M174 44h5M213 44h5M180.5 28.5l3.5 3.5M208 56l3.5 3.5M211.5 28.5 208 32M184 56l-3.5 3.5"
-          stroke="var(--math-strong)"
+          stroke="var(--board-strong)"
           strokeWidth="3"
           strokeLinecap="round"
           opacity="0.85"
@@ -92,12 +92,12 @@ export function HomeIllustration(props: IllustrationProps) {
       {/* 문 · 계단 */}
       <path
         d="M109 156v-24a11 11 0 0 1 22 0v24Z"
-        fill="var(--math-soft)"
-        stroke="var(--math-strong)"
+        fill="var(--board-soft)"
+        stroke="var(--board-strong)"
         strokeWidth="2.8"
         strokeLinejoin="round"
       />
-      <circle cx="126" cy="142" r="2" fill="var(--math-strong)" />
+      <circle cx="126" cy="142" r="2" fill="var(--board-strong)" />
       <rect x="100" y="155" width="40" height="6" rx="3" fill="var(--home-strong)" />
 
       {/* 덤불과 꽃 */}
@@ -106,10 +106,10 @@ export function HomeIllustration(props: IllustrationProps) {
       <circle cx="50" cy="150" r="2.2" fill="var(--games-soft)" />
       <circle cx="188" cy="154" r="10" fill="var(--science-strong)" />
       <circle cx="200" cy="158" r="7" fill="var(--science-strong)" opacity="0.75" />
-      <circle cx="191" cy="150" r="2.2" fill="var(--math-soft)" />
+      <circle cx="191" cy="150" r="2.2" fill="var(--board-soft)" />
 
       {/* 반짝이 */}
-      <Sparkle x={104} y={22} size={5} fill="var(--math-strong)" className="illo-twinkle-late" />
+      <Sparkle x={104} y={22} size={5} fill="var(--board-strong)" className="illo-twinkle-late" />
       <Sparkle x={218} y={92} size={6} fill="var(--games-strong)" className="illo-twinkle" />
       <Sparkle x={22} y={128} size={4.5} fill="var(--home-strong)" className="illo-twinkle-late" />
     </svg>

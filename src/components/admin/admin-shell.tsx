@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCapIcon, LayoutDashboardIcon, NewspaperIcon, ShieldCheckIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { FlagIcon, GraduationCapIcon, LayoutDashboardIcon, NewspaperIcon, ShieldCheckIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { UnreadCount } from "@/components/learning/learning-ui";
 import type { MenuColor } from "@/data/menu";
 import { useUnreadFeedback } from "@/hooks/use-unread-feedback";
@@ -24,7 +24,8 @@ export const adminNavItems: AdminNavItem[] = [
   { id: "overview", label: "개요", href: "/admin/", icon: LayoutDashboardIcon, color: "home" },
   { id: "posts", label: "글 관리", href: "/admin/posts/", icon: NewspaperIcon, color: "science" },
   { id: "members", label: "회원 관리", href: "/admin/members/", icon: UsersIcon, color: "games" },
-  { id: "learning", label: "학습 현황", href: "/admin/learning/", icon: GraduationCapIcon, color: "math" },
+  { id: "learning", label: "학습 현황", href: "/admin/learning/", icon: GraduationCapIcon, color: "board" },
+  { id: "community", label: "커뮤니티", href: "/admin/community/", icon: FlagIcon, color: "games" },
 ];
 
 /** usePathname()은 basePath가 빠진 경로를 준다. 개요(/admin/)는 정확히 일치할 때만 활성. */
@@ -38,7 +39,7 @@ function isActive(item: AdminNavItem, pathname: string | null): boolean {
 /**
  * 관리자 대시보드 크롬(docs/admin/spec.md §3.0).
  * - lg 이상: 본문 왼쪽 세로 메뉴(전역 사이드바와 별개)
- * - lg 미만: 본문 위 가로 스크롤 메뉴(4개 이하라 드로어 대신 탭 모양 링크)
+ * - lg 미만: 본문 위 가로 스크롤 메뉴(개수가 적어 드로어 대신 탭 모양 링크)
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

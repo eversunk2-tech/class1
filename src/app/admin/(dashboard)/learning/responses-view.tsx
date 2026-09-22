@@ -389,7 +389,7 @@ function QuestionView({
           </p>
         ) : null}
       </div>
-      <div className={cn("rounded-xl px-3 py-2.5", currentGroup?.old ? "bg-math-soft/60 ring-1 ring-math-strong/30" : "bg-muted/30")}>
+      <div className={cn("rounded-xl px-3 py-2.5", currentGroup?.old ? "bg-board-soft/60 ring-1 ring-board-strong/30" : "bg-muted/30")}>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {currentGroup?.old ? (
             <Badge variant="outline" className="text-[0.7rem]">

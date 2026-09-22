@@ -15,7 +15,16 @@ const LOAD_TIMEOUT_MS = 10_000;
  * 마크다운 본문 렌더러. marked·DOMPurify·highlight.js를 CDN에서 로드하고,
  * 로드 실패 시 원문 텍스트를 그대로 보여준다. 에디터 미리보기에서도 재사용 가능.
  */
-export function MarkdownViewer({ content, className }: { content: string; className?: string }) {
+export function MarkdownViewer({
+  content,
+  className,
+  ugc = false,
+}: {
+  content: string;
+  className?: string;
+  /** 학생이 쓴 글: 이미지·미디어를 막는 더 엄격한 정화 규칙을 쓴다. */
+  ugc?: boolean;
+}) {
   const [markedOk, setMarkedOk] = useState(false);
   const [purifyOk, setPurifyOk] = useState(false);
   // highlight.js는 선택 사항: 로드 완료/실패 모두 "결정됨"으로 본다.
@@ -35,8 +44,8 @@ export function MarkdownViewer({ content, className }: { content: string; classN
   else if (timedOut) state = required ? "ready" : "failed";
 
   const html = useMemo(
-    () => (state === "ready" && isMarkdownReady() ? renderMarkdown(content) : null),
-    [state, content],
+    () => (state === "ready" && isMarkdownReady() ? renderMarkdown(content, { ugc }) : null),
+    [state, content, ugc],
   );
 
   return (
