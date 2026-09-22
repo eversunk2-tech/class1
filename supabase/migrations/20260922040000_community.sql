@@ -550,10 +550,8 @@ create policy "game-uploads: 본인 폴더에만 업로드"
     bucket_id = 'game-uploads'
     and (storage.foldername(name))[1] = auth.uid()::text
     and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.html$'
-    and (
-      select count(*) from storage.objects o
-      where o.bucket_id = 'game-uploads' and (storage.foldername(o.name))[1] = auth.uid()::text
-    ) < 35
+    -- 파일 개수 제한은 20260922050000_game_upload_policy_fix.sql 의 public.my_game_upload_count()로 센다.
+    -- (정책 안에서 storage.objects를 다시 조회하면 42P17 정책 정의 오류가 난다 — 업로드 실패의 원인이었다.)
   );
 
 drop policy if exists "game-uploads: 본인 또는 관리자 삭제" on storage.objects;
