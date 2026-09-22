@@ -140,7 +140,11 @@ export function communityErrorMessage(error: unknown, fallback: string): string 
     return "권한이 없어요. 로그인 상태를 확인해 주세요.";
   }
   if (m.includes("failed to fetch") || m.includes("network")) return "인터넷 연결을 확인해 주세요.";
-  return fallback;
+  // 원인을 알 수 없는 오류는 선생님이 알려 줄 수 있도록 짧은 원인 정보를 덧붙인다(개인정보는 들어 있지 않다).
+  console.error("[community]", error);
+  const code = e?.code ?? e?.statusCode ?? e?.status;
+  const detail = [code, (e?.message ?? "").slice(0, 120)].filter(Boolean).join(" ");
+  return detail ? `${fallback} (원인: ${detail})` : fallback;
 }
 
 // ─────────────────────────────────────────────
