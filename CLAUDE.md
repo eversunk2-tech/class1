@@ -30,7 +30,7 @@
 * anon key만 클라이언트에 노출한다. service_role key는 절대 코드/저장소에 넣지 않는다.
 * 모든 테이블에 RLS를 켜고 정책을 작성한다. 보안은 클라이언트 가드가 아니라 RLS로 보장한다.
 * 블로그 공용 테이블: `profiles`(role: admin/user), `posts`, `comments`, `likes`, `views`.
-* 학습 테이블: `member_directory`, `app_results`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks` (설계: `docs/admin/spec.md`).
+* 학습 테이블: `member_directory`, `app_results`, `app_progress`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks` (설계: `docs/admin/spec.md`).
 * service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다.
 * 웹앱 전용 테이블은 `app_{앱이름}_` 접두사를 붙인다.
 * 스키마 변경은 `supabase/migrations/`에 SQL 파일로 남긴다.
@@ -89,13 +89,16 @@
 * **기록·분석하기**: 저장한 기록으로 표와 그래프를 만든다. 결과 분석은 질문에 대해 보기 중 고르기로 간편하게 한다. 고른 뒤 맞고 틀림에 따라 짧은 피드백을 준다.
 * **정리하기**: 학생이 결론을 직접 적은 뒤에 모범 답안을 보여주고 자기 답과 비교하게 한다. 이어서 실험 결과를 바탕으로 한 발전 질문에 학생이 답을 적고, 그 후 모범 답안을 보여준다.
 * 마지막에 **'더 탐구하고 싶은 점(또는 궁금한 점)'**을 적게 한다.
-* 실험은 언제든 다시 할 수 있고, 앞 단계로 돌아갈 수 있다. 진행 중 입력은 새로고침해도 남도록 localStorage에 임시 저장한다.
+* 실험은 언제든 다시 할 수 있고, 앞 단계로 돌아갈 수 있다. 진행 중 입력은 localStorage 임시 사본과 `app_progress` DB에 저장해 새로고침·다른 기기에서도 이어서 할 수 있게 한다.
 
 ### 공통
 * **반드시 과학적 사실에 맞게** 만든다. 시뮬레이션의 수치·현상·용어는 지도서와 교과서 표기를 따르고, 단순화한 부분은 화면에 "모형" 등으로 밝힌다. Review 단계에서 과학적 정확성을 별도 항목으로 검증한다.
 * 태블릿 우선(가로·세로 모두), 큰 터치 영역, 초등 6학년 눈높이의 한국어.
 * 앱 폴더 이름: `sci-{학기}-{단원}-{탐구번호}` (예: `/public/apps/sci-6-1-2-3/`). `science-curriculum.ts`의 해당 차시에 앱 경로를 연결해 차시 화면에서 바로 열 수 있게 한다(Embed 단계).
-* 로그인한 학생이 정리하기까지 마치면 `class1-record.js`로 결과(`completed`, 소요 시간, `detail`에 예상·기록·분석 선택·결론·발전 질문 답·궁금한 점)를 저장한다. 로그인하지 않아도 앱은 끝까지 사용할 수 있다.
+* **로그인 필수**: 앱은 로그인한 학생만 사용한다. 로그인하지 않았으면 활동 화면 대신 로그인 안내(블로그 로그인 후 이 앱으로 돌아오기)를 보여준다.
+* **진행 상황 DB 저장**: 학생이 입력·기록할 때마다 진행 상황을 `app_progress` 테이블(학생 × 앱)에 자동 저장하고, 다시 열면 이어서 하게 한다. localStorage는 같은 학생의 임시 사본일 뿐이며, 로그인한 학생과 기록 주인이 다르면 즉시 지우고 그 학생의 DB 기록을 불러온다.
+* **로그아웃 시 삭제**: 블로그에서 로그아웃(또는 세션 만료)하면 과학 앱의 로컬 입력(`sci6…` 키)을 모두 지운다. 새 앱의 저장 키는 반드시 `sci6`으로 시작한다.
+* 정리하기까지 마치면 `class1-record.js`로 완료 결과(`completed`, 소요 시간, `detail`에 예상·기록·분석 선택·결론·발전 질문 답·궁금한 점)를 `app_results`에 저장한다.
 * 여러 차시 앱이 같은 틀을 쓰므로, 공통 단계 UI·3D 뷰어·기록/그래프 코드는 `scripts/templates/science-sim/`에 정본을 두고 앱 폴더로 복사해 쓴다(앱은 자체 완결 유지).
 
 

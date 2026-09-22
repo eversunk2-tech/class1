@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useSession } from "@/hooks/use-session";
 import { authErrorMessage, signInWithId, signInWithOAuth, type OAuthProvider } from "@/lib/auth";
+import { goAfterLogin, nextFromLocation, rememberedLoginNext, rememberLoginNext } from "@/lib/login-redirect";
 
 type Pending = null | "password" | OAuthProvider;
 
@@ -30,10 +31,21 @@ export function LoginForm() {
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 이미 로그인했거나 OAuth 리다이렉트로 세션이 생기면 메인으로 이동
+  // 로그인 후 돌아갈 곳(?next=, 같은 사이트 경로만). OAuth에서 돌아오면 떠나기 전에 기억해 둔 값을 쓴다.
+  // 오류 표시 effect가 주소창의 쿼리를 지우기 전에, 첫 렌더에서 한 번만 읽는다.
+  // (정적 프리렌더 때는 window가 없어 null — 화면에 그리지 않는 값이라 하이드레이션 차이가 없다.)
+  // OAuth에서 기억해 둔 값은 OAuth로 돌아왔을 때만 쓴다. 이 화면에서 비밀번호로 로그인하면 주소의 ?next=만 쓴다
+  // (OAuth를 취소한 뒤 같은 탭에서 다른 사람이 비밀번호로 로그인해도 앞 사람이 가려던 곳으로 가지 않게).
+  const [urlNext] = useState<string | null>(() => (typeof window === "undefined" ? null : nextFromLocation()));
+  const [next] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : (nextFromLocation() ?? rememberedLoginNext()),
+  );
+  const viaPassword = useRef(false);
+
+  // 이미 로그인했거나 OAuth 리다이렉트로 세션이 생기면 돌아갈 곳(없으면 메인)으로 이동
   useEffect(() => {
-    if (!loading && user) router.replace("/");
-  }, [loading, user, router]);
+    if (!loading && user) goAfterLogin(viaPassword.current ? urlNext : next, (href) => router.replace(href));
+  }, [loading, user, router, next, urlNext]);
 
   useEffect(() => {
     const oauthError = readOAuthError();
@@ -51,6 +63,8 @@ export function LoginForm() {
     }
     setPending("password");
     setError(null);
+    viaPassword.current = true;
+    rememberLoginNext(null);
     try {
       const { error } = await signInWithId(loginId, password);
       if (error) {
@@ -67,6 +81,9 @@ export function LoginForm() {
   async function onOAuth(provider: OAuthProvider) {
     setPending(provider);
     setError(null);
+    viaPassword.current = false;
+    // 공급자 화면을 다녀와도 돌아갈 곳을 잃지 않게 잠깐 기억해 둔다(redirectTo는 /login/ 그대로).
+    rememberLoginNext(next);
     try {
       const { error } = await signInWithOAuth(provider);
       if (error) {

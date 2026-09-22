@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { withBasePath } from "@/lib/base-path";
+import { clearLocalUserData } from "@/lib/local-data";
+import { conflictQuestion, flushScienceProgress, unsavedQuestion } from "@/lib/science-progress";
 
 /** 사전 발급 계정의 아이디 → 이메일 매핑 규칙 (spec §12 Q2) */
 export const LOGIN_EMAIL_DOMAIN = "class1.local";
@@ -54,8 +56,30 @@ export async function signInWithOAuth(provider: OAuthProvider): Promise<{ error:
   return { error: null };
 }
 
-export async function signOut() {
-  return supabase.auth.signOut();
+/**
+ * 로그아웃.
+ * 1) 과학 앱이 이 기기에 남긴 "아직 DB에 올리지 못한" 기록을 지금 세션(= 기록 주인일 때만)으로 올린다.
+ *    다른 기기 기록과 부딪히면 학생에게 묻고, 올리지 못하면 "그래도 로그아웃할까요?"를 묻는다(취소하면 로그아웃하지 않음).
+ * 2) 이 브라우저에 남은 사용자 입력(과학 앱 `sci6…` 로컬 사본, 에디터 임시 글)을 앞뒤로 지운다
+ *    (로그아웃 요청이 실패하거나 도중에 다른 탭이 다시 쓰더라도 남지 않게 두 번 지운다).
+ * 3) 서버에 알리지 못해도(오프라인) 이 기기의 세션은 지운다(scope: "local").
+ */
+export async function signOut(
+  options: { confirm?: (message: string) => boolean } = {},
+): Promise<{ cancelled: boolean }> {
+  const ask = options.confirm ?? ((message: string) => window.confirm(message));
+  const flushed = await flushScienceProgress({ confirmConflict: (info) => ask(conflictQuestion(info)) });
+  if (!flushed.ok && !ask(unsavedQuestion(flushed))) return { cancelled: true };
+  clearLocalUserData();
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  } finally {
+    clearLocalUserData();
+  }
+  return { cancelled: false };
 }
 
 export async function getSession() {

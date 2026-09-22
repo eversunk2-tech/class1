@@ -12,6 +12,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { isMissingSchemaError } from "@/lib/admin";
+import { clearScienceLocalData } from "@/lib/local-data";
 import { PROFILE_COLUMNS, type Profile } from "@/lib/types";
 
 /**
@@ -85,7 +86,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let active = true;
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        // 확실히 로그인되지 않은 상태(세션 만료 포함)면 과학 앱 로컬 사본을 지운다.
+        // 네트워크 문제로 확인하지 못한 경우(error)는 지우지 않는다.
+        if (!data.session && !error) clearScienceLocalData();
         if (active) setSession(data.session);
       })
       .catch(() => {})
@@ -93,7 +97,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (active) setLoading(false);
       });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      // 로그아웃·세션 만료(토큰 갱신 실패) → 과학 앱 로컬 입력(sci6…)을 지운다.
+      if (event === "SIGNED_OUT") clearScienceLocalData();
       if (!active) return;
       setSession(next);
       setLoading(false);

@@ -18,7 +18,8 @@
  *     detail: function () { return {...}; },    // class1-record.js로 저장할 detail
  *     summary: function () { return ["기록한 실험: 24칸", …]; },
  *   });
- *   lesson.restart(button)                      → "처음부터 다시 하기"(이 앱의 임시 저장만 지운다)
+ *   lesson.restart(button)                      → "처음부터 다시 하기"(이 앱의 로컬 기록 + DB 진행 상황(app_progress)을 지운다)
+ *   로그인 필수·진행 상황 DB 저장은 Lesson.create가 SciSim.Sync.start()로 켠다(persist.js 맨 위 주석).
  *   lesson.meta                                 → { startedAt, activeSec, finishedAt, savedAt }
  *
  * 저장 실패 문구는 까닭(reason)에 따라 다르게 보여 준다: 로그인 안 함 / 적은 글이 너무 김(invalid) / 네트워크 등.
@@ -77,6 +78,8 @@
       } catch (e) {
         console.warn("[science-sim] 결과 저장 기능을 준비하지 못했습니다(학습은 계속할 수 있어요).", e);
       }
+      /* 로그인 필수 · 진행 상황 DB 동기화 시작(persist.js의 SciSim.Sync). 비로그인이면 이미 로그인 안내가 떠 있다. */
+      if (SciSim.Sync) SciSim.Sync.start({ recordReady: recordReady, appId: o.appId });
 
       var navApi = null;
       var navOpts = null;
@@ -184,6 +187,7 @@
             }
             if (res.reason === "invalid")
               return "적은 글이 너무 길어서 저장하지 못했어요. 예상·결론·궁금한 점 가운데 긴 글을 조금 줄인 뒤 다시 '학습 마치기'를 눌러 주세요.";
+            if (res.reason === "user_changed") return "다른 사람으로 로그인되어 있어서 저장하지 않았어요. 화면을 새로 불러와 주세요.";
             if (res.reason === "not_initialized") return "결과 저장 기능을 불러오지 못해 저장하지 않았어요. 학습은 모두 마쳤어요.";
             return "인터넷 연결 문제 등으로 결과를 저장하지 못했어요. 잠시 뒤 다시 '학습 마치기'를 눌러 주세요.";
           }
@@ -205,7 +209,13 @@
             saving = true;
             f.button.disabled = true;
             f.msgEl.textContent = "결과를 저장하고 있어요…";
-            window.Class1Record.save({ completed: true, durationSec: meta.activeSec || 0, detail: f.detail() })
+            window.Class1Record.save({
+              completed: true,
+              durationSec: meta.activeSec || 0,
+              detail: f.detail(),
+              // 이 화면의 기록 주인으로만 저장한다(다른 학생이 로그인해 있으면 저장하지 않음)
+              expectedUserId: SciSim.Sync && SciSim.Sync.owner ? SciSim.Sync.owner() : undefined,
+            })
               .then(function (res) {
                 var text;
                 if (res.ok) {
@@ -232,7 +242,7 @@
             if (!loginChecked && recordReady && f.loginHintEl) {
               loginChecked = true;
               window.Class1Record.getUser().then(function (u) {
-                if (!u) window.Class1Record.renderLoginHint(f.loginHintEl, "로그인하면 학습 결과가 저장돼요. 로그인하지 않아도 끝까지 할 수 있어요.");
+                if (!u) window.Class1Record.renderLoginHint(f.loginHintEl, "로그인이 풀렸어요. 다시 로그인하면 이어서 하고 결과도 저장돼요.");
               });
             }
           });
@@ -241,8 +251,16 @@
           button.addEventListener("click", function () {
             if (!window.confirm("처음부터 다시 할까요? 적은 내용과 실험 기록이 모두 지워져요.")) return;
             resetting = true;
-            store.clearAll();
-            location.reload();
+            button.disabled = true;
+            // 로컬 삭제 + DB 진행 상황 삭제(clearProgress). DB 삭제가 실패해도 다음에 열 때 다시 시도한다.
+            var done = function () {
+              location.reload();
+            };
+            if (SciSim.Sync) SciSim.Sync.reset(store).then(done, done);
+            else {
+              store.clearAll();
+              done();
+            }
           });
         },
       };

@@ -326,3 +326,16 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 색만으로 구분하지 않는다: 색 칩 옆에 항상 글자, 그래프는 점 모양·선 무늬·범례.
 - 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI.
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
+
+## 로그인 필수 · 진행 상황 DB 저장 (2026-09-22)
+
+- `persist.js`의 `SciSim.Sync`가 맡는다(설계·충돌 규칙은 `persist.js` 맨 위 주석). **앱 코드(app.js)는 바꿀 필요 없다** — `SciSim.createStore(C.storageKey)`와 `SciSim.Lesson.create(...)`만 부르면 된다.
+- 로그인하지 않았으면 활동 화면 위에 로그인 안내(가림막)가 뜨고 `sci6…` 로컬 키를 지운다. 링크는 `../../login/?next=<돌아올 경로>`.
+- 로그인하면 `app_progress`(학생 × 앱 1행, `supabase/migrations/20260922010000_app_progress.sql`)에 이 앱의 모든 로컬 키 스냅샷을 자동 저장하고, 다른 기기·다시 로그인 때 이어서 한다. 기록 주인이 다르면 로컬을 즉시 지운다.
+- `storageKey`는 반드시 `sci6`으로 시작한다(블로그 로그아웃 때 이 머리로 지운다). 버전을 올리면(`:v2`) 예전 DB 기록은 쓰지 않는다.
+- 앱에서 localStorage를 직접 쓰지 말고 store(`createStore`)만 쓴다(직접 쓴 값은 저장·주인 확인에서 빠진다).
+- "처음부터 다시 하기"(`lesson.restart`)는 로컬과 DB 진행 상황을 함께 지운다.
+- 머리말 `.ss-topline`에 저장 상태(저장 중… / 저장됨 / 저장 실패 · 다시 시도 중 / 저장 안 됨)가 나온다.
+- 모든 DB 요청은 페이지의 기록 주인(`owner`)을 `expectedUserId`로 넘긴다. 실제 요청 토큰의 사용자가 다르면 요청하지 않고(`user_changed`) 앞 사람 로컬을 지운 뒤 새 사용자로 다시 연다. 화면을 떠날 때 "확인 중" 가림막을 씌우고 돌아올 때(`pageshow`·`visibilitychange`·`focus`) 세션을 다시 확인한다.
+- 머리말에 "○○ 계정으로 로그인 중 · 내가 아니면 [로그아웃]"이 나온다(`.ss-who`). 로그아웃은 블로그와 같은 절차: 못 올린 기록(`<storageKey>:__meta`의 `dirty`)을 올리고, 실패하면 확인을 받은 뒤 로그아웃·로컬 삭제.
+- 두 기기에서 모두 바뀌었으면(서버 `updated_at`이 마지막으로 맞춘 값과 다르고 로컬도 안 올린 변경이 있으면) 학생에게 "이 기기의 기록 / 저장된 기록"을 고르게 한다. 기기 시계는 비교에 쓰지 않는다.

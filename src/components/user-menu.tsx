@@ -128,8 +128,8 @@ export function UserMenu() {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={async () => {
-              await signOut();
-              router.replace("/");
+              const { cancelled } = await signOut();
+              if (!cancelled) router.replace("/");
             }}
           >
             <LogOutIcon />
