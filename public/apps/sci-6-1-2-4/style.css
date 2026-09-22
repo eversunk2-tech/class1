@@ -120,3 +120,6 @@
   .sw-shout { font-size: 1.2rem; }
 }
 #result-table table { min-width: 460px; }
+
+/* 2026-09-22 개정: 궁금한 점은 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }

@@ -7,10 +7,6 @@
 /* 자동차 색 칩(글자와 함께 쓴다) */
 .car-chip { flex: none; display: inline-block; width: 22px; height: 14px; border-radius: 4px; background: var(--c); border: 2px solid rgba(0, 0, 0, 0.3); vertical-align: middle; }
 
-/* 알아 두기 */
-.intro-sub { font-weight: 700; margin: 12px 0 4px; }
-.calc-steps { margin: 0 0 8px; padding-left: 1.4em; }
-.calc-steps li { margin: 2px 0; }
 
 /* ── 계산기 ── */
 .calc { max-width: 300px; margin: 10px auto 4px; padding: 10px; border-radius: 14px; background: #2b3240; color: #f3f6fa; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
@@ -82,24 +78,9 @@
 .ss-exp-view.is-2d .ss-view2d { padding-top: 12px; }
 .t2-wrap .sw-hud { top: 0; max-width: 100%; }
 
-/* ── 분석: 표 아래 식, 교통수단 카드 ── */
-.formula-list { list-style: none; margin: 10px 0 4px; padding: 0; display: grid; gap: 4px; }
-.formula-list li { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
-.tr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
-.tr-card { margin: 0; }
-.tr-card.is-done { border: 2px solid var(--ss-good); }
-.tr-head { display: flex; align-items: center; gap: 8px; }
-.tr-icon { font-size: 1.8rem; }
-.tr-name { font-size: 1.1rem; }
-.tr-says { margin: 6px 0; padding: 8px 10px; border-radius: 12px; background: var(--ss-surface-2); }
-.tr-facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0; font-weight: 700; font-size: 0.92rem; }
-.tr-feedback { margin: 6px 0 0; font-weight: 600; min-height: 1.3em; }
-.tr-feedback.is-correct { color: var(--ss-good); }
-.tr-feedback.is-wrong { color: var(--ss-bad); }
-.tr-result { margin: 4px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-.think-note { background: var(--ss-warn-bg); font-weight: 600; }
-.refs-list { margin: 0; padding-left: 1.2em; }
-.refs-list li { margin: 4px 0; }
+/* ── 분석: 교통수단 표(접을 수 있음) ── */
+.tr-more > summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.tr-more[open] > summary { margin-bottom: 8px; }
 
 /* ── 마치기 ── */
 .finish-card { text-align: center; }
@@ -128,16 +109,6 @@
 .t2-tick small { white-space: nowrap; }
 .calc-box { margin: 4px 0; }
 
-/* ── 빠른 순서대로 쓰기 ── */
-.order-card.is-correct { border: 2px solid var(--ss-good); }
-.order-card.is-wrong { border: 2px solid var(--ss-bad); }
-.ord-seq { list-style: none; margin: 8px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
-.ord-slot { display: flex; flex-direction: column; gap: 2px; min-height: 58px; padding: 6px 8px; border-radius: 10px; border: 2px dashed var(--ss-border); background: var(--ss-surface-2); }
-.ord-slot.is-filled { border-style: solid; }
-.ord-rank { font-size: 0.78rem; font-weight: 700; color: var(--ss-muted); }
-.ord-empty { font-weight: 700; color: var(--ss-muted); }
-.ord-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
-.ord-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
-.ord-pick { min-height: 48px; }
-.ord-ctrl { flex-wrap: wrap; gap: 8px; }
-.cmp-card .ss-compare-model ul { margin: 0; }
+/* 궁금한 점: 선택 입력 한 줄 (2026-09-22 축소판) */
+.cur-line { display: block; width: 100%; min-height: 48px; padding: 8px 12px; border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); color: inherit; font: inherit; font-size: 1rem; }
+.cur-line:focus { border-color: var(--ss-primary); outline: none; }

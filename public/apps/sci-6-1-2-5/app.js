@@ -3,7 +3,10 @@
  * 공통 틀(science-sim/)이 단계 이동·실험 패널·기록·저장을 맡고, 이 파일은
  *   ① 3D/2D 장면(태엽 자동차 4대, 출발선, 줄자, 100 cm 결승선, 초시계)
  *   ② 관찰 카드(줄자 확대 그림·초시계 + 계산기 + 값 확인)
- *   ③ 교통수단 속력 계산 카드(활동해요2), 표·막대그래프, 퀴즈 연결 만 만든다.
+ *   ③ 자동차 표·막대그래프, 교통수단 속력 표(계산해 둔 자료), 퀴즈 연결 만 만든다.
+ * 2026-09-22 질문 축소판(7분 기준): 교통수단 계산기·순서 쓰기·비교해 쓰기·발전 질문·궁금한 점 단계를 뺐다(spec.md 개정 절).
+ * 2026-09-22 slim-review 반영(v3): 학생은 파랑·초록 두 대만 실행하고, 계산기에 식을 직접 눌러 속력을 구한 뒤 반올림한 값을 직접 적는다
+ *   (자동 채우기 없음, 한 번 틀린 뒤에만 도움). 빨강·노랑은 교과서 예시 값으로 표에 미리 채운다(실행은 선택).
  * 수치는 LessonConfig의 지도서 값만 쓴다(탐구 3·4의 예시 자료, 오차 없음). 자동차는 일정한 빠르기로 움직이는 모형이다.
  * 학생 입력은 모두 textContent/value로만 다룬다(innerHTML을 쓰지 않는다).
  */
@@ -42,6 +45,10 @@
     var t = truth(id);
     return round1(t.distance / t.time); // 반올림하여 소수 첫째 자리까지
   }
+  function isExample(id) {
+    return C.exampleCars.indexOf(id) >= 0;
+  }
+  var MEASURE_CARS = P1.measureCars.concat(P2.measureCars); // 학생이 직접 실행·계산하는 자동차(파랑, 초록)
   // 지도서 값과 어긋나면 개발 중에 바로 알 수 있게
   C.cars.forEach(function (c) {
     if (speedOf(c.id) !== C.expectedSpeeds[c.id]) console.error("[sci-6-1-2-5] 속력 값이 지도서와 다릅니다:", c.id, speedOf(c.id));
@@ -74,24 +81,18 @@
     },
   });
 
-  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리(+ 궁금한 점 한 줄, 선택) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
   var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
-  var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
-  (function refs() {
-    var box = $("curiosity-refs");
-    box.appendChild(el("h3", { class: "sub-h first", text: "📚 더 알아보기" }));
-    box.appendChild(
-      el(
-        "ul",
-        { class: "refs-list" },
-        C.curiosity.refs.map(function (t) {
-          return el("li", { text: t });
-        })
-      )
-    );
-  })();
+  // 궁금한 점: 선택 입력 한 줄(비워도 마칠 수 있음). 저장 키는 틀과 같은 "curiosity"
+  var curInput = el("input", { type: "text", id: "ss-curiosity", class: "ss-input cur-line", maxlength: "200", placeholder: C.curiosity.placeholder, autocomplete: "off" });
+  curInput.value = store.get("curiosity", "") || "";
+  curInput.addEventListener("input", function () {
+    store.set("curiosity", curInput.value); // 한 줄이라 곧바로 저장한다
+  });
+  $("curiosity-root").appendChild(el("label", { for: "ss-curiosity", class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "궁금한 점" }), C.curiosity.prompt]));
+  $("curiosity-root").appendChild(curInput);
 
   /* ───────── 계산기(실험관찰 28쪽 계산기 애플리케이션을 본뜬 작은 화면) ───────── */
   // opts: { label, onResult({ a, b, raw, rounded }) }  → { node, setExpr(a, b), clear() }
@@ -221,7 +222,7 @@
     function x(cm) {
       return (cm - lo) * PX;
     }
-    var s = svg("svg", { viewBox: "0 0 " + W + " 178", class: "zoom-svg", role: "img", "aria-label": "줄자 확대 그림: " + CAR[id].name + "의 앞부분은 " + d + " cm 눈금에 있어요." });
+    var s = svg("svg", { viewBox: "0 0 " + W + " 178", class: "zoom-svg", role: "img", "aria-label": "줄자 확대 그림" });
     // 자동차(앞부분까지)
     s.appendChild(svg("rect", { x: 0, y: 28, width: x(d), height: 56, rx: 8, fill: CAR[id].color, stroke: "#1f2733", "stroke-width": 2 }));
     s.appendChild(svg("text", { x: Math.max(70, x(d) - 90), y: 62, "text-anchor": "middle", class: "zoom-car-text", fill: S.TableChart.textOn(CAR[id].color) }, CAR[id].short + " 자동차"));
@@ -247,6 +248,8 @@
   }
 
   /* ───────── 관찰·기록 카드 ───────── */
+  // 학생이 ① 읽은 값을 적고 ② 계산기에 '이동 거리 ÷ 걸린 시간'을 직접 눌러 계산한 뒤 ③ 반올림한 속력을 직접 적는다.
+  // 앱은 식이나 속력을 자동으로 채우지 않는다. '확인하기'에서 한 번 틀린 뒤에만 도움(계산기에 식 넣어 주기)을 준다.
   function observeCard(sel) {
     var id = sel.car;
     var car = CAR[id];
@@ -255,45 +258,40 @@
     var ph = phaseOf(id);
     var measureId = ph === 1 ? "distance" : "time";
     var measureVal = ph === 1 ? t.distance : t.time;
+    var calcOk = false; // 계산기에 이 자동차의 '이동 거리 ÷ 걸린 시간'을 눌러 계산했는지
     var body = el("div", { class: "obs-body" });
     if (ph === 1) {
       body.appendChild(zoomRuler(id));
-      body.appendChild(el("p", { class: "fixed-line", text: "⏱ 걸린 시간: 5초 (1단계에서 같게 한 조건)" }));
+      body.appendChild(el("p", { class: "fixed-line", text: "⏱ 걸린 시간: 5초 (같게 한 조건)" }));
     } else {
-      body.appendChild(stopwatchFace(t.time, "🏁 자동차 앞부분이 100 cm 결승선에 닿은 순간 멈춘 초시계예요."));
-      body.appendChild(el("p", { class: "fixed-line", text: "📏 이동 거리: 100 cm (2단계에서 같게 한 조건)" }));
+      body.appendChild(stopwatchFace(t.time, "🏁 앞부분이 100 cm 결승선에 닿은 순간 멈춘 초시계예요."));
+      body.appendChild(el("p", { class: "fixed-line", text: "📏 이동 거리: 100 cm (같게 한 조건)" }));
     }
     var msg = el("p", { class: "obs-msg", "aria-live": "polite" });
     var calc = makeCalc({
       label: car.name + " 속력 계산기",
       onIncomplete: function () {
-        msg.textContent = "‘이동 거리 ÷ 걸린 시간’ 식을 끝까지 누른 뒤 = 단추를 눌러요.";
+        msg.textContent = "‘이동 거리 ÷ 걸린 시간’을 끝까지 누른 뒤 = 를 눌러요.";
       },
       onResult: function (r) {
         if (Math.abs(r.a - t.distance) < 1e-9 && Math.abs(r.b - t.time) < 1e-9) {
-          var inp = document.getElementById("ss-num-speed");
-          if (inp) {
-            inp.value = r.rounded.toFixed(1);
-            inp.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-          msg.textContent =
-            "반올림하여 소수 첫째 자리까지 나타내면 " + r.rounded.toFixed(1) + " cm/s예요. 속력 칸에 넣었어요. ‘📝 기록하기’를 눌러요.";
+          calcOk = true;
+          msg.textContent = "✅ 식이 맞아요. 반올림하여 소수 첫째 자리까지 속력 칸에 적어요.";
         } else if (Math.abs(r.a - t.time) < 1e-9 && Math.abs(r.b - t.distance) < 1e-9) {
-          msg.textContent = "나누는 순서를 확인해 보세요. 속력은 ‘이동 거리 ÷ 걸린 시간’으로 구해요.";
+          msg.textContent = "나누는 순서를 확인해요. 속력 = 이동 거리 ÷ 걸린 시간";
         } else {
-          msg.textContent = "식에 넣은 이동 거리(cm)와 걸린 시간(초)이 이 자동차의 값인지 다시 확인해 보세요.";
+          msg.textContent = "식에 넣은 이동 거리와 걸린 시간이 이 자동차의 값인지 확인해요.";
         }
       },
     });
     body.appendChild(calc.node);
     body.appendChild(msg);
 
-    // 입력칸은 공통 틀이 만든 뒤에 연결한다(값 확인 → 계산기 식 채우기)
+    // 입력칸은 공통 틀이 만든 뒤에 순서를 바꾼다: 읽은 값 → 계산기 → 속력 → 확인하기
     setTimeout(function () {
       var mInp = document.getElementById("ss-num-" + measureId);
       var sInp = document.getElementById("ss-num-speed");
       if (!mInp || !sInp) return;
-      // 순서: 읽은 값 입력 → 계산기 → 속력 입력 → 기록하기 (공통 틀이 만든 입력칸 사이에 계산기를 옮겨 넣는다)
       var grid = mInp.closest(".ss-num-grid");
       var sField = sInp.closest("label");
       if (grid && sField) {
@@ -302,42 +300,49 @@
         var sGrid = el("div", { class: "ss-num-grid" }, [sField]);
         calcBox.parentNode.insertBefore(sGrid, calcBox.nextSibling);
       }
-      mInp.addEventListener("input", function () {
+      mInp.addEventListener("change", function () {
         var v = mInp.value === "" ? NaN : Number(mInp.value);
-        if (!isFinite(v)) {
-          msg.textContent = "";
-          return;
-        }
-        if (Math.abs(v - measureVal) < 1e-9) {
-          calc.setExpr(t.distance, t.time);
-          msg.textContent = "✅ 바르게 읽었어요. 계산기에 ‘" + t.distance + " ÷ " + t.time + "’ 식이 들어갔어요. = 단추를 눌러 속력을 구해요.";
-        } else {
-          msg.textContent =
-            ph === 1
-              ? "🔎 확대 그림에서 자동차 앞부분이 가리키는 눈금을 다시 읽어 보세요. (작은 눈금 한 칸은 1 cm)"
-              : "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
-        }
-      });
-      sInp.addEventListener("change", function () {
-        var v = sInp.value === "" ? NaN : Number(sInp.value);
-        if (isFinite(v) && Math.abs(v - sp) > 1e-9)
-          msg.textContent = "속력 칸의 값을 다시 확인해 보세요. 계산기로 구한 값을 반올림하여 소수 첫째 자리까지 적어요.";
+        if (!isFinite(v)) return;
+        msg.textContent =
+          Math.abs(v - measureVal) < 1e-9
+            ? "✅ 바르게 읽었어요. 이제 계산기로 속력을 구해요."
+            : ph === 1
+            ? "🔎 앞부분이 가리키는 눈금을 다시 읽어 보세요. (작은 눈금 한 칸은 1 cm)"
+            : "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
       });
     }, 0);
+
+    function help(tries) {
+      // 한 번 틀린 뒤에만: 계산기에 식을 넣어 준다(= 누르기와 반올림은 학생이 한다)
+      if (tries < 1) return "";
+      calc.setExpr(t.distance, t.time);
+      return " 💡 계산기에 ‘" + t.distance + " ÷ " + t.time + "’를 넣어 두었어요. = 를 눌러 보세요.";
+    }
 
     return {
       question:
         ph === 1
-          ? "📏 " + car.name + "가 5초 동안 이동한 거리를 줄자에서 읽어 적고, 계산기로 속력을 구해 기록해요."
-          : "⏱ " + car.name + "가 100 cm를 이동하는 데 걸린 시간을 초시계에서 읽어 적고, 계산기로 속력을 구해 기록해요.",
+          ? "📏 " + car.name + ": 이동 거리 읽기 → 계산기로 속력 구하기"
+          : "⏱ " + car.name + ": 걸린 시간 읽기 → 계산기로 속력 구하기",
       body: body,
       type: "numeric",
       fields: [
         ph === 1
-          ? { id: "distance", label: "이동 거리", unit: "cm", step: 1, min: t.distance, max: t.distance }
-          : { id: "time", label: "걸린 시간", unit: "초", step: 0.1, min: t.time, max: t.time },
-        { id: "speed", label: "속력 (소수 첫째 자리)", unit: "cm/s", step: 0.1, min: sp, max: sp },
+          ? { id: "distance", label: "이동 거리", unit: "cm", step: 1, min: 0, max: C.trackMaxCm }
+          : { id: "time", label: "걸린 시간", unit: "초", step: 0.1, min: 0, max: 60 },
+        { id: "speed", label: "속력 (소수 첫째 자리)", unit: "cm/s", step: 0.1, min: 0, max: 1000 },
       ],
+      check: function (v, ctx) {
+        if (Math.abs(v[measureId] - measureVal) > 1e-9)
+          return ph === 1 ? "🔎 줄자에서 앞부분이 가리키는 눈금을 다시 읽어 보세요." : "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
+        if (!calcOk) return "🧮 계산기에 ‘이동 거리 ÷ 걸린 시간’을 누르고 = 로 계산해요." + help(ctx.tries);
+        if (Math.abs(v.speed - sp) < 1e-9) return { ok: true, message: "⭕ 맞아요! " + sp.toFixed(1) + " cm/s예요. ‘📝 기록하기’를 눌러요." };
+        var raw = t.distance / t.time;
+        var tooLong = Math.abs(v.speed * 10 - Math.round(v.speed * 10)) > 1e-6; // 소수 둘째 자리 이하가 있다
+        if (Math.abs(v.speed - raw) < 0.1 && tooLong) return "소수 첫째 자리까지만 나타내요(소수 둘째 자리에서 반올림)." + help(ctx.tries);
+        if (Math.abs(v.speed - raw) < 0.1) return "반올림을 확인해요. 소수 둘째 자리 숫자가 5 이상이면 올려요.";
+        return "계산기 결과를 다시 보고, 반올림하여 소수 첫째 자리까지 적어요." + help(ctx.tries);
+      },
     };
   }
 
@@ -347,16 +352,6 @@
     C.intro.paragraphs.forEach(function (p) {
       box.appendChild(S.rich(p, "p"));
     });
-    box.appendChild(el("p", { class: "intro-sub", text: "🧮 계산기 사용법 (『실험관찰』 28쪽)" }));
-    box.appendChild(
-      el(
-        "ol",
-        { class: "calc-steps" },
-        C.intro.calcSteps.map(function (t) {
-          return el("li", { text: t.replace(/^[①②③④]\s*/, "") });
-        })
-      )
-    );
     box.appendChild(S.rich("📂 " + C.intro.dataNote, "p"));
     return box;
   }
@@ -382,10 +377,12 @@
         id: "car",
         title: "자동차 고르기",
         short: "자동차",
-        options: C.cars.map(function (c) {
+        // 직접 할 자동차(파랑, 초록)를 먼저, 교과서 예시(빨강, 노랑)는 뒤에 '선택'으로 둔다
+        options: MEASURE_CARS.concat(C.exampleCars).map(function (cid) {
+          var c = CAR[cid];
           return {
             id: c.id,
-            label: c.name,
+            label: isExample(c.id) ? c.name + " (예시·선택)" : c.name,
             icon: function () {
               return carChip(c.id);
             },
@@ -393,6 +390,7 @@
         }),
         note: function (sel) {
           if (!sel.car) return null;
+          if (isExample(sel.car)) return "교과서 예시 자료예요. 표에 이미 들어 있으니 달려 보기는 선택이에요.";
           return phaseOf(sel.car) === 1
             ? "1단계 · 걸린 시간을 5초로 같게 하고, 이동 거리를 재요."
             : "2단계 · 이동 거리를 100 cm로 같게 하고, 걸린 시간을 재요.";
@@ -405,7 +403,7 @@
         name: P1.name,
         title: P1.title,
         lead: P1.lead,
-        cells: P1.cars.map(function (id) {
+        cells: P1.measureCars.map(function (id) {
           return { car: id };
         }),
       },
@@ -414,12 +412,12 @@
         name: P2.name,
         title: P2.title,
         lead: P2.lead,
-        cells: P2.cars.map(function (id) {
+        cells: P2.measureCars.map(function (id) {
           return { car: id };
         }),
       },
     ],
-    doneLead: "네 자동차의 속력을 모두 기록했어요. 다시 해 보고 싶은 자동차는 자유롭게 다시 달려 보세요. 다 했으면 ‘다음 단계’로 가요.",
+    doneLead: "파랑·초록 자동차의 속력을 구했어요. ‘다음 단계’로 가서 네 자동차를 비교해요. (빨강·노랑 달려 보기는 선택)",
     cellKey: function (sel) {
       return sel.car;
     },
@@ -429,7 +427,7 @@
     view: {
       build3D: build3D,
       build2D: build2D,
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 자동차를 눌러 고를 수도 있어요",
+      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향",
       tip2D: "2D 화면(위에서 본 모형)이에요. 자동차 이름을 눌러 고를 수 있어요.",
     },
     observe: observeCard,
@@ -449,7 +447,7 @@
       title: "기록한 자동차 한눈에 보기",
       rows: [{ id: "rec", label: "기록" }],
       cols: C.cars.map(function (c) {
-        return { id: c.id, label: c.short };
+        return { id: c.id, label: isExample(c.id) ? c.short + "(예시)" : c.short };
       }),
       sel: function (r, c) {
         return { car: c.id };
@@ -845,392 +843,27 @@
 
   /* ───────── 3. 기록·분석하기 ───────── */
   var T = S.TableChart;
-  // 활동해요2: 교통수단 카드(주어진 자료 + 계산기)
-  var trState = store.get("transport", {}) || {};
-  function trDone(id) {
-    return !!(trState[id] && trState[id].done);
-  }
-  function allTransportsDone() {
-    return C.transports.every(function (t) {
-      return trDone(t.id);
-    });
-  }
   function trSpeed(t) {
-    return t.distanceKm / t.hours;
+    return round1(t.distanceKm / t.hours); // 반올림하여 소수 첫째 자리까지
   }
-  (function renderTransports() {
-    var root = $("transport-root");
-    root.textContent = "";
-    C.transports.forEach(function (t) {
-      var st = trState[t.id] || (trState[t.id] = { done: false, tries: 0, speed: null });
-      if (st.done) st.speed = round1(trSpeed(t)); // 예전 판(허용 오차 채점)에 남은 값도 참값으로 바로잡는다
-      var fb = el("p", { class: "tr-feedback", "aria-live": "polite" });
-      var result = el("p", { class: "tr-result" });
-      var card = el("div", { class: "ss-card tr-card" });
-      function drawDone() {
-        card.classList.toggle("is-done", st.done);
-        result.hidden = !st.done;
-        result.textContent = st.done ? "✅ " + t.name + "의 속력: " + t.distanceKm.toLocaleString("ko-KR") + " km ÷ " + t.hours + " h = " + fmtNum(st.speed) + " km/h" : "";
-      }
-      var calc = makeCalc({
-        label: t.name + " 속력 계산기",
-        onIncomplete: function () {
-          fb.textContent = "‘이동 거리 ÷ 걸린 시간’ 식을 끝까지 누른 뒤 = 단추를 눌러요.";
-          fb.className = "tr-feedback";
-        },
-        onResult: function (r) {
-          st.tries = (st.tries || 0) + 1;
-          // 카드의 이동 거리 ÷ 걸린 시간을 그대로 넣었을 때만 정답(허용 오차 없음, 답만 넣는 식 900 ÷ 1 등은 틀림)
-          var ok = Math.abs(r.a - t.distanceKm) < 1e-9 && Math.abs(r.b - t.hours) < 1e-9;
-          var keep = st.done ? " (앞에서 구한 속력은 그대로 있어요.)" : "";
-          if (ok) {
-            st.done = true;
-            st.speed = round1(trSpeed(t)); // 저장·표시는 참값(반올림하여 소수 첫째 자리)
-            fb.textContent = "⭕ 맞았어요! " + S.josa(t.name, "은", "는") + " 1시간 동안 " + fmtNum(st.speed) + " km를 이동한 것과 같은 빠르기예요.";
-            fb.className = "tr-feedback is-correct";
-          } else if (Math.abs(r.a - t.hours) < 1e-9 && Math.abs(r.b - t.distanceKm) < 1e-9) {
-            fb.textContent = "❌ 나누는 순서를 확인해 보세요. 속력은 ‘이동 거리 ÷ 걸린 시간’으로 구해요." + keep;
-            fb.className = "tr-feedback is-wrong";
-          } else {
-            fb.textContent = "❌ 카드에 적힌 이동 거리(km)와 걸린 시간(시간)을 그대로 식에 넣었는지 다시 확인해 보세요." + keep;
-            fb.className = "tr-feedback is-wrong";
-          }
-          store.set("transport", trState);
-          drawDone();
-          drawTransportResults();
-          drawTransportOrderAndCompare();
-          lesson.refresh();
-        },
-      });
-      card.appendChild(el("div", { class: "tr-head" }, [el("span", { class: "tr-icon", "aria-hidden": "true", text: t.icon }), el("strong", { class: "tr-name", text: t.name })]));
-      card.appendChild(el("p", { class: "tr-says", text: "“" + t.says + "”" }));
-      card.appendChild(
-        el("p", { class: "tr-facts" }, [
-          el("span", { text: "이동 거리 " + t.distanceKm.toLocaleString("ko-KR") + " km" }),
-          el("span", { text: "걸린 시간 " + t.hours + "시간" }),
-        ])
-      );
-      card.appendChild(calc.node);
-      card.appendChild(fb);
-      card.appendChild(result);
-      drawDone();
-      root.appendChild(card);
-    });
-  })();
-
-  function drawTransportResults() {
-    var rows = C.transports.map(function (t) {
-      var st = trState[t.id] || {};
-      return {
-        name: t.icon + " " + t.name,
-        dist: t.distanceKm.toLocaleString("ko-KR"),
-        hours: t.hours,
-        speed: st.done ? st.speed : null,
-      };
-    });
+  // 교통수단(활동해요2): 주어진 자료를 계산해 둔 표(학생이 계산하지 않는다 — 7분 기준 축소)
+  (function drawTransportTable() {
     T.renderTable($("transport-table"), {
-      caption: "교통수단의 이동 거리, 걸린 시간, 속력",
+      caption: "교통수단의 속력",
       columns: [
         { id: "name", label: "교통수단" },
-        { id: "dist", label: "이동 거리", unit: "km" },
-        { id: "hours", label: "걸린 시간", unit: "시간" },
+        { id: "calc", label: "속력 = 이동 거리 ÷ 걸린 시간" },
         { id: "speed", label: "속력", unit: "km/h" },
       ],
-      rows: rows,
-    });
-    var chartBox = $("transport-chart");
-    if (!C.transports.some(function (t) { return trDone(t.id); })) {
-      chartBox.textContent = "";
-      chartBox.appendChild(el("p", { class: "ss-help", text: "📊 교통수단의 속력을 구하면 여기에 막대그래프가 그려져요." }));
-    } else {
-      T.renderBar(
-        chartBox,
-        Object.assign({}, C.chart.barTransports, {
-          digits: null,
-          categories: C.transports.map(function (t) {
-            return t.name;
-          }),
-          series: [
-            {
-              name: "속력",
-              values: C.transports.map(function (t) {
-                return trDone(t.id) ? trState[t.id].speed : null;
-              }),
-            },
-          ],
-        })
-      );
-    }
-  }
-
-  /* ───────── 빠른 순서대로 쓰기(실험관찰 28·29쪽, 지도서 222·223쪽) ───────── */
-  // 학생이 보기 단추를 빠른 것부터 차례로 눌러 순서를 직접 쓴다. 정답 순서는 속력 참값으로 정렬해 만든다.
-  var orderState = store.get("order", {}) || {};
-  function makeOrder(root, cfg, items, isOpen) {
-    // items: [{ id, label, chip? }], 정답: 속력이 큰 것부터
-    var byId = {};
-    items.forEach(function (it) {
-      byId[it.id] = it;
-    });
-    var answer = items
-      .slice()
-      .sort(function (a, b) {
-        return b.speed - a.speed;
-      })
-      .map(function (it) {
-        return it.id;
-      });
-    var st = orderState[cfg.id];
-    if (!st || !Array.isArray(st.seq)) st = orderState[cfg.id] = { seq: [], checked: false, correct: false, tries: 0 };
-    st.seq = st.seq.filter(function (id, i) {
-      return byId[id] && st.seq.indexOf(id) === i;
-    });
-    var focusKey = null;
-    function save() {
-      store.set("order", orderState);
-    }
-    function labelOf(id, withChip) {
-      var it = byId[id];
-      return el("span", { class: "ord-label" }, [withChip && it.chip ? it.chip() : null, el("span", { text: it.label })]);
-    }
-    function feedbackText() {
-      if (!st.checked) return "";
-      if (st.correct) return cfg.correct;
-      if (st.seq.slice().reverse().join("|") === answer.join("|")) return C.order.wrongReversed;
-      var i = 0;
-      while (i < answer.length && st.seq[i] === answer[i]) i++;
-      return C.order.wrongAt.replace("{n}", String(i + 1));
-    }
-    function change(fn, key) {
-      fn();
-      st.checked = false;
-      focusKey = key;
-      save();
-      draw();
-      lesson.refresh();
-    }
-    function draw() {
-      root.textContent = "";
-      root.classList.remove("is-correct", "is-wrong");
-      root.appendChild(el("p", { class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "빠른 순서" }), cfg.prompt]));
-      if (!isOpen()) {
-        root.appendChild(el("p", { class: "ss-help", text: cfg.lock || "" }));
-        return;
-      }
-      root.classList.toggle("is-correct", st.checked && st.correct);
-      root.classList.toggle("is-wrong", st.checked && !st.correct);
-      var seqList = el("ol", { class: "ord-seq", "aria-label": "내가 쓴 빠른 순서" });
-      answer.forEach(function (_, i) {
-        var id = st.seq[i];
-        seqList.appendChild(
-          el("li", { class: "ord-slot" + (id ? " is-filled" : "") }, [
-            el("span", { class: "ord-rank", text: i === 0 ? "가장 빠름" : i === answer.length - 1 ? "가장 느림" : i + 1 + "번째" }),
-            id ? labelOf(id, true) : el("span", { class: "ord-empty", text: "?" }),
-          ])
-        );
-      });
-      root.appendChild(seqList);
-      var full = st.seq.length === answer.length;
-      root.appendChild(el("p", { class: "ss-help", text: full ? "모두 놓았어요. ‘확인하기’를 눌러요." : "아래 단추를 빠른 것부터 차례대로 눌러요. (" + (st.seq.length + 1) + "번째 자리를 고를 차례)" }));
-      var pool = el("div", { class: "ord-pool", role: "group", "aria-label": "놓을 보기" });
-      cfg.pool.forEach(function (id) {
-        var used = st.seq.indexOf(id) >= 0;
-        var b = el("button", { type: "button", class: "ss-btn ord-pick", "data-k": "p-" + id }, [labelOf(id, true)]);
-        b.disabled = used || full;
-        b.addEventListener("click", function () {
-          change(function () {
-            st.seq.push(id);
-          }, "next");
-        });
-        pool.appendChild(b);
-      });
-      root.appendChild(pool);
-      var undo = el("button", { type: "button", class: "ss-btn ss-btn-ghost", "data-k": "undo", text: "↶ 하나 빼기" });
-      undo.disabled = st.seq.length === 0;
-      undo.addEventListener("click", function () {
-        change(function () {
-          st.seq.pop();
-        }, "undo");
-      });
-      var reset = el("button", { type: "button", class: "ss-btn ss-btn-ghost", "data-k": "reset", text: "다시 놓기" });
-      reset.disabled = st.seq.length === 0;
-      reset.addEventListener("click", function () {
-        change(function () {
-          st.seq = [];
-        }, "next");
-      });
-      var check = el("button", { type: "button", class: "ss-btn ss-btn-primary", "data-k": "check", text: "확인하기" });
-      check.disabled = !full;
-      check.addEventListener("click", function () {
-        st.checked = true;
-        st.tries = (st.tries || 0) + 1;
-        st.correct = st.seq.join("|") === answer.join("|");
-        focusKey = "check";
-        save();
-        draw();
-        lesson.refresh();
-      });
-      root.appendChild(el("div", { class: "ss-row ord-ctrl" }, [undo, reset, check]));
-      var fb = feedbackText();
-      root.appendChild(el("p", { class: "ss-feedback" + (st.checked ? (st.correct ? " is-correct" : " is-wrong") : ""), "aria-live": "polite", text: fb }));
-      // 다시 그린 뒤 키보드 초점을 이어 준다
-      if (focusKey) {
-        var target = null;
-        if (focusKey === "next") target = full ? check : pool.querySelector("button:not([disabled])");
-        else target = root.querySelector('[data-k="' + focusKey + '"]');
-        if (target && target.disabled) target = full ? check : pool.querySelector("button:not([disabled])") || undo;
-        if (target && !target.disabled) target.focus();
-        focusKey = null;
-      }
-    }
-    draw();
-    return {
-      draw: draw,
-      isDone: function () {
-        return isOpen() && st.checked;
-      },
-      result: function () {
+      rows: C.transports.map(function (t) {
         return {
-          order: st.seq.map(function (id) {
-            return byId[id].label;
-          }),
-          correct: !!(st.checked && st.correct),
-          tries: st.tries || 0,
+          name: t.icon + " " + t.name,
+          calc: t.distanceKm.toLocaleString("ko-KR") + " km ÷ " + t.hours + " h",
+          speed: fmtNum(trSpeed(t)),
         };
-      },
-    };
-  }
-
-  var carOrder = makeOrder(
-    $("car-order"),
-    C.order.cars,
-    C.cars.map(function (c) {
-      return {
-        id: c.id,
-        label: c.name,
-        speed: speedOf(c.id),
-        chip: function () {
-          return carChip(c.id);
-        },
-      };
-    }),
-    function () {
-      return exp.allDone();
-    }
-  );
-  var trOrder = makeOrder(
-    $("transport-order"),
-    C.order.transports,
-    C.transports.map(function (t) {
-      return { id: t.id, label: t.icon + " " + t.name, speed: round1(trSpeed(t)) };
-    }),
-    allTransportsDone
-  );
-
-  /* ───────── 두 가지를 골라 속력으로 비교해 쓰기(지도서 223쪽 ②, 실험관찰 29쪽) ───────── */
-  var cmpState = store.get("compare", null);
-  if (!cmpState || typeof cmpState !== "object") cmpState = { text: "", submitted: false };
-  function escRe(x) {
-    return x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-  // 학생 문장을 가볍게 확인한다: 두 교통수단 이름, 두 속력(숫자+단위), 적은 속력이 표의 값인지, '더 빠르다/느리다' 방향이 맞는지
-  function checkCompare(text) {
-    var cfg = C.compare;
-    if (text.length < cfg.minLength) return "조금 더 자세히 적어 보세요. (" + cfg.minLength + "글자 이상)";
-    var named = C.transports.filter(function (t) {
-      return text.indexOf(t.name) >= 0;
+      }),
     });
-    if (named.length < 2) return "비교할 교통수단 두 가지의 이름을 넣어 써 보세요.";
-    var re = /(\d[\d,]*(?:\.\d+)?)\s*(?:km\s*\/\s*h|킬로미터\s*매\s*시)/gi;
-    var nums = [];
-    var m;
-    while ((m = re.exec(text))) nums.push(m[1]);
-    if (nums.length < 2) return "두 교통수단의 속력을 숫자와 단위(km/h)로 함께 써 보세요.";
-    var valid = C.transports.map(function (t) {
-      return round1(trSpeed(t));
-    });
-    for (var i = 0; i < nums.length; i++) {
-      var v = Number(nums[i].replace(/,/g, ""));
-      if (valid.indexOf(v) < 0) return "적은 속력 " + nums[i] + " km/h를 교통수단 표에서 다시 확인해 보세요.";
-    }
-    for (var a = 0; a < named.length; a++) {
-      for (var b = 0; b < named.length; b++) {
-        if (a === b) continue;
-        var r = new RegExp(escRe(named[a].name) + "[이가은는]?\\s*" + escRe(named[b].name) + "보다\\s*(?:더\\s*|훨씬\\s*)?(빠|느)");
-        var mm = r.exec(text);
-        if (!mm) continue;
-        var faster = trSpeed(named[a]) > trSpeed(named[b]);
-        if ((mm[1] === "빠") !== faster) return "두 교통수단의 속력을 다시 비교해 보세요. 단위가 같을 때는 숫자가 클수록 빨라요.";
-      }
-    }
-    return null;
-  }
-  var cmpBox = $("transport-compare");
-  var cmpTa = el("textarea", { id: "cmp-text", class: "ss-textarea", rows: "3", maxlength: "1000", placeholder: C.compare.placeholder });
-  cmpTa.value = cmpState.text || "";
-  var cmpMsg = el("p", { class: "ss-help", "aria-live": "polite" });
-  var cmpBtn = el("button", { type: "button", class: "ss-btn ss-btn-primary" });
-  var cmpOut = el("div", { class: "ss-compare", hidden: true });
-  var cmpLock = el("p", { class: "ss-help", text: C.compare.lock });
-  var cmpBody = el("div", null, [cmpTa, el("div", { class: "ss-row" }, [cmpBtn]), cmpMsg, cmpOut]);
-  cmpBox.appendChild(el("label", { for: "cmp-text", class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "비교해 쓰기" }), C.compare.prompt]));
-  cmpBox.appendChild(cmpLock);
-  cmpBox.appendChild(cmpBody);
-  function saveCmp() {
-    store.set("compare", cmpState);
-  }
-  function drawCompare() {
-    var open = allTransportsDone();
-    cmpLock.hidden = open;
-    cmpBody.hidden = !open;
-    cmpBtn.textContent = cmpState.submitted ? "고친 내용 다시 제출하기" : "제출하고 예시 답안 보기";
-    cmpOut.textContent = "";
-    cmpOut.hidden = !cmpState.submitted;
-    if (!cmpState.submitted) return;
-    cmpOut.appendChild(
-      el("div", { class: "ss-compare-grid" }, [
-        el("div", { class: "ss-compare-mine" }, [el("h4", { text: "✏️ 내 문장" }), el("p", { class: "ss-mine-text", text: cmpState.text })]),
-        el("div", { class: "ss-compare-model" }, [
-          el("h4", { text: "📘 예시 답안" }),
-          el(
-            "ul",
-            { class: "refs-list" },
-            C.compare.models.map(function (t) {
-              return el("li", { text: t });
-            })
-          ),
-        ]),
-      ])
-    );
-    cmpOut.appendChild(el("p", { class: "ss-help", text: C.compare.compareTip }));
-  }
-  cmpTa.addEventListener("input", function () {
-    cmpState.text = cmpTa.value;
-    saveCmp(); // 작은 글이라 곧바로 저장한다(새로고침 직전 입력도 남게)
-    cmpMsg.textContent = "";
-  });
-  cmpBtn.addEventListener("click", function () {
-    var t = cmpTa.value.trim();
-    var problem = checkCompare(t);
-    if (problem) {
-      cmpMsg.textContent = problem;
-      cmpTa.focus();
-      return;
-    }
-    cmpState.text = t;
-    cmpState.submitted = true;
-    saveCmp();
-    drawCompare();
-    lesson.refresh();
-  });
-  drawCompare();
-  function drawTransportOrderAndCompare() {
-    trOrder.draw();
-    drawCompare();
-  }
-  function analyzeActivitiesDone() {
-    return allTransportsDone() && carOrder.isDone() && trOrder.isDone() && !!cmpState.submitted && quiz.isDone();
-  }
+  })();
 
   /* ── 글 입력 즉시 저장(틀의 250 ms 지연 저장이 새로고침·탭 닫기 직전 입력을 놓치지 않게) ── */
   store.set("alive", 1); // '처음부터 다시 하기'로 저장소를 지운 뒤에는 되살리지 않게 하는 표시
@@ -1250,8 +883,7 @@
       cs[it.id].text = ta.value;
     });
     store.set("conclude", cs);
-    var cu = document.getElementById("ss-curiosity");
-    if (cu) store.set("curiosity", cu.value);
+    store.set("curiosity", curInput.value);
   }
   window.addEventListener("pagehide", flushTexts);
   document.addEventListener("visibilitychange", function () {
@@ -1259,12 +891,22 @@
   });
 
   var nav; // 아래에서 만든다
+  // 표에 쓸 값: 학생 기록이 있으면 그 기록, 없으면 교과서 예시(빨강·노랑만). 예시 값도 지도서 값(오차 없음)이다.
+  function exampleRecord(id) {
+    var t = truth(id);
+    return { car: id, distance: t.distance, time: t.time, speed: speedOf(id), example: true };
+  }
+  function rowRecord(id) {
+    var r = records.get(id);
+    if (r) return r;
+    return isExample(id) ? exampleRecord(id) : null;
+  }
   function drawResults() {
     var recs = C.cars.map(function (c) {
-      return records.get(c.id);
+      return rowRecord(c.id);
     });
     T.renderTable($("car-table"), {
-      caption: "태엽 자동차의 이동 거리, 걸린 시간, 속력 (내 기록)",
+      caption: "태엽 자동차의 이동 거리, 걸린 시간, 속력",
       columns: [
         { id: "name", label: "태엽 자동차" },
         { id: "distance", label: "이동 거리", unit: "cm" },
@@ -1273,24 +915,16 @@
       ],
       rows: C.cars.map(function (c, i) {
         var r = recs[i];
-        return { name: c.name, distance: r ? r.distance : null, time: r ? r.time : null, speed: r ? Number(r.speed) : null };
+        return { name: c.name + (r && r.example ? " (교과서 예시)" : ""), distance: r ? r.distance : null, time: r ? r.time : null, speed: r ? Number(r.speed) : null };
       }),
     });
-    var box = $("car-table");
-    var ul = el("ul", { class: "formula-list", "aria-label": "속력 구하는 식" });
-    C.cars.forEach(function (c, i) {
-      var r = recs[i];
-      if (!r) return;
-      ul.appendChild(el("li", null, [carChip(c.id), el("span", { text: c.name + ": " + r.distance + " cm ÷ " + r.time + " s = " + Number(r.speed).toFixed(1) + " cm/s" })]));
-    });
-    box.appendChild(ul);
-    box.appendChild(el("p", { class: "ss-help", text: "속력은 반올림하여 소수 첫째 자리까지 나타냈어요. (예: 100 ÷ 5.8 = 17.241… → 17.2)" }));
+    $("car-table").appendChild(el("p", { class: "ss-help", text: "속력은 그동안의 평균적인 빠르기예요. (파랑 24.4 cm/s는 5초 동안의 평균)" }));
 
     T.renderBar(
       $("car-chart"),
       Object.assign({}, C.chart.barCars, {
-        categories: C.cars.map(function (c) {
-          return c.short;
+        categories: C.cars.map(function (c, i) {
+          return c.short + (recs[i] && recs[i].example ? "(예시)" : "");
         }),
         series: [
           {
@@ -1302,14 +936,9 @@
         ],
       })
     );
-    $("car-chart").appendChild(el("p", { class: "ss-help", text: "막대 위 숫자가 속력(cm/s)이에요. 네 자동차는 서로 다른 대상이라 선으로 잇지 않고 막대로 나타냈어요." }));
-    drawTransportResults();
-    carOrder.draw();
-    drawTransportOrderAndCompare();
-    $("unit-think").textContent = "🤔 생각해 보기: 태엽 자동차의 속력은 cm/s로, 교통수단의 속력은 km/h로 나타냈어요. 왜 서로 다른 단위를 썼을까요? 이동 거리와 걸린 시간의 단위를 살펴보세요.";
   }
 
-  /* ───────── 5. 마치기(결과 저장) ───────── */
+  /* ───────── 4. 정리하기 안의 마치기(결과 저장) ───────── */
   function buildDetail() {
     var q = quiz.result();
     var analysis = {};
@@ -1326,34 +955,28 @@
         tries: r.tries,
       };
     });
-    var transports = {};
-    C.transports.forEach(function (t) {
-      var st = trState[t.id] || {};
-      transports[t.id] = { speed: st.done ? st.speed : null, tries: st.tries || 0 };
-    });
-    var cv = conclude.values();
     return {
       predict: predict.values(),
       records: records.list().map(function (r) {
         return { car: r.car, distance: r.distance, time: r.time, speed: r.speed, recordedAt: r.recordedAt };
       }),
-      transports: transports,
+      examples: C.exampleCars.filter(function (id) {
+        return !records.get(id);
+      }), // 교과서 예시 값으로 표를 채운 자동차
       analysis: analysis,
-      conclusion: cv.conclusion,
-      order: { cars: carOrder.result(), transports: trOrder.result() },
-      compare: cmpState.submitted ? cmpState.text : "",
-      extension: { q1: cv.ext1, q2: cv.ext2 },
-      curiosity: curiosity.value(),
+      conclusion: conclude.values().conclusion,
+      curiosity: curInput.value.trim(),
     };
   }
 
   lesson.finish({
+    stage: "conclude",
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      return conclude.isDone() || "결론을 적고 ‘제출하고 모범 답안 보기’를 먼저 눌러 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -1361,13 +984,10 @@
       var correct = C.quiz.filter(function (qq) {
         return q[qq.id].correct;
       }).length;
-      var trN = C.transports.filter(function (t) {
-        return trDone(t.id);
+      var mine = MEASURE_CARS.filter(function (id) {
+        return !!records.get(id);
       }).length;
-      var ordN = [carOrder, trOrder].filter(function (o) {
-        return o.result().correct;
-      }).length;
-      return ["태엽 자동차 속력: " + records.count() + "/4대", "교통수단 속력: " + trN + "/5가지", "빠른 순서 쓰기: " + ordN + "/2 맞힘", "분석 질문: " + correct + "/" + C.quiz.length + " 맞힘"];
+      return ["태엽 자동차 속력 직접 구하기: " + mine + "/" + MEASURE_CARS.length + "대", "분석 질문: " + correct + "/" + C.quiz.length + " 맞힘"];
     },
   });
   lesson.restart($("btn-restart"));
@@ -1384,26 +1004,18 @@
       },
       analyze: function () {
         var p = exp.progress();
-        return exp.allDone() || "1단계(2대)와 2단계(2대) 자동차의 속력을 모두 기록해야 넘어갈 수 있어요. (지금 " + p.done + "/" + p.total + "대)";
+        return exp.allDone() || "파란색(1단계)·초록색(2단계) 자동차의 속력을 기록해야 넘어갈 수 있어요. (지금 " + p.done + "/" + p.total + "대)";
       },
       conclude: function () {
-        if (!carOrder.isDone()) return "활동 1에서 태엽 자동차를 빠른 순서대로 놓고 ‘확인하기’를 눌러 주세요.";
-        if (!allTransportsDone()) return "교통수단 5가지의 속력을 계산기로 모두 구해 주세요.";
-        if (!trOrder.isDone()) return "교통수단을 빠른 순서대로 놓고 ‘확인하기’를 눌러 주세요.";
-        if (!cmpState.submitted) return "교통수단 두 가지를 골라 속력으로 비교하는 문장을 써서 제출해 주세요.";
-        return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 모두 보기를 고르고 ‘확인하기’를 눌러 주세요.";
-      },
-      curiosity: function () {
-        return conclude.isDone() || "결론과 발전 질문 2개를 모두 제출해 주세요.";
+        return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 보기를 고르고 ‘확인하기’를 눌러 주세요.";
       },
     },
     done: {
       predict: predict.isDone,
       experiment: exp.allDone,
-      analyze: analyzeActivitiesDone,
-      conclude: conclude.isDone,
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+      analyze: quiz.isDone,
+      conclude: function () {
+        return conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {

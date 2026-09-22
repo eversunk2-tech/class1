@@ -70,37 +70,24 @@
       <!-- 3. 기록·분석하기 -->
       <section data-stage="analyze" aria-labelledby="h-analyze" hidden>
         <h2 id="h-analyze" class="ss-stage-title">3. 기록·분석하기</h2>
-        <p class="ss-lead">실험하기에서 기록한 태엽 자동차의 이동 거리·걸린 시간·속력으로 만든 표와 그래프예요. (탐구 3·4의 교과서 예시 자료, 속력은 반올림하여 소수 첫째 자리까지)</p>
-        <h3 class="sub-h">활동 1. 태엽 자동차의 속력</h3>
+        <p class="ss-lead">표를 보고 분석 질문 2개에 답해요. 빨강·노랑은 교과서 예시 값이에요.</p>
         <div class="ss-card" id="car-table"></div>
         <div class="ss-card" id="car-chart"></div>
-        <div class="ss-card order-card" id="car-order"></div>
-
-        <h3 class="sub-h">활동 2. 교통수단의 속력 구하기</h3>
-        <p class="ss-lead">카드에 적힌 이동 거리와 걸린 시간으로 계산기를 눌러 속력을 구해 보세요. 다섯 가지를 모두 구하면 표와 그래프가 완성돼요.</p>
-        <div id="transport-root" class="tr-grid"></div>
-        <div class="ss-card" id="transport-table"></div>
-        <div class="ss-card" id="transport-chart"></div>
-        <div class="ss-card order-card" id="transport-order"></div>
-        <div class="ss-card cmp-card" id="transport-compare"></div>
-        <p class="ss-card think-note" id="unit-think"></p>
+        <details class="ss-card tr-more" open>
+          <summary>🚄 교통수단의 속력 (교과서 자료)</summary>
+          <div id="transport-table"></div>
+        </details>
 
         <h3 class="sub-h">결과 분석하기</h3>
         <div id="quiz-root"></div>
       </section>
 
-      <!-- 4. 정리하기 -->
+      <!-- 4. 정리하기 (+ 궁금한 점 한 줄, 선택 · 학습 마치기) -->
       <section data-stage="conclude" aria-labelledby="h-conclude" hidden>
         <h2 id="h-conclude" class="ss-stage-title">4. 정리하기</h2>
         <p class="ss-lead">먼저 내 생각을 적고 제출하면 모범 답안이 나와요. 내 답과 비교해 보세요.</p>
         <div id="conclude-root"></div>
-      </section>
-
-      <!-- 5. 더 탐구하고 싶은 점 -->
-      <section data-stage="curiosity" aria-labelledby="h-curiosity" hidden>
-        <h2 id="h-curiosity" class="ss-stage-title">5. 더 탐구하고 싶은 점</h2>
-        <div class="ss-card refs-card" id="curiosity-refs"></div>
-        <div id="curiosity-root"></div>
+        <div class="ss-card" id="curiosity-root"></div>
         <div class="ss-card finish-card">
           <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
           <p class="ss-help" id="finish-msg" aria-live="polite"></p>
@@ -135,7 +122,6 @@
     <script src="./science-sim/table-chart.js"></script>
     <script src="./science-sim/quiz.js"></script>
     <script src="./science-sim/conclude.js"></script>
-    <script src="./science-sim/curiosity.js"></script>
     <script src="./science-sim/sim3d.js"></script>
     <script src="./science-sim/experiment.js"></script>
     <script src="./data/lesson-config.js"></script>

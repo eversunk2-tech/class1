@@ -10,6 +10,9 @@
  *   초시계 값 = 참값 + (−0.10초 ~ +0.10초 사이의 작은 차이)  → 학생이 반올림해 소수 첫째 자리로 기록
  *   자동차는 이번 측정의 초시계 값 동안 출발선에서 결승선까지 일정한 빠르기로 움직인다(애니메이션 = 실제 시간).
  * 이 차시는 다음 차시 용어("속력", 거리 ÷ 시간)를 화면에 쓰지 않는다.
+ *
+ * 2026-09-22 개정(질문 축소·7분 기준): 이동 거리는 100 cm 하나(D)만 쓰고 거리 고르기를 없앴다.
+ * 자동차 2대 × 1번 측정(slim-review 반영, 지도서처럼 평균 없음), 분석은 표 + 막대그래프 + 보기 2개, 정리하기에 결론 1개와 선택 한 줄(궁금한 점)만 둔다.
  */
 (function () {
   "use strict";
@@ -32,6 +35,7 @@
   var CAR_IDS = C.cars.map(function (c) {
     return c.id;
   });
+  var D = C.baseDistance; // 이 앱이 쓰는 유일한 이동 거리(100 cm)
 
   /* ───────── 시간 계산(모형) ───────── */
   // 참값(1/100초 단위 정수): 4.2초 × 50/100 = 2.1초 → 210
@@ -86,29 +90,38 @@
 
   /* ───────── 분석 질문: 내 기록으로 채점 ───────── */
   C.quiz.forEach(function (q) {
-    if (q.dataGraded === "fasterAt100") {
+    if (q.dataGraded === "shorterAt100") {
       q.grade = function (choice) {
-        var ans = fasterAt(C.baseDistance) || q.answer[0];
-        return choice.length === 1 && choice[0] === ans;
-      };
-    } else if (q.dataGraded === "sameWinner") {
-      q.grade = function (choice) {
-        var ws = C.distances.map(fasterAt);
-        var ans = ws.every(function (w) {
-          return w && w !== "same" && w === ws[0];
-        })
-          ? "same"
-          : "changed";
+        var ans = fasterAt(D) || q.answer[0];
         return choice.length === 1 && choice[0] === ans;
       };
     }
   });
 
-  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리(결론 + 선택 한 줄) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    lesson.refresh();
+    showFinish();
+  });
   var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+  // 궁금한 점은 선택 입력 한 줄: 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다.
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 결론을 제출한 뒤에 궁금한 점(선택)과 '학습 마치기'를 보여 준다.
+  function showFinish() {
+    $("finish-wrap").hidden = !conclude.isDone();
+  }
+  showFinish();
 
   /* ───────── 2. 실험하기 ───────── */
   function paragraphs(list) {
@@ -128,7 +141,6 @@
       })
     ),
   ]);
-  var swTip = el("details", { class: "ss-card safety" }, [el("summary", { text: C.stopwatchTip.title }), paragraphs(C.stopwatchTip.paragraphs)]);
 
   function carIcon(id) {
     var i = el("span", { class: "car-icon car-" + id, "aria-hidden": "true", text: CARS[id].mark });
@@ -168,46 +180,25 @@
             },
           };
         }),
-        note: function () {
-          return "🚗 자동차는 한 대씩 출발시켜요. 두 자동차를 같은 이동 거리에서 모두 재야 빠르기를 비교할 수 있어요.";
-        },
-      },
-      {
-        id: "dist",
-        title: "이동 거리 고르기",
-        short: "이동 거리",
-        columns: 3,
-        options: C.distances.map(function (d) {
-          return { id: String(d), label: d === C.baseDistance ? distLabel(d) + " (교과서)" : distLabel(d) };
-        }),
-        note: function (sel) {
-          return sel.dist ? "📏 출발선에서 결승선까지 " + distLabel(sel.dist) + "예요." : null;
-        },
       },
     ],
     phases: [
       {
         id: "M",
         name: "측정",
-        lead: "자동차와 이동 거리를 골라 결승선까지 걸린 시간을 재요. 같은 조건을 " + C.trials + "번씩 재어 기록해요(" + C.cars.length + "대 × " + C.distances.length + "가지 거리).",
+        lead: "자동차를 하나 골라 출발시키고, 두 자동차를 모두 기록해요.",
         trials: C.trials,
-        cells: (function () {
-          var cells = [];
-          C.distances.forEach(function (d) {
-            C.cars.forEach(function (c) {
-              cells.push({ car: c.id, dist: String(d) });
-            });
-          });
-          return cells;
-        })(),
+        cells: C.cars.map(function (c) {
+          return { car: c.id };
+        }),
       },
     ],
-    doneLead: "모든 측정을 기록했어요. 더 재 보고 싶은 조건은 자유롭게 다시 재어 보세요(가장 먼저 잰 기록이 바뀌어요).",
+    doneLead: "모든 측정을 기록했어요. '다음 단계'로 가서 내 기록을 살펴봐요. (다시 재면 기록이 바뀌어요)",
     cellKey: function (sel) {
-      return keyOf(sel.car, sel.dist);
+      return keyOf(sel.car, D);
     },
     runLabel: function (sel) {
-      return "▶ 출발! " + CARS[sel.car].name + " · " + distLabel(sel.dist);
+      return "▶ 출발! " + CARS[sel.car].name + " · " + distLabel(D);
     },
     view: {
       build3D: build3D,
@@ -217,9 +208,9 @@
     },
     observe: observeCard,
     makeRecord: function (sel, v) {
-      var key = keyOf(sel.car, sel.dist);
+      var key = keyOf(sel.car, D);
       var cs = pending && pending.key === key ? pending.cs : lastCs[key];
-      return { car: sel.car, distance: Number(sel.dist), time: round1(v.time), reading: cs == null ? null : cs / 100 };
+      return { car: sel.car, distance: D, time: round1(v.time), reading: cs == null ? null : cs / 100 };
     },
     describeRecord: function (r) {
       return CARS[r.car].name + " " + distLabel(r.distance) + " → " + r.time.toFixed(1) + "초" + (r.trial ? " (" + r.trial + "회)" : "");
@@ -229,25 +220,23 @@
       rows: C.cars.map(function (c) {
         return { id: c.id, label: c.name };
       }),
-      cols: C.distances.map(function (d) {
-        return { id: String(d), label: distLabel(d) };
-      }),
-      sel: function (r, c) {
-        return { car: r.id, dist: c.id };
+      cols: [{ id: String(D), label: distLabel(D) }],
+      sel: function (r) {
+        return { car: r.id };
       },
     },
-    extras: [safety, swTip],
+    extras: [safety],
     onChange: lesson.refresh,
   });
 
   /* ── 관찰·기록 카드: 멈춘 초시계 값을 보고 반올림해 적기 ── */
   var check = null; // { expect: 1/10초 정수, cs, msg }
   function observeCard(sel) {
-    var key = keyOf(sel.car, sel.dist);
+    var key = keyOf(sel.car, D);
     var cs = pending && pending.key === key ? pending.cs : null;
     if (cs == null) {
       // 애니메이션이 중간에 끝난 경우 등: 이번 측정값을 여기서 정한다
-      cs = measureCs(sel.car, sel.dist);
+      cs = measureCs(sel.car, D);
       pending = { key: key, cs: cs };
       rememberCs(key, cs);
     }
@@ -261,7 +250,7 @@
     );
     body.appendChild(
       el("p", { class: "ss-help" }, [
-        S.rich(CARS[sel.car].name + " · 이동 거리 " + distLabel(sel.dist) + " · 자동차의 **앞부분이 결승선에 닿은 순간** 멈춘 초시계예요.", "span"),
+        S.rich(CARS[sel.car].name + " · 이동 거리 " + distLabel(D) + " · 자동차의 **앞부분이 결승선에 닿은 순간** 멈춘 초시계예요.", "span"),
       ])
     );
     var help = el("details", { class: "round-help" }, [
@@ -319,8 +308,8 @@
 
   /* ── 지금 고른 자동차·거리를 새로고침 뒤에도 되살린다(앱 전용, 공통 틀은 선택을 저장하지 않음) ── */
   function rememberSel(s) {
-    if (!s || (s.car == null && s.dist == null)) return;
-    store.set("curSel", { car: s.car == null ? null : s.car, dist: s.dist == null ? null : String(s.dist) });
+    if (!s || s.car == null) return;
+    store.set("curSel", { car: s.car });
   }
   var selRestored = false;
   function activateExperiment() {
@@ -329,10 +318,7 @@
     selRestored = true;
     var saved = store.get("curSel", null);
     if (!saved) return;
-    var s = {};
-    if (saved.car && CARS[saved.car]) s.car = saved.car;
-    if (saved.dist != null && C.distances.indexOf(Number(saved.dist)) >= 0) s.dist = String(saved.dist);
-    if (s.car != null || s.dist != null) exp.select(s);
+    if (saved.car && CARS[saved.car]) exp.select({ car: saved.car });
   }
 
   /* ── 두 화면이 함께 쓰는 것: 초시계 화면, "출발!" 알림 ── */
@@ -375,7 +361,7 @@
     return { finish: C.baseDistance, atFinish: {} };
   }
   function showSelReading(sw, s) {
-    if (s && s.car && s.dist && lastCs[keyOf(s.car, s.dist)] != null) sw.set(lastCs[keyOf(s.car, s.dist)], "stop");
+    if (s && s.car && lastCs[keyOf(s.car, D)] != null) sw.set(lastCs[keyOf(s.car, D)], "stop");
     else sw.set(0, "ready");
   }
 
@@ -473,7 +459,6 @@
       highlight: function (s) {
         selNow = Object.assign({}, s);
         rememberSel(s);
-        if (s.dist) st.finish = Number(s.dist);
         CAR_IDS.forEach(function (id) {
           cars[id].btn.classList.toggle("is-sel", s.car === id);
           cars[id].btn.setAttribute("aria-pressed", String(s.car === id));
@@ -482,7 +467,7 @@
         showSelReading(sw, s);
       },
       run: async function (sel) {
-        var d = Number(sel.dist);
+        var d = D;
         var key = keyOf(sel.car, d);
         pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
         var cs = measureCs(sel.car, d);
@@ -512,7 +497,7 @@
         rememberCs(key, cs);
       },
       showInstant: function (sel) {
-        st.atFinish[sel.car] = Number(sel.dist);
+        st.atFinish[sel.car] = D;
         layout();
       },
       clear: function () {
@@ -587,7 +572,7 @@
       dimBar.position.set(0, 0.03, 3.1);
       v.root.add(dimBar);
       var dimLabels = {};
-      C.distances.forEach(function (d) {
+      [D].forEach(function (d) {
         var l = M.label("↔ " + distLabel(d), { height: 0.95, bold: true });
         l.position.set(fx(d / 2), 0.5, 3.75);
         l.visible = false;
@@ -668,9 +653,7 @@
       // 좁은 화면(휴대폰)에서는 이름표 글씨가 너무 작아지므로 이름표를 키우고, 줄자 이름표는 숨긴다
       // (줄자 보관은 '안전 수칙' 카드에서 설명한다). review m4
       var tags = [startLabel, finishLabel, tapeLabel].concat(
-        C.distances.map(function (d) {
-          return dimLabels[d];
-        }),
+        [dimLabels[D]],
         CAR_IDS.map(function (id) {
           return cars[id].tag;
         })
@@ -709,9 +692,7 @@
         finishGroup.position.x = x;
         dimBar.scale.x = st.finish / U;
         dimBar.position.x = (START_X + x) / 2;
-        C.distances.forEach(function (d) {
-          dimLabels[d].visible = d === st.finish;
-        });
+        dimLabels[D].visible = D === st.finish;
         CAR_IDS.forEach(function (id) {
           place(id, st.atFinish[id] === st.finish ? x + COAST_U : START_X);
         });
@@ -732,7 +713,6 @@
         whenVisible: v.whenVisible,
         highlight: function (s) {
           rememberSel(s);
-          if (s.dist) st.finish = Number(s.dist);
           CAR_IDS.forEach(function (id) {
             cars[id].ring.visible = s.car === id;
           });
@@ -741,7 +721,7 @@
           v.render();
         },
         run: async function (sel) {
-          var d = Number(sel.dist);
+          var d = D;
           var key = keyOf(sel.car, d);
           pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
           var cs = measureCs(sel.car, d);
@@ -782,7 +762,7 @@
           rememberCs(key, cs);
         },
         showInstant: function (sel) {
-          st.atFinish[sel.car] = Number(sel.dist);
+          st.atFinish[sel.car] = D;
           layout();
           v.render();
         },
@@ -805,29 +785,31 @@
   /* ───────── 3. 기록·분석하기 ───────── */
   function drawResults() {
     var T = S.TableChart;
-    var rows = [];
-    C.distances.forEach(function (d) {
-      C.cars.forEach(function (c) {
-        var tr = records.trials(keyOf(c.id, d));
-        var row = { dist: distLabel(d), car: carLabel(c.id), avg: avg(c.id, d) };
-        for (var i = 1; i <= C.trials; i++) {
-          var r = tr.filter(function (x) {
-            return x.trial === i;
-          })[0];
-          row["t" + i] = r ? r.time : null;
-        }
-        rows.push(row);
-      });
+    var rows = C.cars.map(function (c) {
+      var tr = records.trials(keyOf(c.id, D));
+      var row = { car: carLabel(c.id), avg: avg(c.id, D) };
+      for (var i = 1; i <= C.trials; i++) {
+        var r = tr.filter(function (x) {
+          return x.trial === i;
+        })[0];
+        row["t" + i] = r ? r.time : null;
+      }
+      return row;
     });
-    var cols = [
-      { id: "dist", label: "이동 거리" },
-      { id: "car", label: "자동차" },
-    ];
-    for (var i = 1; i <= C.trials; i++) cols.push({ id: "t" + i, label: i + "회", unit: "초", digits: 1 });
-    cols.push({ id: "avg", label: "평균", unit: "초", digits: 1 });
+    var cols = [{ id: "car", label: "자동차" }];
+    if (C.trials > 1) {
+      for (var i = 1; i <= C.trials; i++) cols.push({ id: "t" + i, label: i + "회", unit: "초", digits: 1 });
+      cols.push({ id: "avg", label: "평균", unit: "초", digits: 1 });
+    } else {
+      cols.push({ id: "avg", label: "걸린 시간", unit: "초", digits: 1 }); // 한 번만 재면 그 기록 그대로
+    }
     var tableRoot = $("result-table");
-    T.renderTable(tableRoot, { caption: "태엽 자동차가 결승선까지 이동하는 데 걸린 시간 (내 기록)", columns: cols, rows: rows });
-    tableRoot.appendChild(el("p", { class: "trend-note", text: "평균은 세 번 잰 시간을 더해 3으로 나눈 뒤, 반올림해 소수 첫째 자리까지 나타냈어요. 같은 이동 거리의 두 줄을 비교해 보세요." }));
+    T.renderTable(tableRoot, { caption: "태엽 자동차가 " + distLabel(D) + "를 이동하는 데 걸린 시간 (내 기록)", columns: cols, rows: rows });
+    if (C.trials > 1) {
+      tableRoot.appendChild(
+        el("p", { class: "trend-note", text: "평균은 " + C.trials + "번 잰 시간을 더해 " + C.trials + "로 나눈 뒤, 반올림해 소수 첫째 자리까지 나타냈어요." })
+      );
+    }
 
     var bar = $("bar-card");
     bar.textContent = "";
@@ -836,40 +818,16 @@
     T.renderBar(
       barRoot,
       Object.assign({}, C.chart.bar, {
-        categories: C.distances.map(distLabel),
+        categories: [distLabel(D)],
         series: C.cars.map(function (c) {
-          return {
-            name: c.name,
-            values: C.distances.map(function (d) {
-              return avg(c.id, d);
-            }),
-          };
+          return { name: c.name, values: [avg(c.id, D)] };
         }),
       })
     );
-    bar.appendChild(el("p", { class: "trend-note", text: "막대가 짧을수록 결승선까지 걸린 시간이 짧아요. 같은 이동 거리에 있는 두 막대끼리 비교해요." }));
-
-    var line = $("line-card");
-    line.textContent = "";
-    var lineRoot = el("div");
-    line.appendChild(lineRoot);
-    T.renderLine(
-      lineRoot,
-      Object.assign({}, C.chart.line, {
-        series: C.cars.map(function (c) {
-          return {
-            name: c.name,
-            points: C.distances.map(function (d) {
-              return { x: d, y: avg(c.id, d) };
-            }),
-          };
-        }),
-      })
-    );
-    line.appendChild(el("p", { class: "trend-note", text: "⚠️ 이동 거리가 서로 다른 점끼리는 걸린 시간으로 빠르기를 비교할 수 없어요. 세로로 같은 줄(같은 이동 거리)에 있는 두 점끼리 비교해요." }));
+    bar.appendChild(el("p", { class: "trend-note", text: "막대가 짧을수록 결승선까지 걸린 시간이 짧아요." }));
   }
 
-  /* ───────── 5. 마치기(결과 저장) ───────── */
+  /* ───────── 4. 마치기(결과 저장) ───────── */
   function buildDetail() {
     var q = quiz.result();
     var analysis = {};
@@ -887,33 +845,30 @@
       };
     });
     var cv = conclude.values();
+    var avgs = { distanceCm: D };
+    C.cars.forEach(function (c) {
+      avgs[c.name] = avg(c.id, D);
+    });
     return {
       predict: predict.values(),
       records: records.list().map(function (r) {
         return { car: CARS[r.car] ? CARS[r.car].name : r.car, distanceCm: r.distance, trial: r.trial, time: r.time, stopwatch: r.reading };
       }),
-      averages: C.distances.map(function (d) {
-        var o = { distanceCm: d };
-        C.cars.forEach(function (c) {
-          o[c.name] = avg(c.id, d);
-        });
-        return o;
-      }),
+      averages: [avgs],
       analysis: analysis,
       conclusion: cv.conclusion,
-      apply: cv.apply,
-      extension: { q1: cv.ext1, q2: cv.ext2 },
       curiosity: curiosity.value(),
     };
   }
 
   lesson.finish({
+    stage: "conclude",
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      return conclude.isDone() || "결론을 먼저 적고 제출해 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -934,26 +889,22 @@
     nextBtn: $("btn-next"),
     gates: {
       experiment: function () {
-        return predict.isDone() || "예상하기의 두 질문에 내 생각을 " + C.predict.minLength + "글자 이상 먼저 적어 주세요.";
+        return predict.isDone() || "예상하기 질문에 내 생각을 " + C.predict.minLength + "글자 이상 먼저 적어 주세요.";
       },
       analyze: function () {
         var p = exp.progress();
-        return exp.allDone() || "자동차 " + C.cars.length + "대 × 이동 거리 " + C.distances.length + "가지를 " + C.trials + "번씩 모두 기록해야 넘어갈 수 있어요. (다 잰 칸: " + p.done + "/" + p.total + ")";
+        return exp.allDone() || "두 자동차를 " + (C.trials > 1 ? C.trials + "번씩 " : "") + "모두 기록해야 넘어갈 수 있어요. (다 잰 칸: " + p.done + "/" + p.total + ")";
       },
       conclude: function () {
         return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
-      },
-      curiosity: function () {
-        return conclude.isDone() || "결론, 생활 속 적용, 발전 질문 2개를 모두 차례로 제출해 주세요.";
       },
     },
     done: {
       predict: predict.isDone,
       experiment: exp.allDone,
       analyze: quiz.isDone,
-      conclude: conclude.isDone,
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+      conclude: function () {
+        return conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {
