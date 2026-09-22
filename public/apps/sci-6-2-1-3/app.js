@@ -163,7 +163,7 @@
     C.intro.forEach(function (line) {
       introBox.appendChild(S.rich(line, "p"));
     });
-    introBox.appendChild(el("p", { class: "ss-help", text: "📚 자료: " + C.source.note + " (" + C.source.area + ", " + C.source.period + ", 매월 21일 오후 12시 30분 무렵)" }));
+    introBox.appendChild(el("p", { class: "ss-help", text: "📚 자료: " + C.source.note + " (" + C.source.area + ", 매월 21일 오후 12시 30분 무렵)" }));
     var det = el("details", { class: "ss-card ss-intro" }, [el("summary", { text: "🔎 실험 방법 알아 두기" }), introBox]);
     det.open = store.get("intro", true) !== false;
     det.addEventListener("toggle", function () {
@@ -1046,7 +1046,7 @@
 
   function drawResults() {
     S.TableChart.renderTable($("result-table"), {
-      caption: "내 기록 표 (" + C.source.area + ", " + C.source.period + ", 매월 21일)",
+      caption: "내 기록 표 (" + C.source.area + ", 매월 21일)",
       columns: [
         { id: "season", label: "계절" },
         { id: "month", label: "월" },
@@ -1109,7 +1109,7 @@
     card.appendChild(
       el("p", {
         class: "ss-help chart-note",
-        text: "점은 매월 21일의 값이에요. 남중 고도와 낮의 길이는 달이 바뀔 때 갑자기 바뀌지 않고 날마다 조금씩 계속 달라져요. (2024년 서울특별시 자료 — 지역마다 값이 조금씩 달라요)",
+        text: "점은 매월 21일의 값이에요. 남중 고도와 낮의 길이는 달이 바뀔 때 갑자기 바뀌지 않고 날마다 조금씩 계속 달라져요. (서울특별시 자료 — 지역마다 값이 조금씩 달라요)",
       })
     );
     card.appendChild(el("p", { class: "ss-help", text: "낮의 길이 그래프의 세로축은 8시간부터 그렸어요." }));
@@ -1144,7 +1144,7 @@
     return {
       predict: predict.values(),
       hintsOpened: predict.hintsOpened(),
-      source: { area: C.source.area, period: C.source.period, day: 21 },
+      source: { area: C.source.area, day: 21 },
       records: rows,
       analysis: analysis,
       conclusion: conclude.values().conclusion,

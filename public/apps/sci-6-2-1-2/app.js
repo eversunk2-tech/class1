@@ -2,11 +2,11 @@
  * app.js — sci-6-2-1-2 "하루 동안 태양 고도, 그림자 길이, 기온의 관계는?" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·실험 화면 틀(3D/2D 전환)·기록 저장·진행 상황 DB 저장을 맡고, 이 파일은
  *   ① 3D/2D 장면: 태양 고도 측정기(막대기 10 cm·자·각도기·실), 그늘의 온도계, 하늘의 태양과 하루 경로
- *   ② 시간 바(앱 전용 UI): 8:30~15:30, 1분 단위 슬라이더 + 매시 30분 눈금 버튼 8개 + 값 패널 + 📝 기록하기
+ *   ② 시간 바(앱 전용 UI): 9:30~15:30, 1분 단위 슬라이더 + 매시 30분 눈금 버튼 7개 + 값 패널 + 📝 기록하기
  *   ③ 분석 표·꺾은선그래프 3개, 내 기록으로 답하는 보기 고르기 2개, 결론 1개, 궁금한 점 한 줄(선택)   만 만든다.
  *
  * spec.md "개정 1"(우선):
- *  - 기록은 매시 30분 눈금 8곳에서만(필수 8칸). 값은 data/lesson-config.js의 results(교과서·실험관찰 예시 값, 8:30은 모형 추정)만 기록한다.
+ *  - 기록은 매시 30분 눈금 7곳에서만(필수 7칸, 개정 2: 8:30 삭제). 값은 data/lesson-config.js의 results(교과서·실험관찰 예시 값)만 기록한다.
  *  - 눈금 사이는 살펴보기 전용 모형 값: 태양 고도(data/sun-table.js), 그림자 길이 = 10 ÷ tan(태양 고도) + 보정(눈금에서 표와 같게),
  *    기온 = 8점 단조 3차 보간(PCHIP, 14:30 최고값 27.0 °C를 넘지 않음).
  *  - 눈금 버튼 → 약 1초 빨리 감기(모형). 학생은 값을 타이핑하지 않는다. 모든 수치는 소수 첫째 자리.
@@ -49,7 +49,7 @@
 
   /* ───────── 측정 시각·모형 ───────── */
   var TIMES = C.times;
-  var MIN0 = SUN.startMin; // 510 = 8:30
+  var MIN0 = SUN.startMin; // 570 = 9:30
   var MIN1 = SUN.endMin; // 930 = 15:30
   var TIME_BY_ID = {};
   TIMES.forEach(function (t) {
@@ -133,7 +133,7 @@
     var tk = tickAt(min);
     if (tk) {
       var r = C.results[tk.id];
-      return { min: tk.min, tick: tk, solar: r.solar, shadow: r.shadow, temp: r.temp, az: azAt(tk.min), estimate: !!tk.estimate };
+      return { min: tk.min, tick: tk, solar: r.solar, shadow: r.shadow, temp: r.temp, az: azAt(tk.min) };
     }
     var alt = tableAt(SUN.alt, min);
     var x = clamp(min, MIN0, MIN1) - MIN0;
@@ -147,7 +147,6 @@
       shadow: Math.round((C.stickCm / Math.tan(alt * RAD) + corr) * 10) / 10,
       temp: Math.round(tempAt(min) * 10) / 10,
       az: azAt(min),
-      estimate: true,
     };
   }
 
@@ -852,20 +851,20 @@
     intro: introNode(),
     introTitle: "🔎 측정 방법 알아 두기",
     modelNote: C.modelNote,
-    clearLabel: "⏮ 8:30으로",
-    clearMessage: "시간 바를 8:30으로 되돌렸어요. 기록은 그대로 남아 있어요.",
+    clearLabel: "⏮ 9:30으로",
+    clearMessage: "시간 바를 9:30으로 되돌렸어요. 기록은 그대로 남아 있어요.",
     factors: [],
     phases: [
       {
         id: "M",
         name: "측정",
-        lead: "시간 바를 끌어 하루 동안의 변화를 살펴보고, 매시 30분 눈금 8곳에서 값을 기록해요.",
+        lead: "시간 바를 끌어 하루 동안의 변화를 살펴보고, 매시 30분 눈금 7곳에서 값을 기록해요.",
         cells: TIMES.map(function (t) {
           return { time: t.id };
         }),
       },
     ],
-    doneLead: "8개 시각을 모두 기록했어요! '다음 단계'로 가서 표와 그래프로 분석해 보세요. 시간 바는 계속 움직여 볼 수 있어요.",
+    doneLead: "7개 시각을 모두 기록했어요! '다음 단계'로 가서 표와 그래프로 분석해 보세요. 시간 바는 계속 움직여 볼 수 있어요.",
     cellKey: function (sel) {
       return sel.time;
     },
@@ -904,9 +903,10 @@
     var fill = el("div", { class: "tb-fill" });
     var thumb = el("div", { class: "tb-thumb", "aria-hidden": "true" });
     var railTicks = el("div", { class: "tb-rail-ticks", "aria-hidden": "true" });
-    for (var h = 0; h <= 14; h++) railTicks.appendChild(el("span", { class: "tb-rt" + (h % 2 === 0 ? " is-big" : "") }));
+    var NH = Math.round((MIN1 - MIN0) / 30); // 30분 간격 작은 눈금(매시 30분이 큰 눈금)
+    for (var h = 0; h <= NH; h++) railTicks.appendChild(el("span", { class: "tb-rt" + (h % 2 === 0 ? " is-big" : "") }));
     var railTicksKids = railTicks.children;
-    for (var k = 0; k < railTicksKids.length; k++) railTicksKids[k].style.left = (100 * k) / 14 + "%";
+    for (var k = 0; k < railTicksKids.length; k++) railTicksKids[k].style.left = (100 * k) / NH + "%";
     var rail = el("div", { class: "tb-rail" }, [fill, railTicks, thumb]);
     var track = el("div", {
       class: "tb-track",
@@ -1044,11 +1044,11 @@
       var t = st.tick;
       var r = C.results[t.id];
       var before = exp.allDone();
-      var res = records.upsert({ time: t.id, label: t.label, solar: r.solar, shadow: r.shadow, temp: r.temp, estimate: !!t.estimate });
+      var res = records.upsert({ time: t.id, label: t.label, solar: r.solar, shadow: r.shadow, temp: r.temp,  });
       exp.refresh();
       drawRecords();
       var desc = t.label + " — 태양 고도 " + f1(r.solar) + "°, 그림자 길이 " + f1(r.shadow) + " cm, 기온 " + f1(r.temp) + " °C";
-      if (!before && exp.allDone()) toast("🎉 8개 시각을 모두 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
+      if (!before && exp.allDone()) toast("🎉 7개 시각을 모두 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
       else toast((res.replaced ? "🔁 다시 기록했어요: " : "📝 기록했어요: ") + desc, 3000);
       lesson.refresh();
       draw(st);
@@ -1075,12 +1075,10 @@
       if (key === lastKey) return;
       lastKey = key;
       // 출처 표시
-      vp.classList.toggle("is-model", !tk || !!(tk && tk.estimate));
+      vp.classList.toggle("is-model", !tk);
       srcLine.textContent = tk
-        ? tk.estimate
-          ? "🏷 모형(추정): 8:30은 교과서 표에 없는 시각이라 계산하고 추정한 값이에요."
-          : "📘 교과서·실험관찰 예시 값(2023년 9월 23일 서울 관측 자료)이에요."
-        : "🏷 모형(추정): 눈금 사이 값은 살펴보기만 해요(기록하지 않아요).";
+        ? "📘 교과서·실험관찰 예시 값(2023년 9월 23일 서울 관측 자료)이에요."
+        : "🏷 모형: 눈금 사이 값은 살펴보기만 해요(기록하지 않아요).";
       southNote.hidden = !(tk && tk.south && !tweening);
       // 눈금 버튼
       var todo = nextTodo();
@@ -1093,7 +1091,7 @@
         b.classList.toggle("is-next", !done && !!todo && todo.id === t.id && !at);
         if (at) b.setAttribute("aria-current", "true");
         else b.removeAttribute("aria-current");
-        b.setAttribute("aria-label", t.label + "으로 빨리 감기" + (t.estimate ? " (모형 추정 값)" : "") + (done ? ", 기록함" : ", 아직 기록 안 함"));
+        b.setAttribute("aria-label", t.label + "으로 빨리 감기" + (done ? ", 기록함" : ", 아직 기록 안 함"));
       });
       // 기록하기
       if (tweening) {
@@ -1108,7 +1106,7 @@
       } else {
         recBtn.disabled = true;
         recBtn.textContent = "📝 기록은 매시 30분 눈금에서";
-        recMsg.textContent = "눈금 사이 시각은 살펴보기만 해요. 위의 눈금 버튼(8:30~15:30)을 누르면 기록할 수 있어요." + (todo ? " 다음: " + todo.label : "");
+        recMsg.textContent = "눈금 사이 시각은 살펴보기만 해요. 위의 눈금 버튼(9:30~15:30)을 누르면 기록할 수 있어요." + (todo ? " 다음: " + todo.label : "");
       }
       if (!tweening && tk) live.textContent = tk.label + ": 태양 고도 " + f1(st.solar) + "도, 그림자 길이 " + f1(st.shadow) + " 센티미터, 기온 " + f1(st.temp) + "도";
     }
@@ -1137,10 +1135,9 @@
       ],
       rows: TIMES.map(function (t) {
         var r = recOf(t.id);
-        return { time: t.label + (t.estimate ? "*" : ""), solar: r ? r.solar : null, shadow: r ? r.shadow : null, temp: r ? r.temp : null };
+        return { time: t.label, solar: r ? r.solar : null, shadow: r ? r.shadow : null, temp: r ? r.temp : null };
       }),
     });
-    myTable.appendChild(el("p", { class: "ss-help", text: "* 8:30 값은 모형(추정)이에요." }));
   }
   drawRecords();
   drawNow();
@@ -1157,19 +1154,13 @@
       ],
       rows: TIMES.map(function (t) {
         var r = recOf(t.id);
-        return { time: t.label + (t.estimate ? "*" : ""), solar: r ? r.solar : null, shadow: r ? r.shadow : null, temp: r ? r.temp : null };
+        return { time: t.label, solar: r ? r.solar : null, shadow: r ? r.shadow : null, temp: r ? r.temp : null };
       }),
     });
-    $("result-table").appendChild(el("p", { class: "ss-help", text: "* 8:30 값은 교과서 표에 없는 시각이라 모형으로 계산·추정한 값이에요. 나머지는 교과서·실험관찰 예시 값이에요." }));
+    $("result-table").appendChild(el("p", { class: "ss-help", text: "모든 값은 교과서·실험관찰 예시 값(2023년 9월 23일 서울 관측 자료)이에요." }));
     ["solar", "shadow", "temp"].forEach(function (k) {
       renderChart(k);
     });
-    var cc = $("chart-card");
-    var note = cc.querySelector(".est-note");
-    if (!note) {
-      note = el("p", { class: "ss-help est-note" }, [el("span", { class: "est-dot", "aria-hidden": "true" }), " 속이 빈 점(8:30)은 모형(추정) 값이에요. 나머지는 교과서·실험관찰 예시 값이에요."]);
-      cc.appendChild(note);
-    }
   }
   function renderChart(k) {
     {
@@ -1182,17 +1173,6 @@
           }),
         })
       );
-      // 8:30(모형 추정) 점: 속이 빈 표시 + 값 옆 *
-      var box = $("chart-" + k);
-      var dot = box.querySelector(".ss-dot");
-      var val = box.querySelector(".ss-val");
-      if (dot && recOf(TIMES[0].id)) {
-        dot.classList.add("is-est");
-        var tt = dot.querySelector("title");
-        if (tt) tt.textContent = "8:30 (모형 추정)";
-        else dot.appendChild(svg("title", {}, "8:30 (모형 추정)"));
-        if (val) val.textContent = val.textContent + "*";
-      }
     }
   }
 
@@ -1223,7 +1203,7 @@
       predict: predict.values(),
       hintsOpened: predict.hintsOpened(),
       records: rows.map(function (r) {
-        return { time: r.label, solar: r.solar, shadow: r.shadow, temp: r.temp, estimate: !!r.estimate };
+        return { time: r.label, solar: r.solar, shadow: r.shadow, temp: r.temp };
       }),
       analysis: analysis,
       conclusion: conclude.values().conclusion,
@@ -1246,7 +1226,7 @@
                 { key: "temp", label: "기온(°C)" },
               ],
               rows: rows.map(function (r) {
-                return { time: r.label + (r.estimate ? " (모형 추정)" : ""), solar: f1(r.solar), shadow: f1(r.shadow), temp: f1(r.temp) };
+                return { time: r.label, solar: f1(r.solar), shadow: f1(r.shadow), temp: f1(r.temp) };
               }),
             },
           },
@@ -1289,10 +1269,10 @@
         return predict.isDone() || "예상하기 질문에 내 생각을 " + C.predict.minLength + "글자 이상 먼저 적어 주세요.";
       },
       analyze: function () {
-        return exp.allDone() || "매시 30분 눈금 8곳(8:30~15:30)의 값을 모두 기록해야 넘어갈 수 있어요. (지금 " + exp.progress().done + "/" + TIMES.length + ")";
+        return exp.allDone() || "매시 30분 눈금 7곳(9:30~15:30)의 값을 모두 기록해야 넘어갈 수 있어요. (지금 " + exp.progress().done + "/" + TIMES.length + ")";
       },
       conclude: function () {
-        if (!exp.allDone()) return "먼저 실험하기에서 8개 시각을 모두 기록해 주세요.";
+        if (!exp.allDone()) return "먼저 실험하기에서 7개 시각을 모두 기록해 주세요.";
         return quiz.isDone() || "분석 질문 2개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
       },
     },

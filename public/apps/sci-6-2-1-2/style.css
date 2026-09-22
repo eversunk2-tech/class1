@@ -171,10 +171,6 @@
 }
 .ss-exp-view.is-2d .ss-view2d { padding-top: 40px; }
 
-/* 분석 그래프: 8:30(모형 추정) 점은 속이 빈 점 */
-.chart-box .ss-dot.is-est { fill: var(--ss-surface); stroke: var(--ss-s1); stroke-width: 2.5; stroke-dasharray: 3 2; }
-.est-note { display: flex; align-items: center; gap: 6px; }
-.est-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2.5px dashed var(--ss-muted); flex: none; }
 
 /* 휴대폰: 기록할 때 스크롤을 줄인다(3D 장면을 조금 낮추고 값 패널을 한 줄로) */
 @media (max-width: 520px) {
