@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
+import { MessageSquareQuoteIcon } from "lucide-react";
 import { CompletedMark, SuspiciousMark } from "@/components/learning/activity-panels";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
 import { AsyncView, NativeSelect, StudentLink, TableWrap, tdClass, thClass } from "@/components/learning/learning-ui";
 import { EmptyState } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { findResponseApp } from "@/data/app-responses";
 import { webApps } from "@/data/apps";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { formatCount, formatDateTime } from "@/lib/format";
@@ -47,6 +51,17 @@ export function AppResultsView({ initialApp }: { initialApp: string | null }) {
             </option>
           ))}
         </NativeSelect>
+        {app !== ALL && findResponseApp(app) ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link href={`/admin/learning/?tab=responses&app=${encodeURIComponent(app)}`} />}
+            nativeButton={false}
+          >
+            <MessageSquareQuoteIcon />
+            학생 응답 보기
+          </Button>
+        ) : null}
         {state.status === "ready" ? (
           <span className="text-sm text-muted-foreground">
             {formatCount(state.data.length)}건{state.data.length >= 1000 ? " (최근 1,000건)" : ""}

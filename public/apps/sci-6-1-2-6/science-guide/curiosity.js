@@ -3,6 +3,7 @@
  *
  *   var cur = SciSim.Curiosity.render(el, { prompt: "…", placeholder: "…", examples: ["…"], minLength: 5 }, store, onChange);
  *   cur.value() / cur.isDone()
+ *   cur.qa(stage)  → [{ stage, id: "curiosity", label, question, kind: "text", answer }] (detail.qa용, stage 기본 "curiosity")
  *   저장 키: "curiosity"
  */
 (function () {
@@ -44,6 +45,19 @@
         },
         isDone: function () {
           return text.trim().length >= (cfg.minLength || 2);
+        },
+        /* 질문-답 표준 목록(detail.qa). stage 기본 "curiosity" */
+        qa: function (stage) {
+          return [
+            {
+              stage: stage || "curiosity",
+              id: "curiosity",
+              label: "궁금한 점",
+              question: cfg.prompt || "더 탐구하고 싶은 점(또는 궁금한 점)을 적어 보세요.",
+              kind: "text",
+              answer: text.trim(),
+            },
+          ];
         },
       };
     },

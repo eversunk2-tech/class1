@@ -8,6 +8,7 @@
  *   ], store, onChange, { minLength: 5 });   // 마지막 인자 선택(제출에 필요한 최소 글자 수, 기본 5)
  *   conclude.isDone()   → 모든 문항을 제출했는지
  *   conclude.values()   → { conclusion: "…", ext1: "…", … }
+ *   conclude.qa(stage)  → [{ stage, id, label: kind, question: prompt, kind: "text", answer, submitted }] (detail.qa용, stage 기본 "conclude")
  *   저장 키: "conclude"
  */
 (function () {
@@ -118,6 +119,21 @@
             out[it.id] = state[it.id] ? state[it.id].text || "" : "";
           });
           return out;
+        },
+        /* 질문-답 표준 목록(detail.qa). answer는 values()와 같고, submitted로 '제출하고 모범 답안 보기'를 눌렀는지 알린다. stage 기본 "conclude" */
+        qa: function (stage) {
+          return items.map(function (it) {
+            var st = state[it.id] || {};
+            return {
+              stage: stage || "conclude",
+              id: it.id,
+              label: it.kind,
+              question: it.prompt,
+              kind: "text",
+              answer: st.text || "",
+              submitted: !!st.submitted,
+            };
+          });
         },
       };
     },

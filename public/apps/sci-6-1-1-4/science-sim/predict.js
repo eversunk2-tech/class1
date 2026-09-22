@@ -11,6 +11,7 @@
  *   }, store, onChange);
  *   predict.values()   → { q1: "…", q2: "…" }
  *   predict.isDone()   → 모든 질문을 적었는지
+ *   predict.qa(stage)  → [{ stage, id, label, question, kind: "text", answer }] (detail.qa용 질문-답 목록, stage 기본 "predict")
  *   저장 키: "predict"(답), "hints"(열린 힌트 수)
  */
 (function () {
@@ -112,6 +113,19 @@
         minLength: minLength,
         hintsOpened: function () {
           return opened;
+        },
+        /* 질문-답 표준 목록(detail.qa, docs/admin/responses-spec.md §3.3). stage: 이 화면의 단계 id(기본 "predict") */
+        qa: function (stage) {
+          return cfg.questions.map(function (q, i) {
+            return {
+              stage: stage || "predict",
+              id: q.id,
+              label: cfg.questions.length > 1 ? "질문 " + (i + 1) : "예상",
+              question: q.text,
+              kind: "text",
+              answer: (values[q.id] || "").trim(),
+            };
+          });
         },
       };
     },

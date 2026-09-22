@@ -50,6 +50,7 @@
  *   ws.allRows()     → 한 칸이라도 적은 줄 모두
  *   ws.compareOpened() → 비교를 열어 봤는지
  *   ws.mismatches()  → 지도서 예시와 이름은 같은데 mineField가 다른 줄 [{ name, mine, guide }]
+ *   ws.qa(stage, question) → [{ stage, id: 저장 키, label, question, kind: "table", answer: { columns: [{ key, label }], rows } }] (detail.qa용)
  */
 (function () {
   "use strict";
@@ -516,6 +517,35 @@
         },
         mismatches: function () {
           return mismatchList();
+        },
+        /* 질문-답 표준 목록(detail.qa): 조사 정리 틀 전체를 표 한 항목으로(한 칸이라도 적은 줄). stage 기본 "research" */
+        qa: function (stage, question) {
+          var rows = state.rows
+            .filter(function (r) {
+              return !isEmpty(r);
+            })
+            .map(function (r) {
+              var o = {};
+              fields.forEach(function (f) {
+                o[f.id] = val(r, f);
+              });
+              return o;
+            });
+          return [
+            {
+              stage: stage || "research",
+              id: KEY,
+              label: "조사 기록",
+              question: question || cfg.title || cfg.lead || "조사 결과 정리",
+              kind: "table",
+              answer: {
+                columns: fields.map(function (f) {
+                  return { key: f.id, label: f.label || f.id };
+                }),
+                rows: rows,
+              },
+            },
+          ];
         },
       };
     },

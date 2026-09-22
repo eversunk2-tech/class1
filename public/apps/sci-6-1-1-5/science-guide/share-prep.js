@@ -27,6 +27,7 @@
  *   share.refresh()  → 내 조사 기록 요약을 다시 그린다(onEnter에서 부른다)
  *   share.isDone() / share.status() → true | "까닭"
  *   share.values()   → { script, reflect, checked: ["확인한 항목", …] }
+ *   share.qa(stage)  → [{ stage, id, label, question, kind, answer }] (detail.qa용, stage 기본 "share")
  */
 (function () {
   "use strict";
@@ -287,6 +288,23 @@
                 })
               : undefined,
           };
+        },
+        /* 질문-답 표준 목록(detail.qa): 발표 대본 · 확인한 항목(있으면) · 새롭게 알게 된 점(있으면). stage 기본 "share" */
+        qa: function (stage) {
+          var v = {
+            script: state.script.trim(),
+            reflect: rf && state.reflect.submitted ? state.reflect.sent || "" : "",
+            checked: cl
+              ? cl.items.filter(function (x, i) {
+                  return !!state.checks[i];
+                })
+              : [],
+          };
+          var s = stage || "share";
+          var out = [{ stage: s, id: "script", label: "발표 대본", question: sc.prompt || "발표 대본", kind: "text", answer: v.script }];
+          if (cl) out.push({ stage: s, id: "checked", label: "발표 전 확인", question: cl.title || "발표 전에 확인해요", kind: "choice", multi: true, options: cl.items.slice(), answer: { chosen: v.checked || [], correct: null, tries: null } });
+          if (rf) out.push({ stage: s, id: "reflect", label: "새롭게 알게 된 점", question: rf.prompt || "새롭게 알게 된 점", kind: "text", answer: v.reflect || "", submitted: !!state.reflect.submitted });
+          return out;
         },
       };
     },

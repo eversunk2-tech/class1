@@ -158,6 +158,7 @@ var share = SciSim.SharePrep.render($("share-root"), {
 - 색만으로 구분하지 않는다: 무리 카드는 이름·기호 + 테두리 색, 성질 고르기는 글자 버튼.
 - 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만.
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
+- **질문-답 표준 목록 `detail.qa`**(2026-09-22, `docs/admin/responses-spec.md` §3.3): `predict`·`quiz`·`conclude`·`curiosity`·`worksheet`·`share-prep`에 `qa(stage)`가 있다(science-sim과 같은 항목 모양, 기존 값은 그대로). 새 조사 도우미 앱은 `buildDetail()`에 `qa: [].concat(predict.qa("intro"), ws.qa("research"), share.qa("share"), quiz.qa("quiz"), conclude.qa("conclude"), cur.qa("curiosity"))`처럼 넣는다(단계 id는 그 앱의 `stages`에 맞춘다). 이미 만든 조사 도우미 앱 3개(sci-6-1-1-5·6, sci-6-1-2-6)는 소급하지 않고 `src/data/app-responses/` 매핑으로 보여 준다.
 
 ## 로그인 필수 · 진행 상황 DB 저장 (2026-09-22)
 

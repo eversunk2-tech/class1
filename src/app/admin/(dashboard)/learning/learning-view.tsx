@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3Icon, ClipboardListIcon, Gamepad2Icon, LayoutGridIcon } from "lucide-react";
+import { BarChart3Icon, ClipboardListIcon, Gamepad2Icon, LayoutGridIcon, MessageSquareQuoteIcon } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,11 +10,13 @@ import { AppResultsView } from "./app-results-view";
 import { AssignmentManager } from "./assignment-manager";
 import { EngagementTable } from "./engagement-table";
 import { LearningOverview } from "./learning-overview";
+import { ResponsesView } from "./responses-view";
 import { SubmissionReview } from "./submission-review";
 
 const TABS = [
   { id: "overview", label: "개요", icon: LayoutGridIcon },
   { id: "apps", label: "웹앱 결과", icon: Gamepad2Icon },
+  { id: "responses", label: "학생 응답", icon: MessageSquareQuoteIcon },
   { id: "assignments", label: "과제 관리", icon: ClipboardListIcon },
   { id: "engagement", label: "참여 집계", icon: BarChart3Icon },
 ] as const;
@@ -70,6 +72,11 @@ export function LearningView() {
         </TabsContent>
         <TabsContent value="apps">
           <AppResultsView initialApp={params.get("app")} />
+        </TabsContent>
+        <TabsContent value="responses">
+          {tab === "responses" ? (
+            <ResponsesView appParam={params.get("app")} viewParam={params.get("view")} questionParam={params.get("q")} />
+          ) : null}
         </TabsContent>
         <TabsContent value="assignments">
           {assignmentId ? (

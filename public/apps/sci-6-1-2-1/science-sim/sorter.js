@@ -17,6 +17,7 @@
  *   }, store, onChange);
  *   sorter.isDone()   → 확인해서 맞았는지
  *   sorter.result()   → { groups: { acid: [...], base: [...] }, correct, tries }
+ *   sorter.qa(stage)  → [{ stage, id, label, question, kind: "groups", answer: { groups: [{ label, items: [라벨…] }], correct, tries } }] (detail.qa용)
  *
  * ▶ 여러 라운드(같은 항목을 서로 다른 기준으로 여러 번 분류) — SciSim.Sorter.renderRounds
  *   var rounds = SciSim.Sorter.renderRounds(el, {
@@ -32,6 +33,7 @@
  *   rounds.isDone()          → 모든 라운드를 맞혔는지
  *   rounds.roundDone(id)     → 그 라운드를 맞혔는지
  *   rounds.result()          → { transparent: { groups, correct, tries }, foam: { … } }
+ *   rounds.qa(stage)         → 라운드마다 sorter.qa 한 항목(id: "classify.<라운드 id>")
  *   rounds.show(id)          → 그 라운드 탭 열기(잠겨 있으면 false)
  */
 (function () {
@@ -197,6 +199,14 @@
         var out = {};
         rounds.forEach(function (r) {
           out[r.id] = sorters[r.id].result();
+        });
+        return out;
+      },
+      /* 질문-답 표준 목록(detail.qa): 라운드마다 한 항목 */
+      qa: function (stage) {
+        var out = [];
+        rounds.forEach(function (r) {
+          out = out.concat(sorters[r.id].qa(stage, base + "." + r.id, r.title || r.tab));
         });
         return out;
       },
@@ -464,6 +474,34 @@
             });
           });
           return { groups: groups, correct: !!(st.checked && st.correct), tries: st.tries || 0 };
+        },
+        /* 질문-답 표준 목록(detail.qa). 무리·항목은 라벨로 넣는다. stage 기본 "analyze" */
+        qa: function (stage, id, question) {
+          return [
+            {
+              stage: stage || "analyze",
+              id: id || key,
+              label: "분류",
+              question: question || cfg.title || "분류하기",
+              kind: "groups",
+              answer: {
+                groups: cfg.bins.map(function (b) {
+                  return {
+                    label: b.label,
+                    items: cfg.items
+                      .filter(function (i) {
+                        return st.place[i.id] === b.id;
+                      })
+                      .map(function (i) {
+                        return i.label || i.id;
+                      }),
+                  };
+                }),
+                correct: !!(st.checked && st.correct),
+                tries: st.tries || 0,
+              },
+            },
+          ];
         },
       };
     },

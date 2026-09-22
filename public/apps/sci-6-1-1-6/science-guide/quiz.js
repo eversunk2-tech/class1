@@ -14,6 +14,7 @@
  *   ], store, onChange, { numLabel: "문제", key: "analysis" });   // 마지막 인자 선택(기본값이 이것)
  *   quiz.isDone()   → 모든 문항을 '확인'했는지
  *   quiz.result()   → { q1: { choice: [...], correct: true, tries: 2 }, … }
+ *   quiz.qa(stage)  → [{ stage, id, label, question, kind: "choice", multi, options: [라벨…], answer: { chosen: [라벨…], correct, tries } }] (detail.qa용, stage 기본 "quiz")
  *   저장 키: "analysis"
  */
 (function () {
@@ -122,6 +123,30 @@
             out[q.id] = { choice: (s.choice || []).slice(), correct: !!(s.checked && s.correct), tries: s.tries || 0 };
           });
           return out;
+        },
+        /* 질문-답 표준 목록(detail.qa). 고른 보기는 id가 아니라 사람이 읽는 라벨로 넣는다. stage 기본 "quiz" */
+        qa: function (stage) {
+          return questions.map(function (q, qi) {
+            var s = state[q.id] || {};
+            var label = function (id) {
+              var o = q.options.filter(function (x) {
+                return x.id === id;
+              })[0];
+              return o ? o.label : id;
+            };
+            return {
+              stage: stage || "quiz",
+              id: q.id,
+              label: numLabel + " " + (qi + 1),
+              question: q.text,
+              kind: "choice",
+              multi: !!q.multi,
+              options: q.options.map(function (o) {
+                return o.label;
+              }),
+              answer: { chosen: (s.choice || []).map(label), correct: !!(s.checked && s.correct), tries: s.tries || 0 },
+            };
+          });
         },
       };
     },

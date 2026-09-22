@@ -903,3 +903,92 @@ export async function fetchStudents(): Promise<StudentMini[]> {
     avatar_url: m.profiles?.avatar_url ?? null,
   }));
 }
+
+// ─────────────────────────────────────────────
+// 학생 응답(앱별 모아 보기 · 일괄 칭찬) — docs/admin/responses-spec.md §4
+// ─────────────────────────────────────────────
+
+/** app_progress 한 행(관리자 조회 가능, 20260922010000_app_progress.sql) */
+export type AppProgressRow = { user_id: string; app_id: string; state: unknown; updated_at: string };
+
+/** 한 앱의 전체 결과(최신순, 학생 프로필 포함). 1000행이 넘어도 페이지로 나눠 모두 받는다. */
+export async function fetchAllAppResults(appId: string): Promise<AppResultWithStudent[]> {
+  return fetchAllPages<AppResultWithStudent>((from, to) =>
+    supabase
+      .from("app_results")
+      .select(`${APP_RESULT_COLUMNS},profiles(display_name,avatar_url)`, { count: "exact" })
+      .eq("app_id", appId)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+}
+
+/**
+ * 한 앱의 진행 중 스냅샷(관리자). 테이블이 아직 없으면(마이그레이션 전) missing=true와 빈 목록.
+ * state 전체를 받지만 화면은 단계(keys.step)와 저장 시각만 쓴다(spec §12 Q3).
+ */
+export async function fetchAppProgressRows(appId: string): Promise<{ rows: AppProgressRow[]; missing: boolean }> {
+  try {
+    const rows = await fetchAllPages<AppProgressRow>((from, to) =>
+      supabase
+        .from("app_progress")
+        .select("user_id,app_id,state,updated_at", { count: "exact" })
+        .eq("app_id", appId)
+        .order("user_id")
+        .range(from, to),
+    );
+    return { rows, missing: false };
+  } catch (err) {
+    if (isMissingSchemaError(err)) return { rows: [], missing: true };
+    throw err;
+  }
+}
+
+/**
+ * 결과(app_result)마다 관리자가 보낸 피드백 메시지가 있는지 — 일괄 칭찬 "이미 보냄" 표시(spec §4.5, Q7 클라이언트 조합 쿼리).
+ * 학생 본인이 아닌 사람이 보낸 메시지를 선생님 메시지로 본다(스레드 주인은 학생).
+ * 돌려주는 Map: 결과 id → 선생님 메시지 수
+ */
+export async function fetchTeacherFeedbackCounts(results: { id: string; user_id: string }[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!results.length) return out;
+  const threads = (
+    await Promise.all(
+      chunk(
+        [...new Set(results.map((r) => r.id))],
+        IN_CHUNK,
+      ).map(async (ids) => {
+        const { data, error } = await supabase
+          .from("feedback_threads")
+          .select("id,student_id,context_id")
+          .eq("context_type", "app_result")
+          .in("context_id", ids);
+        if (error) throw error;
+        return (data ?? []) as { id: string; student_id: string; context_id: string }[];
+      }),
+    )
+  ).flat();
+  if (!threads.length) return out;
+  const threadById = new Map(threads.map((t) => [t.id, t]));
+  const messages = (
+    await Promise.all(
+      chunk(threads.map((t) => t.id), IN_CHUNK).map((ids) =>
+        fetchAllPages<{ id: string; thread_id: string; sender_id: string }>((from, to) =>
+          supabase
+            .from("feedback_messages")
+            .select("id,thread_id,sender_id", { count: "exact" })
+            .in("thread_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
+      ),
+    )
+  ).flat();
+  for (const m of messages) {
+    const t = threadById.get(m.thread_id);
+    if (!t || m.sender_id === t.student_id) continue;
+    out.set(t.context_id, (out.get(t.context_id) ?? 0) + 1);
+  }
+  return out;
+}

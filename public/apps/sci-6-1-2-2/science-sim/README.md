@@ -326,6 +326,10 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 색만으로 구분하지 않는다: 색 칩 옆에 항상 글자, 그래프는 점 모양·선 무늬·범례.
 - 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI.
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
+- **질문-답 표준 목록 `detail.qa`**(2026-09-22, `docs/admin/responses-spec.md` §3.3): 관리자 대시보드 "학생 응답"이 질문과 답을 정리해 보여 준다. 모듈마다 `qa(stage)`가 있다(기존 `values()`/`result()`는 그대로 — 하위 호환). `buildDetail()`에 한 줄을 더한다:
+  `qa: [].concat(predict.qa("predict"), quiz.qa("analyze"), conclude.qa("conclude"), curiosity.qa("curiosity"))` (+ 분류가 있으면 `sorter.qa("analyze")`).
+  항목 모양은 `{ stage, id, label, question, kind, answer }` — `kind: "text"`(answer: 글), `"choice"`(answer: `{ chosen: [보기 라벨…], correct, tries }`), `"groups"`(분류), `"table"`(answer: `{ columns: [{ key, label }], rows: [{…}] }`). 기록 표처럼 모듈이 없는 값은 앱이 같은 모양으로 직접 넣는다(예: `{ stage: "experiment", id: "records", label: "내 기록", question: "…", kind: "table", answer: { columns, rows } }`).
+- 이미 만든 앱의 `detail` 모양을 바꾸면 `src/data/app-responses/{앱}.ts` 응답 매핑도 같이 고친다.
 
 ## 로그인 필수 · 진행 상황 DB 저장 (2026-09-22)
 

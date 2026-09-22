@@ -950,6 +950,42 @@
       analysis: analysis,
       conclusion: conclude.values().conclusion,
       curiosity: curInput.value.trim(),
+      // 질문-답 표준 목록(관리자 "학생 응답" 화면용, docs/admin/responses-spec.md §3.3). 위 필드는 그대로 둔다.
+      qa: [].concat(
+        predict.qa("predict"),
+        [
+          {
+            stage: "experiment",
+            id: "records",
+            label: "기록 표",
+            question: "자동차의 이동 거리 · 걸린 시간 · 속력",
+            kind: "table",
+            answer: {
+              columns: [
+                { key: "car", label: "자동차" },
+                { key: "distance", label: "이동 거리(cm)" },
+                { key: "time", label: "걸린 시간(초)" },
+                { key: "speed", label: "속력(cm/s)" },
+                { key: "source", label: "값" },
+              ],
+              rows: C.cars.map(function (c) {
+                var r = records.get(c.id);
+                var t = r || (isExample(c.id) ? { distance: truth(c.id).distance, time: truth(c.id).time, speed: speedOf(c.id) } : null);
+                return {
+                  car: c.name,
+                  distance: t ? f1(t.distance) : "",
+                  time: t ? f1(t.time) : "",
+                  speed: t ? f1(t.speed) : "",
+                  source: r ? "직접 측정" : isExample(c.id) ? "교과서 예시" : "",
+                };
+              }),
+            },
+          },
+        ],
+        quiz.qa("analyze"),
+        conclude.qa("conclude"),
+        [{ stage: "conclude", id: "curiosity", label: "궁금한 점(선택)", question: C.curiosity.prompt, kind: "text", answer: curInput.value.trim() }]
+      ),
     };
   }
 

@@ -829,6 +829,33 @@
       analysis: analysis,
       conclusion: conclude.values().conclusion,
       curiosity: curiosityText.trim(),
+      // 질문-답 표준 목록(관리자 "학생 응답" 화면용, docs/admin/responses-spec.md §3.3). 위 필드는 그대로 둔다.
+      qa: [].concat(
+        predict.qa("predict"),
+        [
+          {
+            stage: "experiment",
+            id: "records",
+            label: "내 기록",
+            question: T0S + "초 동안 두 자동차가 이동한 거리",
+            kind: "table",
+            answer: {
+              columns: [
+                { key: "car", label: "자동차" },
+                { key: "dist", label: T0S + "초 동안 이동한 거리(cm)" },
+              ],
+              rows: r
+                ? C.cars.map(function (c) {
+                    return { car: c.name, dist: f1(r[c.id]) };
+                  })
+                : [],
+            },
+          },
+        ],
+        quiz.qa("analyze"),
+        conclude.qa("conclude"),
+        [{ stage: "conclude", id: "curiosity", label: "궁금한 점(선택)", question: C.curiosity.prompt, kind: "text", answer: curiosityText.trim() }]
+      ),
     };
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import Link from "next/link";
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, CircleDashedIcon, ExternalLinkIcon, HeartIcon, MessageSquareIcon } from "lucide-react";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
@@ -14,6 +14,7 @@ import {
   thClass,
 } from "@/components/learning/learning-ui";
 import { MarkdownViewer } from "@/components/markdown-viewer";
+import { ResponsePanel } from "@/components/learning/response-panel";
 import { postHref } from "@/components/post-card";
 import { EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,15 @@ export function SuspiciousMark({ result }: { result: Pick<AppResult, "score" | "
 export function UserAppResults({ userId, audience, studentName }: { userId: string; audience: Audience; studentName?: string }) {
   const load = useCallback(() => fetchUserAppResults(userId), [userId]);
   const { state, reload } = useAsyncData(load);
+  // 관리자만: 행마다 "응답 보기"로 학생이 적고 고른 내용을 펼친다(docs/admin/responses-spec.md §4.6). 학생 화면에는 넣지 않는다(Q6).
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   return (
     <AsyncView
       state={state}
@@ -100,37 +110,52 @@ export function UserAppResults({ userId, audience, studentName }: { userId: stri
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id}>
-                <td className={tdClass}>
-                  <span className={appTitle(r.app_id) ? "font-medium" : "text-muted-foreground"}>
-                    {audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)}
-                  </span>
-                  {!appTitle(r.app_id) ? (
-                    <span className="ml-1 text-xs text-muted-foreground">({audience === "admin" ? "목록에 없는 앱" : r.app_id})</span>
-                  ) : null}
-                </td>
-                <td className={tdClass}>
-                  {formatScore(r.score, r.max_score)}
-                  {audience === "admin" ? <SuspiciousMark result={r} /> : null}
-                </td>
-                <td className={tdClass}>
-                  <CompletedMark completed={r.completed} />
-                </td>
-                <td className={tdClass}>{formatDuration(r.duration_seconds)}</td>
-                <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>{formatDateTime(r.created_at)}</td>
-                <td className={`${tdClass} text-right`}>
-                  <FeedbackDialogButton
-                    studentId={userId}
-                    context={{ type: "app_result", id: r.id }}
-                    audience={audience}
-                    studentName={studentName}
-                    title={`${audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)} · ${formatDateTime(r.created_at)}`}
-                    size="xs"
-                    variant="ghost"
-                    label={audience === "admin" ? "피드백" : "대화"}
-                  />
-                </td>
-              </tr>
+              <Fragment key={r.id}>
+                <tr>
+                  <td className={tdClass}>
+                    <span className={appTitle(r.app_id) ? "font-medium" : "text-muted-foreground"}>
+                      {audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)}
+                    </span>
+                    {!appTitle(r.app_id) ? (
+                      <span className="ml-1 text-xs text-muted-foreground">({audience === "admin" ? "목록에 없는 앱" : r.app_id})</span>
+                    ) : null}
+                  </td>
+                  <td className={tdClass}>
+                    {formatScore(r.score, r.max_score)}
+                    {audience === "admin" ? <SuspiciousMark result={r} /> : null}
+                  </td>
+                  <td className={tdClass}>
+                    <CompletedMark completed={r.completed} />
+                  </td>
+                  <td className={tdClass}>{formatDuration(r.duration_seconds)}</td>
+                  <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>{formatDateTime(r.created_at)}</td>
+                  <td className={`${tdClass} text-right whitespace-nowrap`}>
+                    {audience === "admin" ? (
+                      <Button type="button" variant="ghost" size="xs" onClick={() => toggle(r.id)} aria-expanded={openIds.has(r.id)}>
+                        <ChevronDownIcon className={openIds.has(r.id) ? "rotate-180 transition-transform" : "transition-transform"} />
+                        {openIds.has(r.id) ? "응답 접기" : "응답 보기"}
+                      </Button>
+                    ) : null}
+                    <FeedbackDialogButton
+                      studentId={userId}
+                      context={{ type: "app_result", id: r.id }}
+                      audience={audience}
+                      studentName={studentName}
+                      title={`${audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)} · ${formatDateTime(r.created_at)}`}
+                      size="xs"
+                      variant="ghost"
+                      label={audience === "admin" ? "피드백" : "대화"}
+                    />
+                  </td>
+                </tr>
+                {audience === "admin" && openIds.has(r.id) ? (
+                  <tr>
+                    <td colSpan={6} className="border-b bg-muted/20 px-3 py-3">
+                      <ResponsePanel appId={r.app_id} details={r.details} />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))}
           </tbody>
         </TableWrap>
