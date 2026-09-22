@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>운동하는 물체의 특징을 찾아라! · 과학 실험</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E" />
+    <meta name="description" content="6학년 1학기 물체의 운동 탐구 1 — 교실·바닷가·공원 장면을 5초 간격으로 두 번 찍어 비교하며 운동하는 물체의 공통된 특징을 찾는 3D 관찰 시뮬레이션" />
+
+    <!-- three.js 0.169.0: 정확한 버전 고정 + SRI. importmap의 integrity와 modulepreload 둘 다 둔다(브라우저 지원 차이 대비). -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        },
+        "integrity": {
+          "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js": "sha384-qOubuRxWZ0I7rXTjcuhcKNHKvPM7q0ztN8/82sJnxnyKS0OXTeB5FsIcysc2T9EY",
+          "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/controls/OrbitControls.js": "sha384-aJoe4qqS/DgF2jh9njAuvA6QIveJYoCuYOfYjdFY8P3eawzmc9bEQ40jq2TvOyuP"
+        }
+      }
+    </script>
+    <link
+      rel="modulepreload"
+      href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
+      integrity="sha384-qOubuRxWZ0I7rXTjcuhcKNHKvPM7q0ztN8/82sJnxnyKS0OXTeB5FsIcysc2T9EY"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="modulepreload"
+      href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/controls/OrbitControls.js"
+      integrity="sha384-aJoe4qqS/DgF2jh9njAuvA6QIveJYoCuYOfYjdFY8P3eawzmc9bEQ40jq2TvOyuP"
+      crossorigin="anonymous"
+    />
+
+    <link rel="stylesheet" href="./science-sim/style-common.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="ss-header">
+      <div class="ss-topline">
+        <a class="ss-back" href="../../science/?term=6-1&amp;unit=2&amp;lesson=2" target="_top">← 차시로</a>
+        <h1 class="ss-title">
+          <small>6학년 1학기 · 2. 물체의 운동 · 탐구 1</small>
+          운동하는 물체의 특징을 찾아라!
+        </h1>
+      </div>
+      <nav id="stage-nav" aria-label="학습 단계"></nav>
+    </header>
+
+    <main class="ss-main">
+      <noscript><p class="ss-card">이 실험은 JavaScript가 켜져 있어야 할 수 있어요.</p></noscript>
+      <p id="storage-warning" class="ss-card ss-warn" hidden>
+        이 브라우저에서는 임시 저장을 할 수 없어요. 새로고침하면 적은 내용이 사라지니 주의하세요.
+      </p>
+
+      <!-- 1. 예상하기 -->
+      <section data-stage="predict" aria-labelledby="h-predict">
+        <h2 id="h-predict" class="ss-stage-title">1. 예상하기</h2>
+        <div id="predict-root"></div>
+      </section>
+
+      <!-- 2. 실험하기 (화면 틀은 science-sim/experiment.js가 만든다) -->
+      <section data-stage="experiment" aria-labelledby="h-experiment" hidden>
+        <h2 id="h-experiment" class="ss-stage-title">2. 실험하기</h2>
+        <div id="experiment-root"></div>
+      </section>
+
+      <!-- 3. 기록·분석하기 -->
+      <section data-stage="analyze" aria-labelledby="h-analyze" hidden>
+        <h2 id="h-analyze" class="ss-stage-title">3. 기록·분석하기</h2>
+        <p class="ss-lead">내가 기록한 관찰 결과로 만든 표예요. ⏸는 "같은 위치에 있다", 🏃는 "다른 위치에 있다"를 고른 칸이에요.</p>
+        <div class="ss-card" id="summary-table"></div>
+        <p class="ss-card recheck" id="recheck-note" hidden></p>
+        <details class="ss-card detail-box" id="detail-box">
+          <summary>장면별로 자세히 보기 (물체마다 내가 고른 결과)</summary>
+          <div class="scene-tables" id="scene-tables"></div>
+        </details>
+        <h3 class="sub-h">결과 분석하기</h3>
+        <div id="quiz-root"></div>
+      </section>
+
+      <!-- 4. 정리하기 -->
+      <section data-stage="conclude" aria-labelledby="h-conclude" hidden>
+        <h2 id="h-conclude" class="ss-stage-title">4. 정리하기</h2>
+        <p class="ss-lead">먼저 내 생각을 적고 제출하면 모범 답안이 나와요. 내 답과 비교해 보세요.</p>
+        <div id="conclude-root"></div>
+      </section>
+
+      <!-- 5. 더 탐구하고 싶은 점 -->
+      <section data-stage="curiosity" aria-labelledby="h-curiosity" hidden>
+        <h2 id="h-curiosity" class="ss-stage-title">5. 더 탐구하고 싶은 점</h2>
+        <div id="curiosity-root"></div>
+        <div class="ss-card finish-card">
+          <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
+          <p class="ss-help" id="finish-msg" aria-live="polite"></p>
+          <p class="ss-help" id="login-hint" hidden></p>
+        </div>
+        <div class="ss-card done-card" id="done-card" hidden></div>
+        <p class="restart-line">
+          <button type="button" class="ss-btn ss-btn-ghost" id="btn-restart">↺ 처음부터 다시 하기</button>
+        </p>
+      </section>
+    </main>
+
+    <nav class="ss-footer-nav" aria-label="단계 이동">
+      <button type="button" class="ss-btn" id="btn-prev">← 이전 단계</button>
+      <button type="button" class="ss-btn ss-btn-primary" id="btn-next">다음 단계 →</button>
+    </nav>
+    <div class="ss-toast" id="toast" role="status" hidden></div>
+
+    <!-- supabase-js v2 UMD (정확한 버전 + SRI) → config → class1-record → 공통 틀 → 차시 설정 → 앱 -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"
+      integrity="sha384-iLddHTLokph6Omwoyid4XKxHaWa6w41BnoEj0q5oOrzmYPpHIKt1wyjReA7s//pP"
+      crossorigin="anonymous"
+    ></script>
+    <script src="./config.js"></script>
+    <script src="./class1-record.js"></script>
+    <script src="./science-sim/persist.js"></script>
+    <script src="./science-sim/stage-nav.js"></script>
+    <script src="./science-sim/lesson.js"></script>
+    <script src="./science-sim/predict.js"></script>
+    <script src="./science-sim/record-store.js"></script>
+    <script src="./science-sim/table-chart.js"></script>
+    <script src="./science-sim/quiz.js"></script>
+    <script src="./science-sim/conclude.js"></script>
+    <script src="./science-sim/curiosity.js"></script>
+    <script src="./science-sim/sim3d.js"></script>
+    <script src="./science-sim/experiment.js"></script>
+    <script src="./data/lesson-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

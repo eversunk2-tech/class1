@@ -66,12 +66,12 @@ export const scienceTerms: Term[] = [
         number: 2,
         title: "물체의 운동",
         lessons: [
-          { id: "2", inquiry: 1, period: "2", title: "운동하는 물체의 특징을 찾아라!", science: "38~39", workbook: "22~23" },
-          { id: "3", inquiry: 2, period: "3", title: "물체의 운동을 표현해 볼까?", science: "40~41", workbook: "24~25" },
-          { id: "4", inquiry: 3, period: "4", title: "같은 시간 동안 이동한 물체의 빠르기를 비교해 보자!", science: "42~43", workbook: "26" },
-          { id: "5", inquiry: 4, period: "5", title: "같은 거리를 이동한 물체의 빠르기를 비교해 보자!", science: "44~45", workbook: "27" },
-          { id: "6", inquiry: 5, period: "6", title: "물체의 빠르기를 속력으로 비교해 보자!", science: "46~47", workbook: "28~29" },
-          { id: "7", inquiry: 6, period: "7~8", title: "속력과 관련된 안전 수칙과 안전장치를 조사해 볼까?", science: "48~51", workbook: "30~31" },
+          { id: "2", inquiry: 1, period: "2", title: "운동하는 물체의 특징을 찾아라!", science: "38~39", workbook: "22~23", app: { id: "sci-6-1-2-1", kind: "sim" } },
+          { id: "3", inquiry: 2, period: "3", title: "물체의 운동을 표현해 볼까?", science: "40~41", workbook: "24~25", app: { id: "sci-6-1-2-2", kind: "sim" } },
+          { id: "4", inquiry: 3, period: "4", title: "같은 시간 동안 이동한 물체의 빠르기를 비교해 보자!", science: "42~43", workbook: "26", app: { id: "sci-6-1-2-3", kind: "sim" } },
+          { id: "5", inquiry: 4, period: "5", title: "같은 거리를 이동한 물체의 빠르기를 비교해 보자!", science: "44~45", workbook: "27", app: { id: "sci-6-1-2-4", kind: "sim" } },
+          { id: "6", inquiry: 5, period: "6", title: "물체의 빠르기를 속력으로 비교해 보자!", science: "46~47", workbook: "28~29", app: { id: "sci-6-1-2-5", kind: "sim" } },
+          { id: "7", inquiry: 6, period: "7~8", title: "속력과 관련된 안전 수칙과 안전장치를 조사해 볼까?", science: "48~51", workbook: "30~31", app: { id: "sci-6-1-2-6", kind: "guide" } },
         ],
       },
       {

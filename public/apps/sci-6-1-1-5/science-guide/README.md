@@ -34,7 +34,7 @@
 |---|---|---|
 | `ref-cards.js` | `SciSim.RefCards` | 지도서 근거 **조사 참고 자료 카드**(접기/펼치기, 무리별 목록·글, 출처 표시, 펼침 상태 저장). `locked`로 "먼저 적은 뒤에 공개"도 된다 |
 | `tips-panel.js` | `SciSim.TipsPanel`, `SciSim.copyText` | **조사 팁**: 검색어 칩(누르면 **복사만**, 외부 검색으로 이동하지 않음), 지도서에 나온 누리집(새 창)·참고 도서, 출처 확인·인터넷 윤리·기기 안전 같은 팁 카드 |
-| `worksheet.js` | `SciSim.Worksheet` | **조사 결과 정리 틀**: 칸(fields)을 config로 정함(글·긴 글·보기 고르기), 줄 더하기/지우기 또는 `fixed` 한 벌, 최소 줄 수·무리별 최소 개수(`requireEach`) 검사, 다 채운 뒤에만 열리는 **"지도서 예시와 비교"** 표. 이름이 같고 `mineField`(예: 성질)도 같으면 "✔ 있어요", **`mineField`가 다르면 "⚠ 성질이 달라요"**(초록 ✔ 없음, 표 아래 경고). `ws.mismatches()`로 불일치 목록을 받아 요약·detail에 쓸 수 있다. `fixed` 틀은 완료 문구가 "✔ 정리 틀의 칸을 모두 채웠어요."(`doneText`로 바꿈) |
+| `worksheet.js` | `SciSim.Worksheet` | **조사 결과 정리 틀**: 칸(fields)을 config로 정함(글·긴 글·보기 고르기), 줄 더하기/지우기 또는 `fixed` 한 벌, 최소 줄 수·무리별 최소 개수(`requireEach`) 검사, 다 채운 뒤에만 열리는 **"지도서 예시와 비교"** 표. 이름이 같고 `mineField`(예: 성질)도 같으면 "✔ 있어요", **`mineField`가 다르면 "⚠ 성질이 달라요"**(초록 ✔ 없음, 표 아래 경고, 조사 이/가 자동). 이름 맞추기 규칙·별칭·`match: "exact"`는 파일 머리 주석 참고. 같은 내용 줄 막기 `unique`. `ws.mismatches()`로 불일치 목록을 받아 요약·detail에 쓸 수 있다. `fixed` 틀은 완료 문구가 "✔ 정리 틀의 칸을 모두 채웠어요."(`doneText`로 바꿈) |
 | `share-prep.js` | `SciSim.SharePrep` | **발표(공유) 준비**: 내 조사 기록 요약, 발표 대본(선택: 템플릿으로 초안 만들기·복사하기), 확인할 점 체크리스트, 다른 모둠 예시 발표 → 새롭게 알게 된 점 적고 제출 → 예시 답 비교, 발표 태도 안내. 알게 된 점은 **제출한 글만** 비교·`values()`에 쓴다 |
 | `topic-picker.js` | `SciSim.TopicPicker` | 조사 **주제 하나 고르기**(바꿀 때 확인, `onChange(새, 이전)`로 앱이 딸린 입력을 지울지 정함) |
 | `style-guide.css` | — | 위 모듈 스타일. `style-common.css` **다음에** 불러온다. 로그인 안내 링크(`#login-hint a`) 터치 영역 44px도 여기서 준다 |
@@ -42,6 +42,7 @@
 ### 고친 기록
 
 - **2026-09 수정 1차**(sci-6-1-1-5·6 review): ① `topic-picker` 375px 가로 스크롤 — 숨긴 잠김 안내가 legend 바로 뒤에 있어 `legend + * { clear: both }`가 목록에 닿지 않던 것을 `.sg-topic .sg-lock-note, .sg-topic-grid { clear: both }`로 고침(격자 최소 폭도 `min(200px, 100%)`). ② `worksheet` `fixed` 틀 완료 문구가 "줄을 더해 적어도 좋아요"로 나오던 것 → `doneText`. ③ 비교 표가 성질을 잘못 고른 기록에도 "✔ 있어요"를 붙이던 것 → "⚠ ○○이 달라요". ④ 제출 뒤 고친 글이 다시 제출하지 않아도 결과에 들어가던 것(`share-prep`·`conclude`). ⑤ 잠긴 단계의 ✓ 표시. 앱에서 따로 막던 임시 보완은 지울 것.
+- **2026-09 수정 2차**(sci-6-1-2-6 review, 기존 앱과 하위 호환): ① `worksheet` 비교 표 이름 맞추기 — 예전에는 지도서 예시 줄마다 "한쪽이 다른 쪽을 품는" 첫 기록을 골라 "장치"가 두 장치에 ⚠를, "계단"이 "자동계단"에 ✔를 붙였다. 이제 **내 기록 한 줄마다 가장 잘 맞는 예시 한 줄**을 고른다(정확히 같음 > 별칭과 같음 > 더 길게 겹침). 가장 잘 맞는 예시가 둘 이상으로 비기면 어디에도 맞추지 않고 "어느 예시인지 알기 어려운 것"으로 따로 알린다 → 틀린 ⚠가 `mismatches()`(저장 detail)에 들어가지 않는다. 새 옵션 `compare.match: "exact"`(정확 일치만), `compare.aliases`·`rows[i].aliases`(별칭), `compare.genericNames`(뜻이 넓어 부분 일치로 쓰지 않을 말), `compare.minPartialLength`. 이름 비교는 띄어쓰기에 더해 문장 부호·괄호도 무시한다. 옵션을 넘기지 않으면 예전처럼 부분 일치(`contains`)로 맞춘다. ② "⚠ ○○이 달라요"의 조사를 받침에 따라 이/가로 고른다("설치 위치가 달라요"). ③ 행 중복 검사 `unique: "칸 id" | ["칸", …] | true`(+`uniqueMessage`) — 같은 내용을 적은 줄이 있으면 넘어가지 못하고 "같은 상황을 적은 줄이 있어요: 계단. …"으로 안내한다. ④ `persist.js`: 미뤄 둔 입력 저장(250ms)을 `pagehide`·`beforeunload`·`visibilitychange(hidden)` 때 바로 실행한다(science-sim과 같은 파일). ⑤ 비교 표의 기본 글자에서 '지도서'를 뺐다(학생 화면에 교사용 자료 이름을 쓰지 않음): 기본 버튼 "📘 예시 답안과 비교해 보기", 안내 "예시 답안에 없는 것을 …" 등. 이름은 `compare.refName`으로 바꾼다. (1단원 앱처럼 `buttonLabel`·`title`·`source`에 '지도서'를 직접 넘긴 앱은 그 글자가 그대로 나오므로 앱 config에서 고쳐야 한다.)
 
 각 파일 맨 위 주석에 자세한 사용법(옵션 전체, 돌려주는 함수, 저장 키)이 있다.
 학생 입력은 모두 `textContent`로만 넣는다(`innerHTML` 없음). `**굵게**`는 config 문구에서만 `SciSim.rich`로 처리한다.

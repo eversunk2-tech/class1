@@ -1,0 +1,98 @@
+/* sci-6-1-2-3 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.sub-h.first { margin-top: 0; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+
+/* 자동차 고르기 아이콘: 색 + 모양(●/■) */
+.car-icon {
+  flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  color: #fff; font-size: 0.85rem; font-weight: 700; border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+/* ── 경주로 그림(2D 화면·사진) — 사진처럼 밝은 바닥을 쓴다(다크모드에서도 같은 색) ── */
+.track-svg, .zoom-svg { display: block; width: 100%; height: auto; }
+.tk-floor { fill: #e4e8ec; }
+.tk-tape { fill: #f6d34a; stroke: #b99a1e; stroke-width: 1; }
+.tk-tick { stroke: #1f2733; stroke-width: 2; }
+.tk-tick-mm { stroke: #1f2733; stroke-width: 1; }
+.tk-num { font: 700 18px system-ui, sans-serif; fill: #1f2733; }
+.tk-unit { font: 700 16px system-ui, sans-serif; fill: #1f2733; }
+.tk-start { fill: #23a26a; }
+.tk-lbl { font: 700 16px system-ui, sans-serif; fill: #14633f; }
+.tk-lane { font: 700 19px system-ui, sans-serif; fill: #3a4452; }
+.tk-body { stroke: rgba(0, 0, 0, 0.35); stroke-width: 2; }
+.tk-bumper { fill: #2a2f36; }
+.tk-mark { font: 700 18px system-ui, sans-serif; fill: #fff; }
+.tk-sel { fill: none; stroke: #b7791f; stroke-width: 4; stroke-dasharray: 8 4; }
+.tk-car { cursor: pointer; }
+.tk-photo-line { stroke: #111827; stroke-width: 3; stroke-dasharray: 6 4; }
+.tk-photo-lbl { font: 700 26px system-ui, sans-serif; }
+
+.track2d { position: relative; border-radius: 12px; overflow: hidden; }
+.p2-caption { margin: 6px 2px 0; font-size: 0.8rem; color: var(--ss-muted); }
+.track2d { padding-top: 40px; background: var(--ss-surface-2); }
+
+/* 달리기 표시(3D·2D 공통) */
+.run-timer {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 90px);
+  padding: 6px 14px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff; font-weight: 700; font-size: 0.95rem;
+  text-align: center; pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.track2d .run-timer { top: 4px; }
+.photo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 4; }
+.photo-flash.is-on { animation: shutter 0.5s ease-out; }
+@keyframes shutter { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+
+/* ── 관찰 카드: 사진 + 확대 ── */
+.obs-photo p { margin: 8px 0 0; }
+.photo { margin: 0; }
+.photo-frame { border: 6px solid #2a2f36; border-radius: 14px; overflow: hidden; background: #2a2f36; }
+.photo-cap { font-size: 0.85rem; color: var(--ss-muted); margin-top: 4px; font-weight: 600; }
+.zoom-btn { width: 100%; margin-top: 10px; }
+.zoom-box { margin-top: 10px; border: 3px solid #b7791f; border-radius: 14px; overflow: hidden; }
+.zm-num { font: 600 14px system-ui, sans-serif; fill: #1f2733; }
+.zm-num.is-5 { font-weight: 800; font-size: 16px; }
+.zm-unit { font: 600 13px system-ui, sans-serif; fill: #3a4452; }
+.zm-carname { font: 700 22px system-ui, sans-serif; fill: #fff; }
+.zm-front { stroke: #111; stroke-width: 2.5; stroke-dasharray: 7 5; }
+.read-check:empty { display: none; }
+.read-check { font-weight: 600; color: var(--ss-text); background: var(--ss-warn-bg); padding: 6px 10px; border-radius: 10px; }
+
+/* ── 분석 ── */
+.recheck { background: var(--ss-warn-bg); font-weight: 600; }
+.chart-card { --ss-s1: #d93a3a; --ss-s2: #2f63d6; }
+@media (prefers-color-scheme: dark) { .chart-card { --ss-s1: #ff7b7b; --ss-s2: #7aa2ff; } }
+.q-with-fig { display: block; }
+.q-text { display: block; }
+.dots-fig { display: block; margin: 10px 0 4px; font-weight: 400; }
+.dots-svg { display: block; width: 100%; max-width: 520px; height: auto; background: var(--ss-surface-2); border-radius: 12px; }
+.dots-grid { stroke: var(--ss-border); stroke-width: 1.5; }
+.dots-start { stroke: #23a26a; stroke-width: 4; }
+.dots-lbl { font: 700 13px system-ui, sans-serif; fill: var(--ss-text); }
+.dots-name { font: 700 20px system-ui, sans-serif; fill: var(--ss-text); }
+.dots-path { stroke: var(--ss-muted); stroke-width: 2; stroke-dasharray: 4 5; }
+.dots-dot { fill: var(--ss-text); }
+.dots-cap { display: block; }
+
+/* ── 정리: 참고 표 ── */
+.ref-box { margin: 0 0 10px; }
+.ref-table { min-width: 0; }
+.ref-table td { text-align: center; }
+.ref-note { margin-top: 6px; font-weight: 600; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .run-timer { font-size: 0.78rem; padding: 4px 10px; top: 8px; max-width: calc(100% - 64px); white-space: normal; }
+}
+.ss-num-unit { white-space: nowrap; }

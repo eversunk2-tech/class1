@@ -8,12 +8,12 @@
 
 | 파일 | 전역 이름 | 하는 일 |
 |---|---|---|
-| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce` | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사 |
+| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce`(+`flush`, 떠날 때 자동 저장) | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사 |
 | `stage-nav.js` | `SciSim.StageNav` | 단계 진행바(앞 단계는 언제든, 뒤 단계는 조건 통과 시) |
 | `lesson.js` | `SciSim.Lesson` | 앱 뼈대: 알림, 학습 시간, 단계 이동 연결·새로고침 복원, 마치기·결과 저장(실패 까닭별 문구), 처음부터 다시 |
 | `predict.js` | `SciSim.Predict` | 예상하기(직접 타이핑 + 한 단계씩 열리는 힌트, 최소 글자 수 안내) |
-| `experiment.js` | `SciSim.Experiment` | **실험하기 화면 틀 전체**: 3D/2D 화면 자리, 조건 고르기 버튼, 실험 단계 잠금·진행률, 실행 버튼(누르면 실험 화면이 보이게 스크롤한 뒤 실행), 관찰·기록 카드(보기 고르기 **또는 수치 입력**), 기록 한눈에 보기 표, 3D↔2D 전환(겹침 방지·렌더러 해제), **안전상 관찰하지 않는 칸(`skipCells`)** |
-| `sim3d.js` | `SciSim.Sim3D` | three.js 3D 장면 도우미(카메라·조명·드래그 회전, 물체 팩토리, 트윈, `discard`, `dispose`로 WebGL 컨텍스트 반납) |
+| `experiment.js` | `SciSim.Experiment`, `SciSim.Countdown` | **실험하기 화면 틀 전체**: 3D/2D 화면 자리, 조건 고르기 버튼, 실험 단계 잠금·진행률, 실행 버튼(누르면 실험 화면이 보이게 스크롤한 뒤 실행), 관찰·기록 카드(보기 고르기 **또는 수치 입력**), 기록 한눈에 보기 표, 3D↔2D 전환(겹침 방지·렌더러 해제), **안전상 관찰하지 않는 칸(`skipCells`)** |
+| `sim3d.js` | `SciSim.Sim3D` | three.js 3D 장면 도우미(카메라·조명·드래그 회전, 물체 팩토리, 트윈, `discard`, **사진(`snapshot`)·시점 저장(`cameraPose`)·`project`**, `dispose`로 WebGL 컨텍스트 반납) |
 | `record-store.js` | `SciSim.RecordStore` | 기록 저장(같은 칸 덮어쓰기 / `trial` 회차별 저장, 평균) |
 | `table-chart.js` | `SciSim.TableChart` | 색상 매트릭스 표, 수치 기록 표(평균 줄), **꺾은선그래프(수치 x축·여러 계열)**, **막대그래프(범주×계열)** — 축 제목에 단위, 범례, 계열마다 다른 점 모양 |
 | `sorter.js` | `SciSim.Sorter` | 분류하기 활동(탭하거나 끌어다 놓기) + 맞고 틀림 피드백. **`renderRounds`: 같은 항목을 여러 기준으로 차례로 분류(라운드 탭)** |
@@ -123,6 +123,78 @@
    - `Quiz` 문항 `missBy: { 보기id: "그 정답 보기를 빠뜨렸을 때 피드백" }` (고른 오답의 `wrongBy`가 먼저).
    - `TableChart.renderMatrix`의 칸 `icon`(글자 앞 아이콘 — 색 없이 모양으로도 구분), `muted`(흐린 칸).
    - `Sim3D.create({ minDistance })`: 카메라가 다가갈 수 있는 가장 가까운 거리. 종이 앞 낮은 시점처럼 가까이에서 보는 연출이 화면 크기 변화 때 뒤로 밀려나지 않게 할 때 쓴다(기본은 예전처럼 화면 맞춤 거리의 45%).
+
+### 추가 기능(6-1-2-1 "운동하는 물체의 특징"에서 확장, 기존 차시 앱과 하위 호환)
+
+모두 **선택 옵션**이다. 넘기지 않으면 예전과 똑같이 동작한다(6-1-1-1·6-1-1-4를 새 틀로 바꿔 실행해 확인).
+
+1. **장면 사진(스냅샷) — 전/후 비교** (`sim3d.js`)
+   ```js
+   var pose = v.cameraPose();                                   // { position, target } 지금 시점
+   var p1 = v.snapshot({ pose: pose, width: 560,                 // 사진 1
+                         marks: [{ at: [x, y, z], radius: 0.06, label: "시곗바늘" }],   // 점선 표시 원(반지름은 사진 가로 대비)
+                         hide: [선택표시물체] });                  // 찍는 순간에만 숨길 물체
+   // … 시간이 흐른 뒤 …
+   var p2 = v.snapshot({ pose: pose, … });                      // 같은 시점(삼각대처럼)에서 사진 2 — 학생이 그사이 화면을 돌려도 된다
+   // 반환 { url(dataURL), canvas, width, height, marks: [{ x, y, r, inView }] } — 해제된 뒤면 null
+   v.project([x, y, z], pose?)   // 화면 위 자리 { x, y (0~1), inView }
+   v.setCameraPose(pose)         // 시점 되돌리기
+   ```
+   - `Sim3D.create({ viewDir: [0, 0.62, 0.79] })`: 처음 시점 방향(기본 `[0, 0.78, 0.62]`). 야외처럼 조금 낮게 볼 때.
+   - `v.discard(group)`이 그 안에 `pickable`로 등록한 자식도 함께 뺀다(장면을 통째로 바꿔도 떼어 낸 물체가 탭에 걸리지 않음).
+
+2. **실제 시간 카운트다운(초시계)** (`experiment.js`, 스타일 `.ss-countdown`)
+   ```js
+   await SciSim.Countdown.run(container, 5, { label: "초 뒤에 사진 2를 찍어요", note: "실제 시간 5초 (초시계)", onTick: function (remain) {} });
+   ```
+   - ⏱ 아이콘 + 큰 숫자(5·4·3·2·1) + 진행 고리. 벽시계(`Date.now`) 기준이라 빨리 감기가 아니고, 탭이 숨겨져도 제시간에 끝난다. 시작·끝을 화면 읽기 프로그램에 알린다.
+   - `view.run(sel)` 안에서 3D `v.tween(ms, …)`(움직임)과 함께 쓴다. 반환 Promise에 `.cancel()`이 있다.
+
+3. **조건 보기 숨기기 · 그 밖**
+   - `factors[].visible: function (optionId, sel) { return bool; }` — 다른 조건에 따라 보기를 숨긴다(예: 고른 장면의 물체만). 숨겨진 보기가 골라져 있으면 선택이 풀린다. 장면마다 물체가 다른 차시에서 `factors: [장면, 물체]`로 쓴다.
+   - `factors[].phaseTag: false` — 보기 아래에 단계 이름(예: "실험 A")을 쓰지 않는다(잠김 안내는 그대로).
+   - `Experiment.create({ busyLabel })` — 실행 중 버튼 글자(문자열 또는 `function (sel)`).
+   - 잠김 안내 조사 고침: "교실 안(7칸)을 모두 기록하면 …"(예전: "칸)를").
+   - 공통 CSS `.ss-sr-only`(화면 읽기 전용 글자).
+
+### 추가 기능(6-1-2-2 "물체의 운동을 표현해 볼까?" review 1차 수정에서 확장, 기존 차시 앱과 하위 호환)
+
+모두 **선택 옵션**이다. 넘기지 않으면 예전과 똑같이 동작한다(6-1-1-1·6-1-1-5를 새 틀로 바꿔 실행해 확인).
+
+1. **기록 전 확인하기 — 공식 훅** (`experiment.js`) — 앱이 틀의 DOM(선택자·리스너 순서)에 기대지 않고 학생 입력을 검사한다.
+   ```js
+   observe: function (sel) {
+     return {
+       question: "…", body: node, type: "numeric",
+       fields: [
+         { id: "seconds", label: "걸린 시간", unit: "초", step: 1, min: 1, max: 20 },
+         { id: "sentence", kind: "text", label: "문장으로 써 보기", placeholder: "…", minLength: 8, maxLength: 120 },  // 글 칸(새로 추가)
+       ],
+       check: function (observed, ctx) {           // observed = { seconds: 5, sentence: "…" } (보기형이면 고른 보기 문자열)
+         // ctx = { sel, tries }  tries: 이 카드에서 틀린 횟수(같은 답을 다시 누른 것은 세지 않음)
+         return true | "틀렸을 때 피드백" | { ok: true, message: "⭕ …", node: 덧붙일노드 };
+       },
+       checkLabel: "✔️ 확인하기",                  // 선택
+       okMessage: "⭕ 맞아요! …",                    // 선택: check가 true만 돌려줄 때의 문구
+       retryLabel: "🔁 다시 움직여 보기",            // 선택: 틀렸을 때 '같은 조건으로 다시 실행' 버튼
+     };
+   },
+   check: function (observed, ctx) { … },           // 선택: 모든 관찰 카드 공통(observe의 check가 먼저)
+   beforeRecord: function (sel, observed) { return true | "막는 까닭"; },   // 선택: 기록 직전 마지막 검사
+   canRun: function (sel) { return true | "먼저 할 일 안내"; },               // 선택: 실행 전 검사(막으면 토스트)
+   onRunBlocked: function (sel, message) {},                                  // 선택: canRun이 막았을 때
+   ```
+   - `check`가 있으면 관찰 카드에 '확인하기' 버튼이 생기고, **확인을 통과해야 '기록하기'가 켜진다.** 입력을 바꾸면 다시 확인해야 한다.
+   - 같은 답으로 다시 '확인하기'를 누르면 `check`를 부르지 않고 앞 피드백에 "(고친 곳이 없어요.)"를 붙여 다시 보여 준다(오답 횟수가 부풀지 않음).
+   - `check`·`beforeRecord`·`canRun`이 오류를 던지면 **통과시키지 않는다**(fail-closed, 콘솔 경고).
+   - 수치 칸·글 칸에서 Enter = 확인하기. 글 칸 값은 공백을 한 칸으로 줄이고 앞뒤를 뺀 문자열이다.
+   - 아직 비어 있는 칸은 빨간 테두리로 보이지 않는다(예전: 처음부터 빨간 테두리). 기록은 여전히 막힌다.
+   - 스타일: `.ss-check-row`, `.ss-check-node`, `.ss-text-input`, `.ss-num-field.is-text`(한 줄 전체).
+
+2. **입력 저장 즉시 반영** (`persist.js`)
+   - `SciSim.debounce(fn, ms)`로 미뤄 둔 저장은 `pagehide`·`beforeunload`·`visibilitychange(hidden)` 때 **바로 실행**된다. 새로고침·탭 닫기 직전 250ms 안에 적은 글자도 남는다.
+   - `save.flush()`(그 저장만 지금 실행), `SciSim.flushPendingSaves()`(기다리는 저장 모두 실행).
+   - `persist.js`는 science-guide 틀과 **같은 파일**이다(머리 주석 한 줄만 다름). 한쪽을 고치면 다른 쪽도 똑같이 고친다.
 
 ## 3. config 예시
 

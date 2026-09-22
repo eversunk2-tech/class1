@@ -14,6 +14,9 @@
  *         options: [{ id: "식초", label: "식초", icon: function () { return node; } }] },
  *       { id: "ind", title: "지시약 고르기", options: [...],
  *         note: function (sel) { return "선택에 따른 도움말" | null; } },
+ *       { id: "obj", title: "물체 고르기", options: [...],
+ *         visible: function (optionId, sel) { return true | false; },   // 선택: 다른 조건에 따라 보기를 숨긴다(예: 고른 장면의 물체만).
+ *         phaseTag: false },                                  //  숨겨진 보기가 골라져 있으면 선택이 풀린다. phaseTag: false면 보기 아래 단계 이름을 쓰지 않는다(잠김 안내는 그대로)
  *     ],
  *     phases: [                                              // 실험 단계. 앞 단계를 다 기록해야 다음 단계가 열린다.
  *       { id: "A", name: "실험 A", title: "…", lead: "안내 문장",
@@ -23,6 +26,7 @@
  *     doneLead: "모든 실험을 기록했어요 …",
  *     cellKey: function (sel) { return sel.sol + "|" + sel.ind; },
  *     runLabel: function (sel) { return "▶ … 넣기"; },
+ *     busyLabel: "실험하는 중… 잘 지켜보세요 👀",               // 선택: 실행 중 버튼 글자(문자열 또는 function (sel))
  *     view: {
  *       build3D: function (container, ctx) { return Promise<view|null>; },   // null이면 2D로 대신한다
  *       build2D: function (container, ctx) { return view; },
@@ -37,7 +41,21 @@
  *                type: "choice", choices: ["붉은색으로 변함", …] }            // 색 관찰형
  *       // 또는 { question, body, type: "numeric",
  *       //        fields: [{ id: "time", label: "걸린 시간", unit: "초", step: 0.1, min: 0, max: 60, value: 2.4 }] }  // 수치 측정형
+ *       //   fields에 글 칸도 섞을 수 있다: { id: "sentence", kind: "text", label: "…", placeholder: "…", minLength: 1, maxLength: 200 }
+ *       //   (글 칸 값은 앞뒤 공백을 뺀 문자열. 비어 있거나 minLength보다 짧으면 기록할 수 없다)
+ *       // ── 선택: 기록 전에 학생 입력 확인하기(공식 훅) ──
+ *       //   check: function (observed, ctx) { return true | "틀렸을 때 피드백" | { ok, message, node }; },
+ *       //     observed: 고른 보기 문자열 | { fieldId: 값 }. ctx = { sel, tries: 이번 관찰 카드에서 틀린 횟수(같은 답 반복은 세지 않음) }
+ *       //     check가 있으면 관찰 카드에 '확인하기' 버튼이 생기고, 확인을 통과해야 '기록하기'가 켜진다.
+ *       //     입력을 바꾸면 다시 확인해야 한다. 같은 답으로 다시 누르면 check를 부르지 않고 앞 피드백만 다시 보여 준다.
+ *       //     check가 오류를 던지면 통과시키지 않는다(fail-closed). 글 칸·수치 칸에서 Enter = 확인하기.
+ *       //   checkLabel: "✔️ 확인하기",  okMessage: "⭕ 맞아요! …",      // 선택: 버튼 글자, 통과 기본 문구
+ *       //   retryLabel: "🔁 다시 실행해 보기",                          // 선택: 틀렸을 때 보이는 '다시 실행' 버튼(같은 조건으로 다시 실행)
  *     },
+ *     check: function (observed, ctx) { … },                 // 선택: 모든 관찰 카드에 쓰는 확인 함수(observe가 돌려준 check가 먼저)
+ *     beforeRecord: function (sel, observed) { return true | "막는 까닭"; },  // 선택: 기록 직전 마지막 검사(문자열이면 토스트로 알리고 기록하지 않음)
+ *     canRun: function (sel) { return true | "먼저 할 일 안내"; },              // 선택: 실행 전 검사(문자열이면 토스트로 알리고 실행하지 않음)
+ *     onRunBlocked: function (sel, message) {},             // 선택: canRun이 막았을 때(할 일 위치로 스크롤 등)
  *     makeRecord: function (sel, observed) { return { … }; },  // observed: 고른 보기 문자열 | { fieldId: 숫자 }
  *     describeRecord: function (rec) { return "식초 + 푸른색 리트머스 → 붉은색으로 변함"; },
  *     miniTable: { title: "…", rows: [{ id, label }], cols: [{ id, label }], sel: function (row, col) { return {...}; } },  // 선택
@@ -62,6 +80,16 @@
  *
  * 저장 키: "scene"(실험 화면에 남아 있는 결과), "view2d"(2D 보기 선택), "intro"(알아 두기 접힘)
  * 실행 버튼을 누르면 실험 화면이 보이도록 먼저 스크롤한 뒤(세로 화면·휴대폰) 애니메이션을 시작한다.
+ *
+ * ▶ 실제 시간 카운트다운(초시계) — view.run 안에서 쓴다(예: 5초 간격으로 두 번 사진 찍기)
+ *   await SciSim.Countdown.run(container, 5, {
+ *     label: "초 뒤에 다시 찍어요",       // 숫자 옆 글자
+ *     note: "실제 시간 5초",              // 선택: 작은 글자(빨리 감기가 아님을 밝힐 때 등)
+ *     onTick: function (remainSec) {},   // 선택: 0.1초마다
+ *   });
+ *   - 화면 오른쪽 위에 ⏱ 아이콘 + 큰 숫자(5, 4, 3, 2, 1) + 진행 고리를 띄우고, 끝나면 지운다.
+ *   - 벽시계(Date.now) 기준이라 탭이 숨겨져도 실제 시간대로 끝난다. 시작·끝은 화면 읽기 프로그램에 알린다.
+ *   - container는 position이 relative/absolute인 요소(3D 화면 칸 등). 반환 Promise에 .cancel()이 있다.
  */
 (function () {
   "use strict";
@@ -222,7 +250,7 @@
     function lockMessage(p) {
       var prev = o.phases[p.index - 1];
       return prev
-        ? prev.name + "(" + prev.cells.length + "칸)" + "를 모두 기록하면 " + SciSim.josa(p.name, "이", "가") + " 열려요."
+        ? prev.name + "(" + prev.cells.length + "칸)을 모두 기록하면 " + SciSim.josa(p.name, "이", "가") + " 열려요."
         : SciSim.josa(p.name, "은", "는") + " 아직 열리지 않았어요.";
     }
 
@@ -293,11 +321,19 @@
     R.obsChoices = el("div", { class: "ss-obs-input" });
     R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", text: "📝 기록하기", disabled: true });
     R.recordMsg = el("p", { class: "ss-help", "aria-live": "polite" });
+    R.checkBtn = el("button", { type: "button", class: "ss-btn ss-check-btn", text: "✔️ 확인하기" });
+    R.retryBtn = el("button", { type: "button", class: "ss-btn ss-btn-ghost", hidden: true });
+    R.checkRow = el("div", { class: "ss-row ss-check-row", hidden: true }, [R.checkBtn, R.retryBtn]);
+    R.checkFb = el("p", { class: "ss-feedback", "aria-live": "polite", hidden: true });
+    R.checkNode = el("div", { class: "ss-check-node", hidden: true });
     R.observe = el("div", { class: "ss-card ss-step-card ss-observe", hidden: true }, [
       el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: nObs }), " 관찰하고 기록하기"]),
       R.obsQ,
       R.obsBody,
       R.obsChoices,
+      R.checkRow,
+      R.checkFb,
+      R.checkNode,
       R.record,
       R.recordMsg,
     ]);
@@ -317,6 +353,15 @@
     o.root.appendChild(el("div", { class: "ss-exp-layout" }, [viewCol, panel]));
 
     /* ── 고르기 ── */
+    // 조건 보기 숨기기(factor.visible): 다른 조건에 따라 보기를 숨기고, 숨겨진 보기를 골라 두었으면 선택을 푼다
+    function optionVisible(f, oid) {
+      return typeof f.visible !== "function" || f.visible(oid, Object.assign({}, sel)) !== false;
+    }
+    function pruneHidden() {
+      o.factors.forEach(function (f) {
+        if (sel[f.id] != null && !optionVisible(f, sel[f.id])) delete sel[f.id];
+      });
+    }
     function pick(fid, oid) {
       if (busy) return;
       var lock = optionLock(fid, oid);
@@ -325,6 +370,7 @@
         return;
       }
       sel[fid] = oid;
+      pruneHidden();
       afterSelect();
     }
     function select(s) {
@@ -337,6 +383,7 @@
       factorIds.forEach(function (k) {
         if (s[k] != null) sel[k] = s[k];
       });
+      pruneHidden();
       afterSelect();
       return true;
     }
@@ -356,11 +403,12 @@
       o.factors.forEach(function (f) {
         f.options.forEach(function (op) {
           var b = R.factorBtns[f.id][op.id];
+          b.hidden = !optionVisible(f, op.id);
           var lock = optionLock(f.id, op.id);
           b.setAttribute("aria-pressed", String(sel[f.id] === op.id));
           b.classList.toggle("is-locked", !!lock);
           var ps = phasesOfOption(f.id, op.id);
-          var tag = lock ? "🔒 " + SciSim.josa(o.phases[lock.index - 1].name, "을", "를") + " 마치면 열려요" : ps.length === 1 && o.phases.length > 1 ? ps[0].name : "";
+          var tag = lock ? "🔒 " + SciSim.josa(o.phases[lock.index - 1].name, "을", "를") + " 마치면 열려요" : ps.length === 1 && o.phases.length > 1 && f.phaseTag !== false ? ps[0].name : "";
           b.querySelector(".ss-lock-note").textContent = tag;
         });
         var note = f.note ? f.note(Object.assign({}, sel)) : null;
@@ -491,6 +539,21 @@
       if (skipOf(s)) return; // 관찰하지 않는 조합은 실행하지 않는다
       var p = cellPhase(s);
       if (p && !phaseUnlocked(p)) return;
+      if (o.canRun) {
+        var cr;
+        try {
+          cr = o.canRun(Object.assign({}, s));
+        } catch (e) {
+          console.warn("[science-sim] canRun 오류", e);
+          cr = "지금은 실험을 시작할 수 없어요.";
+        }
+        if (cr !== true && cr !== undefined) {
+          var msg = typeof cr === "string" ? cr : "먼저 해야 할 일이 있어요.";
+          toast(msg, 3600);
+          if (o.onRunBlocked) o.onRunBlocked(Object.assign({}, s), msg);
+          return;
+        }
+      }
       setBusy(true);
       R.observe.hidden = true;
       var v = view;
@@ -518,7 +581,8 @@
       R.btnToggle.disabled = on || mounting || (viewKind === "2d" && !can3D);
       if (on) {
         R.run.disabled = true;
-        R.run.textContent = "실험하는 중… 잘 지켜보세요 👀";
+        var bl = typeof o.busyLabel === "function" ? o.busyLabel(Object.assign({}, sel)) : o.busyLabel;
+        R.run.textContent = bl || "실험하는 중… 잘 지켜보세요 👀";
       } else draw();
       if (o.onBusy) o.onBusy(on);
     }
@@ -533,26 +597,48 @@
       var p = cellPhase(s) || { trials: 1 };
       var key = o.cellKey(s);
       trial.type = ob.type || "choice";
+      trial.check = typeof ob.check === "function" ? ob.check : typeof o.check === "function" ? o.check : null;
+      trial.checked = false;
+      trial.tries = 0;
+      trial.lastKey = null;
+      trial.lastRes = null;
+      trial.ob = ob;
       if (trial.type === "numeric") {
         trial.trialNo = p.trials > 1 ? records.nextTrial(key, p.trials) : null;
         trial.inputs = {};
         var grid = el("div", { class: "ss-num-grid" });
         ob.fields.forEach(function (f) {
           var id = "ss-num-" + f.id;
-          var inp = el("input", {
-            id: id,
-            type: "number",
-            inputmode: "decimal",
-            class: "ss-num-input",
-            step: f.step != null ? String(f.step) : "any",
-            min: f.min != null ? String(f.min) : null,
-            max: f.max != null ? String(f.max) : null,
-          });
+          var isText = f.kind === "text";
+          var inp = isText
+            ? el("input", {
+                id: id,
+                type: "text",
+                class: "ss-num-input ss-text-input",
+                autocomplete: "off",
+                placeholder: f.placeholder || null,
+                maxlength: f.maxLength != null ? String(f.maxLength) : "300",
+              })
+            : el("input", {
+                id: id,
+                type: "number",
+                inputmode: "decimal",
+                class: "ss-num-input",
+                step: f.step != null ? String(f.step) : "any",
+                min: f.min != null ? String(f.min) : null,
+                max: f.max != null ? String(f.max) : null,
+              });
           if (f.value != null) inp.value = String(f.value);
           inp.addEventListener("input", checkNumeric);
+          inp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && trial && trial.check) {
+              e.preventDefault();
+              runCheck();
+            }
+          });
           trial.inputs[f.id] = { input: inp, field: f };
           grid.appendChild(
-            el("label", { for: id, class: "ss-num-field" }, [
+            el("label", { for: id, class: "ss-num-field" + (isText ? " is-text" : "") }, [
               el("span", { class: "ss-num-label", text: f.label }),
               el("span", { class: "ss-num-row" }, [inp, f.unit ? el("span", { class: "ss-num-unit", text: f.unit }) : null]),
             ])
@@ -570,13 +656,23 @@
             box.querySelectorAll(".ss-obs").forEach(function (x) {
               x.setAttribute("aria-pressed", String(x === b));
             });
-            R.record.disabled = false;
+            resetCheck();
+            R.record.disabled = !!trial.check;
           });
           box.appendChild(b);
         });
         R.obsChoices.appendChild(box);
         R.record.disabled = true;
       }
+      // 확인하기(check 훅)
+      R.checkBtn.textContent = ob.checkLabel || "✔️ 확인하기";
+      R.retryBtn.textContent = ob.retryLabel || "";
+      R.checkRow.hidden = !trial.check;
+      R.retryBtn.hidden = true;
+      R.checkFb.hidden = true;
+      R.checkFb.textContent = "";
+      R.checkNode.textContent = "";
+      R.checkNode.hidden = true;
       var n = records.countOf(key);
       R.recordMsg.textContent =
         trial.type === "numeric" && p.trials > 1
@@ -597,19 +693,112 @@
       Object.keys(trial.inputs).forEach(function (k) {
         var t = trial.inputs[k];
         var raw = t.input.value;
-        var v = raw === "" ? NaN : Number(raw);
         var f = t.field;
-        var bad = !isFinite(v) || (f.min != null && v < f.min) || (f.max != null && v > f.max);
-        t.input.setAttribute("aria-invalid", String(bad));
+        var v, bad;
+        if (f.kind === "text") {
+          v = String(raw).replace(/\s+/g, " ").trim();
+          bad = v.length < (f.minLength != null ? f.minLength : 1);
+        } else {
+          v = raw === "" ? NaN : Number(raw);
+          bad = !isFinite(v) || (f.min != null && v < f.min) || (f.max != null && v > f.max);
+        }
+        // 아직 비어 있는 칸은 빨간 테두리로 보이지 않게(기록은 여전히 막힘)
+        t.input.setAttribute("aria-invalid", String(bad && String(raw).trim() !== ""));
         if (bad) ok = false;
         else vals[k] = v;
       });
       trial.observed = ok ? vals : null;
-      R.record.disabled = !ok;
+      resetCheck();
+      R.record.disabled = !ok || !!trial.check;
     }
+    // 입력이 바뀌면 확인 결과를 지운다(다시 확인해야 기록할 수 있다)
+    function resetCheck() {
+      if (!trial || !trial.check) return;
+      trial.checked = false;
+      R.checkFb.hidden = true;
+      R.checkFb.textContent = "";
+      R.checkFb.className = "ss-feedback";
+      R.checkNode.textContent = "";
+      R.checkNode.hidden = true;
+    }
+    function obsKey(v) {
+      try {
+        return JSON.stringify(v);
+      } catch (e) {
+        return String(v);
+      }
+    }
+    function showCheck(res) {
+      R.checkFb.hidden = false;
+      R.checkFb.className = "ss-feedback " + (res.ok ? "is-correct" : "is-wrong");
+      R.checkFb.textContent = res.message || "";
+      R.checkNode.textContent = "";
+      R.checkNode.hidden = !res.node;
+      if (res.node) R.checkNode.appendChild(res.node);
+      R.retryBtn.hidden = res.ok || !(trial && trial.ob && trial.ob.retryLabel);
+    }
+    function runCheck() {
+      if (!trial || !trial.check) return;
+      if (trial.type === "numeric") checkNumeric();
+      if (!trial.observed) {
+        showCheck({ ok: false, message: trial.type === "numeric" ? "빈칸을 알맞게 모두 채운 뒤 확인해요." : "먼저 보기를 골라요." });
+        R.record.disabled = true;
+        return;
+      }
+      var key = obsKey(trial.observed);
+      if (trial.lastRes && trial.lastKey === key) {
+        // 같은 답으로 다시 확인: 세지 않고 앞 결과를 다시 보여 준다
+        trial.checked = trial.lastRes.ok;
+        R.record.disabled = !trial.checked;
+        showCheck(trial.lastRes.ok ? trial.lastRes : { ok: false, message: trial.lastRes.message + " (고친 곳이 없어요.)", node: trial.lastRes.node });
+        return;
+      }
+      var raw;
+      try {
+        raw = trial.check(typeof trial.observed === "object" ? Object.assign({}, trial.observed) : trial.observed, { sel: Object.assign({}, trial.sel), tries: trial.tries });
+      } catch (e) {
+        console.warn("[science-sim] check 오류(기록하지 않아요)", e);
+        raw = "확인하는 중 문제가 생겼어요. 다시 눌러 보세요.";
+        key = null;
+      }
+      var res;
+      if (raw === true) res = { ok: true, message: trial.ob.okMessage || "⭕ 맞아요! '기록하기'를 눌러 기록해요." };
+      else if (raw && typeof raw === "object") res = { ok: raw.ok === true, message: raw.message || (raw.ok === true ? trial.ob.okMessage || "⭕ 맞아요! '기록하기'를 눌러 기록해요." : "다시 확인해 보세요."), node: raw.node || null };
+      else res = { ok: false, message: typeof raw === "string" && raw ? raw : "다시 확인해 보세요." };
+      if (!res.ok) trial.tries++;
+      trial.lastKey = key;
+      trial.lastRes = res;
+      trial.checked = res.ok;
+      R.record.disabled = !res.ok;
+      showCheck(res);
+    }
+
+    R.checkBtn.addEventListener("click", runCheck);
+    R.retryBtn.addEventListener("click", function () {
+      if (!busy) run();
+    });
 
     R.record.addEventListener("click", function () {
       if (!trial || !trial.observed) return;
+      if (trial.check && !trial.checked) {
+        // fail-closed: 확인을 통과하지 않은 값은 기록하지 않는다
+        R.record.disabled = true;
+        showCheck({ ok: false, message: "먼저 '확인하기'를 눌러 확인해요." });
+        return;
+      }
+      if (o.beforeRecord) {
+        var br;
+        try {
+          br = o.beforeRecord(Object.assign({}, trial.sel), typeof trial.observed === "object" ? Object.assign({}, trial.observed) : trial.observed);
+        } catch (e) {
+          console.warn("[science-sim] beforeRecord 오류(기록하지 않아요)", e);
+          br = "기록하는 중 문제가 생겼어요.";
+        }
+        if (br !== true && br !== undefined) {
+          toast(typeof br === "string" ? br : "지금은 기록할 수 없어요.", 3400);
+          return;
+        }
+      }
       var s = trial.sel;
       var p = cellPhase(s);
       var before = o.phases.map(function (ph) {
@@ -640,6 +829,7 @@
         toast((r.replaced ? "🔁 다시 기록했어요" : "📝 기록했어요") + (desc ? ": " + desc : ""));
         advance(s, p);
       }
+      pruneHidden();
       afterSelect();
       if (o.onRecorded) o.onRecorded({ record: r.record, replaced: r.replaced, phaseCompleted: completed ? completed.id : null, allDone: allDone() });
       if (o.onChange) o.onChange();
@@ -831,4 +1021,78 @@
   }
 
   SciSim.Experiment = { create: create, scrollIntoView: scrollIntoViewSafe, sleep: sleep };
+
+  /* ── 실제 시간 카운트다운(초시계) ── */
+  function countdown(container, seconds, opts) {
+    opts = opts || {};
+    var total = Math.max(0.1, Number(seconds) || 1) * 1000;
+    var R0 = 22;
+    var CIRC = 2 * Math.PI * R0;
+    var NS = "http://www.w3.org/2000/svg";
+    var ring = document.createElementNS(NS, "svg");
+    ring.setAttribute("viewBox", "0 0 52 52");
+    ring.setAttribute("class", "ss-cd-ring");
+    ring.setAttribute("aria-hidden", "true");
+    var bg = document.createElementNS(NS, "circle");
+    var fg = document.createElementNS(NS, "circle");
+    [bg, fg].forEach(function (c) {
+      c.setAttribute("cx", "26");
+      c.setAttribute("cy", "26");
+      c.setAttribute("r", String(R0));
+      ring.appendChild(c);
+    });
+    bg.setAttribute("class", "ss-cd-bg");
+    fg.setAttribute("class", "ss-cd-fg");
+    fg.setAttribute("stroke-dasharray", String(CIRC));
+    var num = el("span", { class: "ss-cd-num", text: String(Math.ceil(total / 1000)) });
+    var live = el("span", { class: "ss-sr-only", "aria-live": "polite" });
+    var box = el("div", { class: "ss-countdown", role: "timer" }, [
+      el("span", { class: "ss-cd-dial" }, [ring, el("span", { class: "ss-cd-icon", "aria-hidden": "true", text: "⏱" })]),
+      el("span", { class: "ss-cd-body" }, [
+        el("span", { class: "ss-cd-main" }, [num, el("span", { class: "ss-cd-label", text: opts.label || "초 남았어요" })]),
+        opts.note ? el("span", { class: "ss-cd-note", text: opts.note }) : null,
+      ]),
+      live,
+    ]);
+    container.appendChild(box);
+    live.textContent = "초시계 시작: " + Math.round(total / 1000) + "초";
+    var t0 = Date.now();
+    var timer = null;
+    var done = false;
+    var resolveFn;
+    var p = new Promise(function (resolve) {
+      resolveFn = resolve;
+    });
+    function end() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (box.parentNode) box.parentNode.removeChild(box);
+      resolveFn();
+    }
+    function tick() {
+      if (done) return;
+      var elapsed = Date.now() - t0;
+      var remain = Math.max(0, total - elapsed);
+      num.textContent = String(Math.ceil(remain / 1000));
+      fg.setAttribute("stroke-dashoffset", String((CIRC * elapsed) / total));
+      if (opts.onTick) {
+        try {
+          opts.onTick(remain / 1000);
+        } catch (e) {
+          /* 무시 */
+        }
+      }
+      if (remain <= 0) {
+        live.textContent = opts.doneText || "시간이 다 되었어요";
+        end();
+        return;
+      }
+      timer = setTimeout(tick, 100);
+    }
+    tick();
+    p.cancel = end;
+    return p;
+  }
+  SciSim.Countdown = { run: countdown };
 })();

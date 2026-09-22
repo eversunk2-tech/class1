@@ -21,14 +21,27 @@
  *     (fields의 칸마다 optional: true면 비워도 된다, minLength: n이면 n글자 이상이어야 채운 것으로 본다, hint: 칸 아래 도움말)
  *     requireEach: [{ field: "property", value: "산성", message: "산성 용액을 한 가지 이상 적어 주세요." }],   // 선택
  *     compare: {                 // 선택: 다 적은 뒤 열리는 지도서 예시
- *       buttonLabel: "📘 지도서 속 예시와 비교해 보기",
- *       title: "지도서 속 예시", lead: "…", source: "지도서 149~150쪽",
+ *       buttonLabel: "📘 예시 답안과 비교해 보기",           // 선택(기본 "📘 {refName}과/와 비교해 보기")
+ *       refName: "예시 답안",    // 선택: 표 아래 안내에 쓰는 비교 대상 이름(기본 "예시 답안"). 학생 화면에 '지도서'라고 쓰지 않는다.
+ *       title: "예시 답안", lead: "…", source: "교과서 ○○쪽",
  *       columns: [{ id: "name", label: "용액" }, { id: "property", label: "성질" }, { id: "use", label: "이용하는 예" }],
  *       rows: [{ name: "…", property: "…", use: "…" }],
- *       matchField: "name",      // 선택: 이 칸 글자가 서로 포함되면 "내 기록에도 있어요"로 표시(띄어쓰기 무시)
- *       mineField: "property",   // 선택: 같은 줄에 "내가 고른 ○○"를 함께 보여 줄 칸. 지도서 값과 다르면 ✔ 대신 "⚠ ○○이 달라요"
- *       diffText: "…",           // 선택: mineField가 다를 때 덧붙일 안내(기본 "지도서 예시와 다시 비교해 보세요.")
+ *       matchField: "name",      // 선택: 내 기록과 지도서 예시의 이 칸이 같으면 "✔ 있어요"(띄어쓰기·문장 부호·대소문자 무시)
+ *       mineField: "property",   // 선택: 같은 줄에 "내가 고른 ○○"를 함께 보여 줄 칸. 지도서 값과 다르면 ✔ 대신 "⚠ ○○이/가 달라요"
+ *       diffText: "…",           // 선택: mineField가 다를 때 덧붙일 안내(기본 "예시 답안과 다시 비교해 보세요.")
+ *       match: "contains",       // 선택: "contains"(기본, 예전과 같음) — 이름이 같거나 한쪽이 다른 쪽을 품으면 같다고 본다
+ *                                //       "exact" — 이름(또는 별칭)이 정확히 같을 때만 같다고 본다
+ *       aliases: { "과속 방지턱": ["방지턱"] },   // 선택: 지도서 예시 이름(matchField 값) → 같은 것으로 볼 다른 이름들.
+ *                                //   행에 직접 rows[i].aliases: [...]로 적어도 된다. 별칭과 정확히 같으면 가장 먼저 맞는다.
+ *                                //   "contains"에서는 내 기록이 별칭을 품어도 맞는다(예: "계단에서" ⊃ "계단").
+ *       genericNames: ["장치"],  // 선택: 뜻이 넓어 부분 일치로 쓰지 않을 말(기본 목록 "용액·세제·물·액"에 더한다)
+ *       minPartialLength: 2,     // 선택: 부분 일치로 인정할 짧은 쪽의 최소 글자 수(기본 2)
  *     },
+ *     ▶ 이름 맞추기 규칙: 내 기록 한 줄마다 가장 잘 맞는 지도서 예시 한 줄을 고른다(정확히 같음 > 별칭과 같음 > 더 긴 글자가 겹침).
+ *       가장 잘 맞는 예시가 둘 이상으로 비기면(예: "장치" → "차간 거리 유지 장치", "자동 긴급 제동 장치") 어느 것에도 맞추지 않고
+ *       "어느 예시인지 알기 어려운 것"으로 따로 알려 준다. 그래서 ⚠(다름) 판정과 mismatches()에 잘못 들어가지 않는다.
+ *     unique: "situation",       // 선택: 이 칸(또는 칸 배열, true면 모든 칸)이 같은 줄이 둘 이상이면 넘어가지 못한다(띄어쓰기 무시)
+ *     uniqueMessage: "…",        // 선택: 그때 안내(기본 "같은 ○○을/를 적은 줄이 있어요: …. 서로 다른 내용으로 적어 주세요.")
  *     doneText: "✔ …",           // 선택(fixed일 때): 칸을 모두 채웠을 때 문구(기본 "✔ 정리 틀의 칸을 모두 채웠어요.")
  *   }, store, onChange, { key: "worksheet" });                  // 마지막 인자 선택(저장 키, 기본 "worksheet")
  *   ws.isDone()      → true | false
@@ -44,20 +57,70 @@
   var el = SciSim.el;
   var uid = 0;
 
+  // 띄어쓰기·문장 부호를 빼고 소문자로(이름 비교용)
   function norm(s) {
     return String(s == null ? "" : s)
-      .replace(/\s+/g, "")
+      .replace(/[\s.,!?·'"‘’“”()（）\[\]{}<>~\-_/]+/g, "")
       .toLowerCase();
   }
 
-  // 이름이 같은지(띄어쓰기 무시). 한쪽이 다른 쪽을 품으면 같다고 보되, "용액"·"세제"처럼 뜻이 넓은 말만 적은 경우는 뺀다.
+  // "용액"·"세제"처럼 뜻이 넓은 말은 부분 일치로 쓰지 않는다(config genericNames로 더할 수 있다).
   var GENERIC = ["용액", "세제", "물", "액"];
-  function sameName(a, b) {
-    if (!a || !b) return false;
-    if (a === b) return true;
-    var s = a.length < b.length ? a : b;
-    var l = a.length < b.length ? b : a;
-    return s.length >= 2 && GENERIC.indexOf(s) < 0 && l.indexOf(s) >= 0;
+
+  // 내 기록 이름(mk, norm 적용)과 지도서 예시 한 줄의 일치 점수. 0 = 맞지 않음.
+  //  3000 이름과 정확히 같음 / 2000 별칭과 정확히 같음 / (contains) 1~999 겹치는 글자 수(더 길게 겹칠수록 높음)
+  function matchScore(mk, row, cmp, generic) {
+    if (!mk) return 0;
+    var key = norm(row[cmp.matchField]);
+    if (mk === key) return 3000;
+    var al = aliasesOf(row, cmp);
+    for (var i = 0; i < al.length; i++) if (al[i] && mk === al[i]) return 2000;
+    if ((cmp.match || "contains") === "exact") return 0;
+    var minLen = cmp.minPartialLength == null ? 2 : cmp.minPartialLength;
+    var best = 0;
+    function partial(a, b) {
+      // 한쪽이 다른 쪽을 품을 때 짧은 쪽 글자 수
+      var sh = a.length < b.length ? a : b;
+      var lo = a.length < b.length ? b : a;
+      if (sh.length < minLen || generic.indexOf(sh) >= 0) return 0;
+      return lo.indexOf(sh) >= 0 ? sh.length : 0;
+    }
+    best = Math.max(best, partial(mk, key));
+    al.forEach(function (a) {
+      // 별칭은 내 기록이 별칭을 품을 때만(예: "계단에서" ⊃ "계단")
+      if (a && a.length >= 2 && generic.indexOf(a) < 0 && mk.indexOf(a) >= 0) best = Math.max(best, a.length);
+    });
+    return Math.min(best, 999);
+  }
+  function aliasesOf(row, cmp) {
+    var list = [];
+    if (Array.isArray(row.aliases)) list = list.concat(row.aliases);
+    if (cmp.aliases && cmp.aliases[row[cmp.matchField]]) list = list.concat(cmp.aliases[row[cmp.matchField]]);
+    return list.map(norm);
+  }
+  // 내 기록 줄마다 가장 잘 맞는 지도서 예시 줄 번호. 반환: [행번호 | -1(없음) | -2(비겨서 알 수 없음), …]
+  function assignMatches(mine, cmp) {
+    var generic = GENERIC.concat((cmp.genericNames || []).map(norm));
+    return mine.map(function (m) {
+      var mk = norm(m[cmp.matchField]);
+      var top = 0;
+      var who = [];
+      cmp.rows.forEach(function (row, ri) {
+        var sc = matchScore(mk, row, cmp, generic);
+        if (!sc) return;
+        if (sc > top) {
+          top = sc;
+          who = [ri];
+        } else if (sc === top) who.push(ri);
+      });
+      if (!who.length) return -1;
+      return who.length === 1 ? who[0] : -2;
+    });
+  }
+  // 받침에 따라 이/가(SciSim.josa가 없을 때 대비)
+  function iGa(word) {
+    if (SciSim.josa) return SciSim.josa(word, "이", "가");
+    return word + "이";
   }
 
   SciSim.Worksheet = {
@@ -113,6 +176,8 @@
             ")"
           );
         }
+        var dup = duplicateInfo(filled);
+        if (dup) return dup;
         var need = (cfg.requireEach || []).filter(function (q) {
           return !filled.some(function (r) {
             return String(r[q.field]) === q.value;
@@ -120,6 +185,26 @@
         });
         if (need.length) return need[0].message;
         return true;
+      }
+
+      // 같은 내용을 적은 줄(unique 옵션). 반환: 안내 문장 | null
+      function duplicateInfo(filled) {
+        if (!cfg.unique) return null;
+        var ids = cfg.unique === true ? fields.map(function (f) { return f.id; }) : [].concat(cfg.unique);
+        var seen = {};
+        var dups = [];
+        filled.forEach(function (r) {
+          var k = ids
+            .map(function (id) {
+              return norm(r[id]);
+            })
+            .join("|");
+          if (seen[k] && dups.indexOf(seen[k]) < 0) dups.push(seen[k]);
+          else if (!seen[k]) seen[k] = String(r[ids[0]] == null ? "" : r[ids[0]]).trim();
+        });
+        if (!dups.length) return null;
+        var what = ids.length === 1 ? fieldLabel(ids[0]) : "내용";
+        return (cfg.uniqueMessage || "같은 " + SciSim.josa(what, "을", "를") + " 적은 줄이 있어요") + ": " + dups.join(", ") + ". 서로 다른 내용으로 적어 주세요. (같은 줄은 한 번만 세어요)";
       }
 
       root.textContent = "";
@@ -268,10 +353,10 @@
         compareBtn.disabled = !ok;
         compareBtn.setAttribute("aria-expanded", state.compareOpen ? "true" : "false");
         compareBtn.textContent = !ok
-          ? "🔒 " + (cmp.buttonLabel || "📘 지도서 속 예시와 비교해 보기").replace(/^📘\s*/, "") + " (정리 틀을 먼저 채워요)"
+          ? "🔒 " + (cmp.buttonLabel || "📘 " + REFWA() + " 비교해 보기").replace(/^📘\s*/, "") + " (정리 틀을 먼저 채워요)"
           : state.compareOpen
           ? "비교 표 접기 ▴"
-          : cmp.buttonLabel || "📘 지도서 속 예시와 비교해 보기";
+          : cmp.buttonLabel || "📘 " + REFWA() + " 비교해 보기";
         compareBody.hidden = !state.compareOpen;
         if (!state.compareOpen) {
           compareBody.textContent = "";
@@ -291,22 +376,14 @@
         var tb = el("tbody");
         var matchedMine = {};
         var mismatchCount = 0;
-        cmp.rows.forEach(function (row) {
+        var assign = cmp.matchField ? assignMatches(mine, cmp) : [];
+        cmp.rows.forEach(function (row, rowIdx) {
           var tr = el("tr");
           cols.forEach(function (c, ci) {
             tr.appendChild(el(ci === 0 ? "th" : "td", ci === 0 ? { scope: "row", text: row[c.id] } : { text: row[c.id] }));
           });
           if (cmp.matchField) {
-            var key = norm(row[cmp.matchField]);
-            var hitIdx = -1;
-            mine.some(function (m, mi) {
-              var k = norm(m[cmp.matchField]);
-              if (sameName(k, key)) {
-                hitIdx = mi;
-                return true;
-              }
-              return false;
-            });
+            var hitIdx = assign.indexOf(rowIdx);
             var cell;
             if (hitIdx >= 0) {
               matchedMine[hitIdx] = true;
@@ -319,9 +396,9 @@
                 : null;
               cell = differs
                 ? el("td", { class: "sg-mine is-diff" }, [
-                    el("span", { text: "⚠ " + (fieldLabel(cmp.mineField) || "") + "이 달라요" }),
+                    el("span", { text: "⚠ " + iGa(fieldLabel(cmp.mineField) || "") + " 달라요" }),
                     sub,
-                    el("span", { class: "sg-mine-sub", text: cmp.diffText || "지도서 예시와 다시 비교해 보세요." }),
+                    el("span", { class: "sg-mine-sub", text: cmp.diffText || REFWA() + " 다시 비교해 보세요." }),
                   ])
                 : el("td", { class: "sg-mine is-hit" }, [el("span", { text: "✔ 있어요" }), sub]);
             } else cell = el("td", { class: "sg-mine", text: "—" });
@@ -334,24 +411,39 @@
         if (mismatchCount) {
           compareBody.appendChild(
             el("p", { class: "ss-help sg-cmp-warn", role: "note" }, [
-              "⚠ 내 기록 가운데 " + mismatchCount + "가지는 지도서 예시와 " + (fieldLabel(cmp.mineField) || "") +
-                "이 달라요. 무엇이 맞는지 자료를 다시 찾아보고, 위 정리 틀에서 고쳐 보세요.",
+              "⚠ 내 기록 가운데 " + mismatchCount + "가지는 " + REFWA() + " " + iGa(fieldLabel(cmp.mineField) || "") +
+                " 달라요. 무엇이 맞는지 자료를 다시 찾아보고, 위 정리 틀에서 고쳐 보세요.",
             ])
           );
         }
         if (cmp.matchField) {
+          var unclear = mine.filter(function (m, i) {
+            return assign[i] === -2;
+          });
+          if (unclear.length)
+            compareBody.appendChild(
+              el("p", { class: "ss-help sg-cmp-unclear" }, [
+                REF() + " 가운데 어느 것과 같은지 알기 어려운 것: " +
+                  unclear.map(function (m) {
+                    return m[cmp.matchField];
+                  }).join(", ") +
+                  ". 이름을 조금 더 자세히 적으면 비교할 수 있어요.",
+              ])
+            );
           var extra = mine.filter(function (m, i) {
-            return !matchedMine[i];
+            return assign[i] === -1;
           });
           compareBody.appendChild(
             el("p", { class: "ss-help" }, [
               extra.length
-                ? "지도서 예시에 없는 것을 " + extra.length + "가지 더 찾았어요: " +
+                ? REF() + "에 없는 것을 " + extra.length + "가지 더 찾았어요: " +
                   extra.map(function (m) {
                     return m[cmp.matchField];
                   }).join(", ") +
                   ". 믿을 수 있는 자료에서 찾았는지 출처를 한 번 더 확인해 보세요."
-                : "내 기록이 모두 지도서 예시 안에 있어요.",
+                : unclear.length
+                ? "나머지 기록은 모두 " + REF() + " 안에 있어요."
+                : "내 기록이 모두 " + REF() + " 안에 있어요.",
             ])
           );
         }
@@ -365,17 +457,22 @@
         var cmp = cfg.compare;
         if (!cmp || !cmp.matchField || !cmp.mineField) return [];
         var mine = filledRows();
+        var assign = assignMatches(mine, cmp);
         var out = [];
-        cmp.rows.forEach(function (row) {
-          var key = norm(row[cmp.matchField]);
-          for (var i = 0; i < mine.length; i++) {
-            if (!sameName(norm(mine[i][cmp.matchField]), key)) continue;
-            if (norm(mine[i][cmp.mineField]) !== norm(row[cmp.mineField]))
-              out.push({ name: val(mine[i], { id: cmp.matchField }), mine: val(mine[i], { id: cmp.mineField }), guide: row[cmp.mineField] });
-            break;
-          }
+        cmp.rows.forEach(function (row, rowIdx) {
+          var i = assign.indexOf(rowIdx); // 표와 같은 규칙: 이 예시에 맞춘 첫 번째 내 기록
+          if (i < 0) return;
+          if (norm(mine[i][cmp.mineField]) !== norm(row[cmp.mineField]))
+            out.push({ name: val(mine[i], { id: cmp.matchField }), mine: val(mine[i], { id: cmp.mineField }), guide: row[cmp.mineField] });
         });
         return out;
+      }
+      // 학생 화면에 쓰는 비교 대상 이름(교사용 '지도서'라는 말을 쓰지 않는다). config compare.refName으로 바꿀 수 있다.
+      function REF() {
+        return (cfg.compare && cfg.compare.refName) || "예시 답안";
+      }
+      function REFWA() {
+        return SciSim.josa(REF(), "과", "와");
       }
       function fieldLabel(id) {
         var f = fields.filter(function (x) {

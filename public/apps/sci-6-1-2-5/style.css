@@ -1,0 +1,143 @@
+/* sci-6-1-2-5 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 20px 0 8px; }
+.sub-h.first { margin-top: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* 자동차 색 칩(글자와 함께 쓴다) */
+.car-chip { flex: none; display: inline-block; width: 22px; height: 14px; border-radius: 4px; background: var(--c); border: 2px solid rgba(0, 0, 0, 0.3); vertical-align: middle; }
+
+/* 알아 두기 */
+.intro-sub { font-weight: 700; margin: 12px 0 4px; }
+.calc-steps { margin: 0 0 8px; padding-left: 1.4em; }
+.calc-steps li { margin: 2px 0; }
+
+/* ── 계산기 ── */
+.calc { max-width: 300px; margin: 10px auto 4px; padding: 10px; border-radius: 14px; background: #2b3240; color: #f3f6fa; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.calc-title { font-size: 0.8rem; font-weight: 700; color: #b9c4d4; margin-bottom: 6px; }
+.calc-screen { background: #dfe8d6; color: #17202b; border-radius: 8px; padding: 6px 10px; min-height: 64px; text-align: right; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; justify-content: center; overflow-wrap: anywhere; }
+.calc-expr { font-size: 1.25rem; font-weight: 700; min-height: 1.5em; }
+.calc-out { font-size: 1.05rem; font-weight: 700; color: #1d5a2e; min-height: 1.3em; }
+.calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.calc-key { min-height: 48px; border: 0; border-radius: 10px; background: #454f61; color: #fff; font-size: 1.2rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.calc-key:active { transform: translateY(1px); }
+.calc-key.is-op { background: #d9822b; }
+.calc-key.is-fn { background: #6b7587; }
+.calc-key.is-eq { grid-column: span 2; background: #2f6fd6; }
+.calc-key:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+
+/* ── 관찰 카드 ── */
+.obs-body { display: grid; gap: 6px; }
+.zoom { margin: 0; }
+.zoom-svg { display: block; width: 100%; height: auto; background: #f4f1e8; border-radius: 10px; border: 1px solid var(--ss-border); }
+.zoom-num { font-size: 26px; font-weight: 800; fill: #1a1a1a; }
+.zoom-car-text { font-size: 22px; font-weight: 700; }
+.zoom-front { font-size: 19px; font-weight: 800; fill: #c2185b; }
+.zoom figcaption { margin-top: 4px; }
+.fixed-line { margin: 2px 0; font-weight: 700; }
+.obs-msg { margin: 4px 0 0; min-height: 1.4em; font-weight: 600; }
+.sw-face { text-align: center; padding: 8px; border-radius: 12px; background: var(--ss-surface-2); }
+.sw-face-digits { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.sw-face-digits strong { font-size: 2.2rem; }
+.sw-face .ss-help { margin: 2px 0 0; }
+
+/* ── 초시계 표시(3D·2D 공통) ── */
+.sw-hud {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 90px);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 14px; border-radius: 14px; background: rgba(20, 30, 45, 0.85); color: #fff; text-align: center; pointer-events: none;
+}
+.hud-sw { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hud-digits { font-size: 1.6rem; }
+.hud-status { font-size: 0.82rem; font-weight: 600; }
+
+/* ── 2D 대체 화면(위에서 본 경주로) ── */
+.t2-wrap { position: relative; padding-top: 70px; }
+.t2-lanes { display: grid; gap: 8px; }
+.t2-lane { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px; border-radius: 12px; border: 2px solid transparent; }
+.t2-lane.is-sel { border-color: var(--ss-accent); background: color-mix(in srgb, var(--ss-accent) 14%, transparent); }
+.t2-name {
+  min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 8px; text-align: left;
+  border: 2px solid var(--ss-border); border-radius: 10px; background: var(--ss-surface); color: var(--ss-text); font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+.t2-name[aria-pressed="true"] { border-color: var(--ss-primary); }
+.t2-phase { width: 100%; font-weight: 600; color: var(--ss-muted); font-size: 0.72rem; }
+.t2-track { position: relative; height: 58px; padding-left: 38px; padding-right: 8px; border-radius: 8px; background: #e7ebf0; }
+.t2-start { position: absolute; left: 36px; top: 0; bottom: 0; width: 4px; background: #2a2f38; }
+.t2-scale { position: relative; height: 100%; }
+.t2-tick { position: absolute; bottom: 0; width: 2px; height: 12px; margin-left: -1px; background: #1a1a1a; }
+.t2-tick small { position: absolute; top: 12px; left: 50%; transform: translate(-50%, -26px); font-size: 0.66rem; color: #1a1a1a; font-weight: 700; }
+.t2-scale::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: rgba(247, 212, 76, 0.75); z-index: -1; }
+.t2-scale { z-index: 0; }
+.t2-finish { position: absolute; top: 0; bottom: 0; width: 5px; margin-left: -2px; background: #7b3fa0; }
+.t2-car {
+  position: absolute; top: 6px; height: 26px; width: 38px; transform: translateX(-100%); border-radius: 6px 12px 12px 6px;
+  background: var(--c); border: 2px solid rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center;
+}
+.t2-car-text { font-size: 0.66rem; font-weight: 800; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.t2-key { position: absolute; left: 3px; top: -7px; width: 8px; height: 8px; border: 2px solid #8b95a3; border-radius: 50%; }
+.t2-car.is-running .t2-key { animation: t2-spin 0.4s linear infinite; }
+@keyframes t2-spin { to { transform: rotate(360deg); } }
+.t2-caption { margin: 8px 2px 0; font-size: 0.8rem; color: var(--ss-muted); }
+.ss-exp-view.is-2d .ss-view2d { padding-top: 12px; }
+.t2-wrap .sw-hud { top: 0; max-width: 100%; }
+
+/* ── 분석: 표 아래 식, 교통수단 카드 ── */
+.formula-list { list-style: none; margin: 10px 0 4px; padding: 0; display: grid; gap: 4px; }
+.formula-list li { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.tr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.tr-card { margin: 0; }
+.tr-card.is-done { border: 2px solid var(--ss-good); }
+.tr-head { display: flex; align-items: center; gap: 8px; }
+.tr-icon { font-size: 1.8rem; }
+.tr-name { font-size: 1.1rem; }
+.tr-says { margin: 6px 0; padding: 8px 10px; border-radius: 12px; background: var(--ss-surface-2); }
+.tr-facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0; font-weight: 700; font-size: 0.92rem; }
+.tr-feedback { margin: 6px 0 0; font-weight: 600; min-height: 1.3em; }
+.tr-feedback.is-correct { color: var(--ss-good); }
+.tr-feedback.is-wrong { color: var(--ss-bad); }
+.tr-result { margin: 4px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.think-note { background: var(--ss-warn-bg); font-weight: 600; }
+.refs-list { margin: 0; padding-left: 1.2em; }
+.refs-list li { margin: 4px 0; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .t2-lane { grid-template-columns: 84px minmax(0, 1fr); gap: 4px; }
+  .t2-name { font-size: 0.74rem; padding: 4px; }
+  .t2-track { padding-left: 30px; }
+  .t2-start { left: 28px; }
+  .t2-tick.is-odd small { display: none; }
+  .t2-car { width: 30px; }
+  .hud-digits { font-size: 1.3rem; }
+  .hud-status { font-size: 0.74rem; }
+  .sw-hud { padding: 4px 10px; max-width: calc(100% - 64px); }
+  .calc { max-width: none; }
+}
+
+/* 관찰 카드 입력칸 단위가 좁은 화면에서 세로로 쪼개지지 않게 */
+.ss-observe .ss-num-unit { white-space: nowrap; }
+.t2-tick small { white-space: nowrap; }
+.calc-box { margin: 4px 0; }
+
+/* ── 빠른 순서대로 쓰기 ── */
+.order-card.is-correct { border: 2px solid var(--ss-good); }
+.order-card.is-wrong { border: 2px solid var(--ss-bad); }
+.ord-seq { list-style: none; margin: 8px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.ord-slot { display: flex; flex-direction: column; gap: 2px; min-height: 58px; padding: 6px 8px; border-radius: 10px; border: 2px dashed var(--ss-border); background: var(--ss-surface-2); }
+.ord-slot.is-filled { border-style: solid; }
+.ord-rank { font-size: 0.78rem; font-weight: 700; color: var(--ss-muted); }
+.ord-empty { font-weight: 700; color: var(--ss-muted); }
+.ord-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.ord-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.ord-pick { min-height: 48px; }
+.ord-ctrl { flex-wrap: wrap; gap: 8px; }
+.cmp-card .ss-compare-model ul { margin: 0; }

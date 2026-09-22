@@ -1,0 +1,122 @@
+/* sci-6-1-2-4 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+:root {
+  --car-green: #2f9e57;
+  --car-yellow: #f2c230;
+  --tape-start: #2f6fd6;
+  --tape-finish: #d8434f;
+}
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.ss-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+.safety p { margin: 8px 0 0; }
+
+/* 자동차 아이콘(색 + 모양: ● 초록, ▲ 노랑) */
+.car-icon {
+  flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 0.85rem; font-weight: 700; border: 2px solid rgba(0, 0, 0, 0.25);
+}
+.car-icon.car-green { background: var(--car-green); color: #fff; }
+.car-icon.car-yellow { background: var(--car-yellow); color: #3a2c00; }
+
+/* ── 초시계 화면(3D·2D 공통) ── */
+.sw-hud {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: 12px;
+  background: rgba(20, 30, 45, 0.88); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums;
+  border: 3px solid transparent; pointer-events: none;
+}
+.ss-view3d .sw-hud { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.sw-icon { font-size: 1.1rem; }
+.sw-num { font-size: 1.7rem; min-width: 3.6ch; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.sw-unit { font-size: 0.95rem; }
+.sw-state { font-size: 0.78rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
+.sw-hud.is-run { border-color: #6ea0ff; }
+.sw-hud.is-stop { border-color: #ffd166; }
+.sw-hud.is-stop .sw-state { background: #ffd166; color: #2a2000; }
+.sw-shout {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
+  padding: 8px 22px; border-radius: 999px; background: rgba(47, 111, 214, 0.92); color: #fff; font-size: 1.6rem; font-weight: 800;
+}
+.sw-shout.is-pop { animation: sw-pop 0.8s ease-out forwards; }
+@keyframes sw-pop { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sw-shout.is-pop { animation: none; } }
+
+/* ── 관찰 카드: 멈춘 초시계 ── */
+.obs-watch {
+  display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 12px; border-radius: 14px;
+  background: #1f2733; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; border: 3px solid #ffd166;
+}
+.obs-watch-icon { font-size: 1.4rem; }
+.obs-watch-num { font-size: 2.4rem; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
+.obs-watch-unit { font-size: 1.1rem; }
+.round-help { margin: 8px 0; }
+.round-help summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; color: var(--ss-primary); }
+.round-help p { margin: 6px 0; }
+.round-msg { min-height: 1.4em; margin: 6px 0 0; font-weight: 600; }
+.round-msg.is-ok { color: var(--ss-good); }
+.round-msg.is-bad { color: var(--ss-bad); }
+
+/* ── 2D 대체 화면: 위에서 본 트랙 ── */
+.t2-wrap { position: relative; }
+.t2-head { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.t2-track {
+  position: relative; height: 178px; border-radius: 14px; background: #d9c7a3; border: 2px solid #b9a680; overflow: hidden;
+}
+@media (prefers-color-scheme: dark) { .t2-track { background: #5b5042; border-color: #7a6c58; } }
+.t2-line { position: absolute; top: 0; bottom: 30px; width: 6px; margin-left: -3px; }
+.t2-start { background: var(--tape-start); }
+.t2-finish { background: var(--tape-finish); transition: left 0.3s ease; }
+.t2-finish.is-flash { animation: t2-flash 0.7s ease; }
+@keyframes t2-flash { 0%, 100% { background: var(--tape-finish); } 30%, 70% { background: #ffd166; } }
+.t2-line-label {
+  position: absolute; top: 4px; left: 8px; white-space: nowrap; font-size: 0.78rem; font-weight: 700; padding: 1px 6px;
+  border-radius: 6px; background: rgba(255, 255, 255, 0.9); color: #1f2733;
+}
+.t2-finish .t2-line-label { left: auto; right: 8px; }
+.t2-lane { position: absolute; left: 0; right: 0; height: 44px; }
+.t2-lane-1 { top: 34px; }
+.t2-lane-2 { top: 88px; }
+.t2-car {
+  position: absolute; top: 0; height: 44px; min-width: 44px; border-radius: 10px; border: 2px solid rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0 4px; cursor: pointer;
+  font-weight: 800; font-size: 0.78rem; line-height: 1; transform: translateX(-100%);
+}
+.t2-car.car-green { background: var(--car-green); color: #fff; }
+.t2-car.car-yellow { background: var(--car-yellow); color: #3a2c00; }
+.t2-car.is-sel { box-shadow: 0 0 0 4px #f2a93b; }
+.t2-car:disabled { cursor: default; opacity: 1; }
+.t2-dim { position: absolute; bottom: 6px; height: 20px; border-top: 2px solid #33404f; transition: left 0.3s ease, width 0.3s ease; }
+@media (prefers-color-scheme: dark) { .t2-dim { border-color: #dbe3ee; } }
+.t2-dim-text {
+  position: absolute; left: 50%; top: 2px; transform: translateX(-50%); white-space: nowrap; font-size: 0.8rem; font-weight: 700;
+  color: #1f2733; background: rgba(255, 255, 255, 0.85); padding: 0 6px; border-radius: 6px;
+}
+.t2-caption { margin: 6px 2px 0; font-size: 0.8rem; color: var(--ss-muted); }
+.t2-wrap .sw-shout { top: 55%; }
+
+/* ── 분석: 그래프 계열 색을 자동차 색에 맞춘다(모양·무늬·범례도 함께 다르다) ── */
+.chart-card { --ss-s1: #1f8a4c; --ss-s2: #c79a00; }
+@media (prefers-color-scheme: dark) { .chart-card { --ss-s1: #5fd394; --ss-s2: #f2c230; } }
+.trend-note { margin: 10px 0 0; font-size: 0.9rem; color: var(--ss-muted); }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+.wide { width: 100%; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .sw-num { font-size: 1.3rem; }
+  .sw-hud { padding: 4px 8px; gap: 4px; }
+  .sw-state { font-size: 0.68rem; padding: 1px 5px; }
+  .obs-watch-num { font-size: 2rem; }
+  .t2-car .t2-car-name { display: none; }
+  .sw-shout { font-size: 1.2rem; }
+}
+#result-table table { min-width: 460px; }

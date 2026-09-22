@@ -74,16 +74,16 @@
     $("worksheet-root"),
     {
       title: "📝 조사 결과 정리하기",
-      lead: "조사한 용액을 한 줄에 하나씩 적어요. **산성 용액과 염기성 용액을 모두 넣어 " + R.worksheet.minRows + "줄 이상** 채우면 지도서 속 예시와 비교할 수 있어요.",
+      lead: "조사한 용액을 한 줄에 하나씩 적어요. **산성 용액과 염기성 용액을 모두 넣어 " + R.worksheet.minRows + "줄 이상** 채우면 참고 예시와 비교할 수 있어요.",
       rowLabel: "조사",
       fields: R.worksheet.fields,
       minRows: R.worksheet.minRows,
       maxRows: R.worksheet.maxRows,
       requireEach: R.worksheet.requireEach,
       compare: {
-        buttonLabel: "📘 지도서 속 예시와 비교해 보기",
-        title: "지도서 속 예시: 산성 용액과 염기성 용액을 이용하는 예",
-        lead: "내가 조사한 것과 비교해 보세요. '내 기록' 칸은 내가 적은 용액 이름과 같은 것이 있는지, 내가 고른 성질이 지도서와 같은지 보여 줘요. 성질이 다르면 ⚠ 표시가 나와요.",
+        buttonLabel: "📘 참고 예시와 비교해 보기",
+        title: "참고 예시: 산성 용액과 염기성 용액을 이용하는 예",
+        lead: "내가 조사한 것과 비교해 보세요. '내 기록' 칸은 내가 적은 용액 이름과 같은 것이 있는지, 내가 고른 성질이 참고 예시와 같은지 보여 줘요. 성질이 다르면 ⚠ 표시가 나와요.",
         columns: [
           { id: "name", label: "용액" },
           { id: "property", label: "성질" },
@@ -92,7 +92,7 @@
         rows: R.modelExamples,
         matchField: "name",
         mineField: "property",
-        diffText: "지도서에서는 다른 성질이에요. 자료를 다시 확인하고 위에서 고쳐 보세요.",
+        diffText: "참고 예시에서는 다른 성질이에요. 자료를 다시 확인하고 위에서 고쳐 보세요.",
         source: R.modelSource,
       },
     },
@@ -122,8 +122,8 @@
           return m.name;
         });
         return ws.rows().map(function (r) {
-          // 지도서 예시와 성질이 다르게 적힌 줄은 발표 전에 다시 확인하도록 표시한다
-          return r.name + " (" + r.property + "): " + r.use + (diff.indexOf(r.name) >= 0 ? "  ⚠ 지도서 예시와 성질이 달라요. 발표 전에 다시 확인해요." : "");
+          // 참고 예시와 성질이 다르게 적힌 줄은 발표 전에 다시 확인하도록 표시한다
+          return r.name + " (" + r.property + "): " + r.use + (diff.indexOf(r.name) >= 0 ? "  ⚠ 참고 예시와 성질이 달라요. 발표 전에 다시 확인해요." : "");
         });
       },
     }
@@ -212,7 +212,7 @@
       var diff = ws.mismatches().length;
       return [
         "조사해 정리한 예: " + rows.length + "가지 (산성 용액 " + acid + "가지, 염기성 용액 " + (rows.length - acid) + "가지)",
-        diff ? "⚠ 지도서 예시와 성질이 다르게 적힌 용액이 " + diff + "가지 있어요. 조사하기로 돌아가 다시 확인해 보세요." : null,
+        diff ? "⚠ 참고 예시와 성질이 다르게 적힌 용액이 " + diff + "가지 있어요. 조사하기로 돌아가 다시 확인해 보세요." : null,
         "발표 대본과 새롭게 알게 된 점을 적었어요.",
         "정리 문제 " + quizItems.length + "개를 모두 확인했어요. (처음 고른 답으로 맞힌 문제 " + firstTry + "개)",
       ].filter(Boolean);

@@ -158,14 +158,14 @@
       $("worksheet-root"),
       {
         title: "📝 조사 결과 정리하기",
-        lead: "조사한 내용을 **내 말로** 적어요. 네 칸을 모두 채우면 아래의 '지도서 속 사실'이 열려 내 조사와 비교할 수 있어요.",
+        lead: "조사한 내용을 **내 말로** 적어요. 네 칸을 모두 채우면 아래의 '참고 자료 속 사실'이 열려 내 조사와 비교할 수 있어요.",
         rowLabel: T ? T.label : "조사",
         fields: C.worksheet.fields,
         fixed: true,
         startRows: 1,
         minRows: 1,
         incompleteText: "원인·피해·대책은 5글자 이상, 출처는 2글자 이상 모두 적어 주세요.",
-        doneText: "✔ 네 칸을 모두 채웠어요. 아래에서 지도서 속 사실과 비교해 보세요.",
+        doneText: "✔ 네 칸을 모두 채웠어요. 아래에서 참고 자료 속 사실과 비교해 보세요.",
       },
       store,
       function () {
@@ -190,7 +190,7 @@
     ref = S.RefCards.render(
       $("ref-root"),
       {
-        title: "📚 지도서 속 사실과 비교해 보기: " + T.label,
+        title: "📚 참고 자료 속 사실과 비교해 보기: " + T.label,
         lead: "내가 조사한 내용과 비교해 보세요. 빠진 것이 있으면 위 정리 틀에 더 적어도 좋아요. (채점하지 않아요)",
         source: T.source,
         open: true,

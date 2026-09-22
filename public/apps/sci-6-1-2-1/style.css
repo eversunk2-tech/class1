@@ -1,0 +1,67 @@
+/* sci-6-1-2-1 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.recheck { background: var(--ss-warn-bg); font-weight: 600; }
+.finish-card .wide { width: 100%; }
+.restart-line { text-align: center; }
+
+/* ── 알아 두기: 새·나무 미리보기 ── */
+.demo-pair { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.demo-fig { margin: 0; flex: 1 1 150px; max-width: 240px; text-align: center; }
+.demo-photo { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--ss-border); }
+.demo-fig figcaption { font-size: 0.85rem; font-weight: 700; margin-top: 4px; }
+.demo-arrow { font-weight: 700; color: var(--ss-muted); }
+.intro-steps { margin: 10px 0 0; padding-left: 1.2em; }
+.intro-steps li { margin: 4px 0; }
+
+/* ── 안전 약속 ── */
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.safety-item { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 10px; background: var(--ss-surface-2); cursor: pointer; }
+.safety-item input { width: 22px; height: 22px; flex: none; accent-color: var(--ss-primary); }
+
+/* ── 기록한 물체 한눈에 보기 ── */
+.overview { display: grid; gap: 10px; margin-top: 8px; }
+.ov-head { margin: 0 0 4px; font-weight: 700; font-size: 0.92rem; }
+.ov-row.is-locked { opacity: 0.6; }
+.ov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ov-chip {
+  min-height: 40px; padding: 4px 10px; border-radius: 999px; border: 2px solid var(--ss-border);
+  background: var(--ss-surface); font-weight: 600; font-size: 0.85rem; cursor: pointer; touch-action: manipulation;
+}
+.ov-chip.is-rec { border-color: var(--ss-good); background: var(--ss-good-bg); color: var(--ss-good); }
+.ov-chip.is-sel { outline: 3px solid var(--ss-accent); outline-offset: 1px; }
+.ov-chip:disabled { cursor: not-allowed; }
+.ov-row.is-locked .ov-chip { border-style: dashed; }
+
+/* ── 사진 1 · 사진 2 ── */
+.photos { display: grid; gap: 8px; }
+.photo-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.photo-fig { margin: 0; min-width: 0; }
+.photo-media { display: block; width: 100%; height: auto; border-radius: 10px; border: 2px solid var(--ss-border); background: #eef3f8; }
+.photo-fig figcaption { font-size: 0.85rem; font-weight: 700; margin-top: 3px; text-align: center; }
+.photo-sub { margin: 4px 0 0; font-size: 0.88rem; font-weight: 700; }
+.photo-pair.is-zoom .photo-media { border-style: dashed; }
+
+/* 셔터(사진 찍는 순간) */
+.shutter { position: absolute; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; animation: shutter 0.4s ease-out; }
+@keyframes shutter { 0% { opacity: 0.75; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .shutter { display: none; } }
+
+/* ── 2D 대체 화면 ── */
+.scene2d-wrap { position: relative; }
+.scene2d { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--ss-border); background: #d8ecfa; }
+.scene2d .pick2d { cursor: pointer; }
+.scene2d .lbl2d { font-size: 0.4px; font-weight: 700; fill: #1f2733; paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.12px; }
+.scene2d .ringlbl2d { font-size: 0.55px; font-weight: 800; fill: #1f2733; paint-order: stroke; stroke: #fff; stroke-width: 0.16px; }
+.scene2d .lbls2d { pointer-events: none; }
+.p2-caption { margin: 6px 0 0; font-size: 0.82rem; color: var(--ss-muted); text-align: center; }
+.photo-media text { font-family: var(--ss-font); }
+
+/* ── 기록·분석하기 ── */
+#summary-table .ss-matrix { min-width: 560px; }
+#summary-table .ss-cell { justify-content: flex-start; text-align: left; }
+.detail-box summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.scene-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; align-items: start; }
+.scene-table .ss-matrix { min-width: 0; }
+.scene-table .ss-matrix tbody th { white-space: normal; }

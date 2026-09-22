@@ -83,6 +83,28 @@
 
   var LOGIN_PATH = "../../login/"; // /class1/apps/{앱}/ → /class1/login/
   var DETAIL_MAX_CHARS = 16000;
+  var SHRINK_MARK = "…(길어서 줄임)";
+
+  /** detail 사본에서 가장 긴 문자열을 반씩 줄여 JSON 길이를 한도 아래로 맞춘다. */
+  function shrinkDetail(detail) {
+    var copy = JSON.parse(JSON.stringify(detail));
+    for (var guard = 0; guard < 200 && JSON.stringify(copy).length > DETAIL_MAX_CHARS; guard++) {
+      var best = null;
+      (function walk(node) {
+        if (!node || typeof node !== "object") return;
+        Object.keys(node).forEach(function (k) {
+          var v = node[k];
+          if (typeof v === "string") {
+            if (!best || v.length > best.len) best = { obj: node, key: k, len: v.length };
+          } else walk(v);
+        });
+      })(copy);
+      if (!best || best.len <= 40) break;
+      var s = best.obj[best.key].replace(SHRINK_MARK, "");
+      best.obj[best.key] = s.slice(0, Math.floor(s.length / 2)) + SHRINK_MARK;
+    }
+    return copy;
+  }
 
   var state = { client: null, appId: null };
 
@@ -146,7 +168,12 @@
       return fail("invalid", "detail을 JSON으로 바꿀 수 없습니다.");
     }
     if (typeof detail !== "object" || Array.isArray(detail)) return fail("invalid", "detail은 객체여야 합니다.");
-    if (detailJson.length > DETAIL_MAX_CHARS) return fail("invalid", "detail이 너무 큽니다.");
+    if (detailJson.length > DETAIL_MAX_CHARS) {
+      // 학생 글이 길어 한도를 넘으면 가장 긴 문자열부터 줄여서라도 저장한다(기록을 통째로 잃지 않게).
+      detail = shrinkDetail(detail);
+      detailJson = JSON.stringify(detail);
+      if (detailJson.length > DETAIL_MAX_CHARS) return fail("invalid", "detail이 너무 큽니다.");
+    }
 
     var user = await getUser();
     if (!user) return fail("not_logged_in", "로그인하면 결과가 저장돼요.");

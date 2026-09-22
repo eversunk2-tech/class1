@@ -1,0 +1,964 @@
+/*
+ * app.js — sci-6-1-2-4 "같은 거리를 이동한 물체의 빠르기를 비교해 보자!" 차시 전용 로직
+ * 공통 틀(science-sim/)이 단계 이동·실험 패널·기록·저장을 맡고, 이 파일은
+ *   ① 3D/2D 장면(출발선·결승선 색 테이프, 태엽 자동차 2대, 초시계 화면)
+ *   ② 관찰 카드(멈춘 초시계 값 → 반올림해 소수 첫째 자리까지 적기, 앱 전용 확인)
+ *   ③ 분석 표·막대그래프·꺾은선그래프, 내 기록으로 채점하는 분석 질문  만 만든다.
+ *
+ * 시간 모형(지도서 외, spec "확정 결정"):
+ *   참값(1/100초) = 100 cm에서의 지도서 예시 시간(초록 4.2초, 노랑 5.8초) × 이동 거리 / 100 × 100
+ *   초시계 값 = 참값 + (−0.10초 ~ +0.10초 사이의 작은 차이)  → 학생이 반올림해 소수 첫째 자리로 기록
+ *   자동차는 이번 측정의 초시계 값 동안 출발선에서 결승선까지 일정한 빠르기로 움직인다(애니메이션 = 실제 시간).
+ * 이 차시는 다음 차시 용어("속력", 거리 ÷ 시간)를 화면에 쓰지 않는다.
+ */
+(function () {
+  "use strict";
+  var C = window.LessonConfig;
+  var S = window.SciSim;
+  var el = S.el;
+  var $ = function (id) {
+    return document.getElementById(id);
+  };
+
+  var store = S.createStore(C.storageKey);
+  if (!store.available) $("storage-warning").hidden = false;
+  var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
+  var toast = lesson.toast;
+
+  var CARS = {};
+  C.cars.forEach(function (c) {
+    CARS[c.id] = c;
+  });
+  var CAR_IDS = C.cars.map(function (c) {
+    return c.id;
+  });
+
+  /* ───────── 시간 계산(모형) ───────── */
+  // 참값(1/100초 단위 정수): 4.2초 × 50/100 = 2.1초 → 210
+  function trueCs(carId, dist) {
+    return Math.round(CARS[carId].ref100 * Number(dist));
+  }
+  function measureCs(carId, dist) {
+    var n = C.noiseCs;
+    var noise = Math.floor(Math.random() * (2 * n + 1)) - n; // −10 ~ +10
+    return Math.max(10, trueCs(carId, dist) + noise);
+  }
+  // 반올림해 소수 첫째 자리(1/10초 단위 정수): 423 → 42 (4.2초), 425 → 43 (4.3초)
+  function roundTenths(cs) {
+    return Math.floor((cs + 5) / 10);
+  }
+  function csText(cs) {
+    return (cs / 100).toFixed(2);
+  }
+  function round1(x) {
+    return x == null ? null : Math.round(x * 10 + 1e-9) / 10;
+  }
+  function keyOf(car, dist) {
+    return car + "|" + Number(dist);
+  }
+  function distLabel(d) {
+    return d + " cm";
+  }
+  function carLabel(id) {
+    return CARS[id].mark + " " + CARS[id].name;
+  }
+
+  /* ───────── 기록 ───────── */
+  var records = S.RecordStore(store, {
+    key: "records",
+    keyOf: function (r) {
+      return keyOf(r.car, r.distance);
+    },
+    onChange: function () {
+      lesson.refresh();
+    },
+  });
+  function avg(car, dist) {
+    return round1(records.mean(keyOf(car, dist), "time"));
+  }
+  // 한 거리에서 걸린 시간이 더 짧은(더 빠른) 자동차: "green" | "yellow" | "same" | null(기록 부족)
+  function fasterAt(dist) {
+    var g = avg("green", dist);
+    var y = avg("yellow", dist);
+    if (g == null || y == null) return null;
+    return g < y ? "green" : y < g ? "yellow" : "same";
+  }
+
+  /* ───────── 분석 질문: 내 기록으로 채점 ───────── */
+  C.quiz.forEach(function (q) {
+    if (q.dataGraded === "fasterAt100") {
+      q.grade = function (choice) {
+        var ans = fasterAt(C.baseDistance) || q.answer[0];
+        return choice.length === 1 && choice[0] === ans;
+      };
+    } else if (q.dataGraded === "sameWinner") {
+      q.grade = function (choice) {
+        var ws = C.distances.map(fasterAt);
+        var ans = ws.every(function (w) {
+          return w && w !== "same" && w === ws[0];
+        })
+          ? "same"
+          : "changed";
+        return choice.length === 1 && choice[0] === ans;
+      };
+    }
+  });
+
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
+  var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+
+  /* ───────── 2. 실험하기 ───────── */
+  function paragraphs(list) {
+    var box = el("div");
+    list.forEach(function (p) {
+      box.appendChild(S.rich(p, "p"));
+    });
+    return box;
+  }
+  var safety = el("details", { class: "ss-card safety" }, [
+    el("summary", { text: "⚠️ 실제 실험할 때 안전 수칙" }),
+    el(
+      "ul",
+      null,
+      C.safety.map(function (t) {
+        return el("li", { text: t });
+      })
+    ),
+  ]);
+  var swTip = el("details", { class: "ss-card safety" }, [el("summary", { text: C.stopwatchTip.title }), paragraphs(C.stopwatchTip.paragraphs)]);
+
+  function carIcon(id) {
+    var i = el("span", { class: "car-icon car-" + id, "aria-hidden": "true", text: CARS[id].mark });
+    return i;
+  }
+
+  // 방금 잰 초시계 값(관찰 카드에서 씀)과 칸마다 마지막 초시계 값(화면 복원용)
+  var pending = null; // { key, cs }
+  var lastCs = store.get("lastCs", {}) || {};
+  function rememberCs(key, cs) {
+    lastCs[key] = cs;
+    store.set("lastCs", lastCs);
+  }
+
+  var exp = S.Experiment.create({
+    root: $("experiment-root"),
+    store: store,
+    records: records,
+    toast: toast,
+    intro: paragraphs(C.intro.paragraphs),
+    introTitle: C.intro.title,
+    modelNote: C.modelNote,
+    clearLabel: "🚗 자동차를 출발선으로",
+    clearMessage: "두 자동차를 출발선에 다시 놓았어요. 기록은 그대로 남아 있어요.",
+    runTitle: "출발시키고 시간 재기",
+    factors: [
+      {
+        id: "car",
+        title: "자동차 고르기",
+        short: "자동차",
+        options: C.cars.map(function (c) {
+          return {
+            id: c.id,
+            label: c.name,
+            icon: function () {
+              return carIcon(c.id);
+            },
+          };
+        }),
+        note: function () {
+          return "🚗 자동차는 한 대씩 출발시켜요. 두 자동차를 같은 이동 거리에서 모두 재야 빠르기를 비교할 수 있어요.";
+        },
+      },
+      {
+        id: "dist",
+        title: "이동 거리 고르기",
+        short: "이동 거리",
+        columns: 3,
+        options: C.distances.map(function (d) {
+          return { id: String(d), label: d === C.baseDistance ? distLabel(d) + " (교과서)" : distLabel(d) };
+        }),
+        note: function (sel) {
+          return sel.dist ? "📏 출발선에서 결승선까지 " + distLabel(sel.dist) + "예요." : null;
+        },
+      },
+    ],
+    phases: [
+      {
+        id: "M",
+        name: "측정",
+        lead: "자동차와 이동 거리를 골라 결승선까지 걸린 시간을 재요. 같은 조건을 " + C.trials + "번씩 재어 기록해요(" + C.cars.length + "대 × " + C.distances.length + "가지 거리).",
+        trials: C.trials,
+        cells: (function () {
+          var cells = [];
+          C.distances.forEach(function (d) {
+            C.cars.forEach(function (c) {
+              cells.push({ car: c.id, dist: String(d) });
+            });
+          });
+          return cells;
+        })(),
+      },
+    ],
+    doneLead: "모든 측정을 기록했어요. 더 재 보고 싶은 조건은 자유롭게 다시 재어 보세요(가장 먼저 잰 기록이 바뀌어요).",
+    cellKey: function (sel) {
+      return keyOf(sel.car, sel.dist);
+    },
+    runLabel: function (sel) {
+      return "▶ 출발! " + CARS[sel.car].name + " · " + distLabel(sel.dist);
+    },
+    view: {
+      build3D: build3D,
+      build2D: build2D,
+      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 자동차를 눌러 고를 수도 있어요",
+      tip2D: "2D 화면(모형, 위에서 본 모습)이에요. 자동차를 눌러 고를 수 있어요.",
+    },
+    observe: observeCard,
+    makeRecord: function (sel, v) {
+      var key = keyOf(sel.car, sel.dist);
+      var cs = pending && pending.key === key ? pending.cs : lastCs[key];
+      return { car: sel.car, distance: Number(sel.dist), time: round1(v.time), reading: cs == null ? null : cs / 100 };
+    },
+    describeRecord: function (r) {
+      return CARS[r.car].name + " " + distLabel(r.distance) + " → " + r.time.toFixed(1) + "초" + (r.trial ? " (" + r.trial + "회)" : "");
+    },
+    miniTable: {
+      title: "기록한 칸 한눈에 보기",
+      rows: C.cars.map(function (c) {
+        return { id: c.id, label: c.name };
+      }),
+      cols: C.distances.map(function (d) {
+        return { id: String(d), label: distLabel(d) };
+      }),
+      sel: function (r, c) {
+        return { car: r.id, dist: c.id };
+      },
+    },
+    extras: [safety, swTip],
+    onChange: lesson.refresh,
+  });
+
+  /* ── 관찰·기록 카드: 멈춘 초시계 값을 보고 반올림해 적기 ── */
+  var check = null; // { expect: 1/10초 정수, cs, msg }
+  function observeCard(sel) {
+    var key = keyOf(sel.car, sel.dist);
+    var cs = pending && pending.key === key ? pending.cs : null;
+    if (cs == null) {
+      // 애니메이션이 중간에 끝난 경우 등: 이번 측정값을 여기서 정한다
+      cs = measureCs(sel.car, sel.dist);
+      pending = { key: key, cs: cs };
+      rememberCs(key, cs);
+    }
+    var body = el("div", { class: "obs-body" });
+    body.appendChild(
+      el("div", { class: "obs-watch", role: "img", "aria-label": "멈춘 초시계: " + csText(cs) + "초" }, [
+        el("span", { class: "obs-watch-icon", "aria-hidden": "true", text: "⏱" }),
+        el("span", { class: "obs-watch-num", "aria-hidden": "true", text: csText(cs) }),
+        el("span", { class: "obs-watch-unit", "aria-hidden": "true", text: "초" }),
+      ])
+    );
+    body.appendChild(
+      el("p", { class: "ss-help" }, [
+        S.rich(CARS[sel.car].name + " · 이동 거리 " + distLabel(sel.dist) + " · 자동차의 **앞부분이 결승선에 닿은 순간** 멈춘 초시계예요.", "span"),
+      ])
+    );
+    var help = el("details", { class: "round-help" }, [
+      el("summary", { text: "🔢 반올림이 헷갈리면 눌러요" }),
+      S.rich("소수 **둘째** 자리 숫자를 봐요. **0, 1, 2, 3, 4**이면 버리고, **5, 6, 7, 8, 9**이면 소수 첫째 자리에 1을 더해요.", "p"),
+      S.rich("예: 3.**7**4초 → 3.7초,  3.7**6**초 → 3.8초", "p"),
+    ]);
+    body.appendChild(help);
+    var msg = el("p", { class: "round-msg", "aria-live": "polite" });
+    body.appendChild(msg);
+    check = { expect: roundTenths(cs), cs: cs, msg: msg };
+    return {
+      question: "초시계에 나온 걸린 시간을 반올림해 소수 첫째 자리까지 적어요.",
+      body: body,
+      type: "numeric",
+      fields: [{ id: "time", label: "걸린 시간", unit: "초", step: C.measure.step, min: C.measure.min, max: C.measure.max }],
+    };
+  }
+  // 공통 틀의 입력 확인(범위) 뒤에, 반올림이 맞는지 앱이 한 번 더 확인한다(입력 이벤트가 위로 올라올 때).
+  $("experiment-root").addEventListener("input", function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("ss-num-input") || !check) return;
+    var btn = document.querySelector("#experiment-root .ss-observe .ss-btn-primary");
+    var raw = t.value.trim();
+    var v = raw === "" ? NaN : Number(raw);
+    var ok = false;
+    var text = "";
+    var digit2 = Math.floor(check.cs) % 10; // 소수 둘째 자리 숫자
+    if (raw === "") text = "";
+    else if (!isFinite(v)) text = "숫자로 적어 주세요.";
+    else if (Math.abs(v * 10 - Math.round(v * 10)) > 1e-6) text = "소수 첫째 자리까지만 적어요. 초시계의 소수 둘째 자리 숫자를 보고 반올림해요.";
+    else if (Math.round(v * 10) === check.expect) {
+      ok = true;
+      text = "✅ 잘 읽었어요. '기록하기'를 눌러요.";
+    } else if (Math.round(v * 10) === Math.floor(check.cs / 10) && digit2 >= 5) text = "소수 둘째 자리 숫자가 " + digit2 + "이에요. 5 이상이면 어떻게 하는지 떠올려 보세요.";
+    else if (Math.round(v * 10) === Math.floor(check.cs / 10) + 1 && digit2 < 5) text = "소수 둘째 자리 숫자가 " + digit2 + "이에요. 4 이하이면 어떻게 하는지 떠올려 보세요.";
+    else text = "초시계에 나온 숫자를 다시 확인해 보세요.";
+    check.msg.textContent = text;
+    check.msg.className = "round-msg" + (text ? (ok ? " is-ok" : " is-bad") : "");
+    t.setAttribute("aria-invalid", String(!ok && raw !== ""));
+    if (btn && !ok) btn.disabled = true;
+  });
+
+  // 공통 틀은 관찰 카드가 처음 뜰 때 빈 입력칸에도 aria-invalid="true"(빨간 테두리)를 붙인다(review m3).
+  // 아직 아무것도 적지 않은 칸은 '틀림'으로 보이지 않게 앱에서 되돌린다(기록 버튼은 꺼진 채로 둔다).
+  // 틀 반영 제안: science-sim/experiment.js checkNumeric에서 raw === ""이면 aria-invalid="false".
+  if (window.MutationObserver) {
+    new MutationObserver(function (list) {
+      list.forEach(function (m) {
+        var t = m.target;
+        if (t.classList && t.classList.contains("ss-num-input") && t.value === "" && t.getAttribute("aria-invalid") === "true") t.setAttribute("aria-invalid", "false");
+      });
+    }).observe($("experiment-root"), { subtree: true, attributes: true, attributeFilter: ["aria-invalid"] });
+  }
+
+  /* ── 지금 고른 자동차·거리를 새로고침 뒤에도 되살린다(앱 전용, 공통 틀은 선택을 저장하지 않음) ── */
+  function rememberSel(s) {
+    if (!s || (s.car == null && s.dist == null)) return;
+    store.set("curSel", { car: s.car == null ? null : s.car, dist: s.dist == null ? null : String(s.dist) });
+  }
+  var selRestored = false;
+  function activateExperiment() {
+    exp.activate();
+    if (selRestored) return;
+    selRestored = true;
+    var saved = store.get("curSel", null);
+    if (!saved) return;
+    var s = {};
+    if (saved.car && CARS[saved.car]) s.car = saved.car;
+    if (saved.dist != null && C.distances.indexOf(Number(saved.dist)) >= 0) s.dist = String(saved.dist);
+    if (s.car != null || s.dist != null) exp.select(s);
+  }
+
+  /* ── 두 화면이 함께 쓰는 것: 초시계 화면, "출발!" 알림 ── */
+  function makeStopwatch() {
+    var num = el("span", { class: "sw-num", text: "0.00" });
+    var state = el("span", { class: "sw-state", text: "준비" });
+    var node = el("div", { class: "sw-hud is-ready", "aria-hidden": "true" }, [el("span", { class: "sw-icon", text: "⏱" }), num, el("span", { class: "sw-unit", text: "초" }), state]);
+    var live = el("p", { class: "ss-sr", "aria-live": "polite" });
+    var shout = el("div", { class: "sw-shout", "aria-hidden": "true", hidden: true });
+    return {
+      nodes: [node, live, shout],
+      set: function (cs, st) {
+        num.textContent = csText(cs || 0);
+        node.className = "sw-hud is-" + st;
+        state.textContent = st === "run" ? "재는 중" : st === "stop" ? "멈춤" : "준비";
+      },
+      say: function (text) {
+        live.textContent = text;
+      },
+      shout: function (text, ms) {
+        shout.textContent = text;
+        shout.hidden = false;
+        shout.classList.remove("is-pop");
+        void shout.offsetWidth;
+        shout.classList.add("is-pop");
+        clearTimeout(shout._t);
+        shout._t = setTimeout(function () {
+          shout.hidden = true;
+        }, ms || 900);
+      },
+      remove: function () {
+        [node, live, shout].forEach(function (n) {
+          if (n.parentNode) n.parentNode.removeChild(n);
+        });
+      },
+    };
+  }
+  // 두 화면 공통 상태: 결승선 거리, 자동차별로 결승선을 지난 채 멈춰 있는 거리
+  function sceneState() {
+    return { finish: C.baseDistance, atFinish: {} };
+  }
+  function showSelReading(sw, s) {
+    if (s && s.car && s.dist && lastCs[keyOf(s.car, s.dist)] != null) sw.set(lastCs[keyOf(s.car, s.dist)], "stop");
+    else sw.set(0, "ready");
+  }
+
+  /* ───────── 2D 대체 화면: 위에서 본 트랙 ───────── */
+  var SPAN_MIN = -35; // cm (출발선 뒤)
+  var SPAN_MAX = 175; // cm
+  var CAR_LEN = 16; // cm(모형)
+  var COAST = 6; // cm: 결승선을 지난 뒤 멈추는 거리(측정과 관계없음)
+  function pct(cm) {
+    return ((cm - SPAN_MIN) / (SPAN_MAX - SPAN_MIN)) * 100;
+  }
+  function build2D(root, ctx) {
+    var st = sceneState();
+    var disposed = false;
+    var sw = makeStopwatch();
+    var track = el("div", { class: "t2-track", role: "group", "aria-label": "위에서 본 트랙(2D 모형)" });
+    var startLine = el("div", { class: "t2-line t2-start", "aria-hidden": "true" }, [el("span", { class: "t2-line-label", text: "출발선" })]);
+    startLine.style.left = pct(0) + "%";
+    var finishLabel = el("span", { class: "t2-line-label" });
+    var finishLine = el("div", { class: "t2-line t2-finish", "aria-hidden": "true" }, [finishLabel]);
+    track.appendChild(startLine);
+    track.appendChild(finishLine);
+    var cars = {};
+    C.cars.forEach(function (c, i) {
+      var lane = el("div", { class: "t2-lane t2-lane-" + (i + 1) });
+      var b = el(
+        "button",
+        {
+          type: "button",
+          class: "t2-car car-" + c.id,
+          "aria-label": c.name + " 고르기",
+          onclick: function () {
+            ctx.onPick({ car: c.id });
+          },
+        },
+        [el("span", { class: "t2-car-mark", "aria-hidden": "true", text: c.mark }), el("span", { class: "t2-car-name", text: c.short })]
+      );
+      b.style.width = "max(44px, " + (CAR_LEN / (SPAN_MAX - SPAN_MIN)) * 100 + "%)";
+      lane.appendChild(b);
+      track.appendChild(lane);
+      cars[c.id] = { btn: b, front: 0 };
+    });
+    var dim = el("div", { class: "t2-dim", "aria-hidden": "true" }, [el("span", { class: "t2-dim-text" })]);
+    track.appendChild(dim);
+    var caption = el("p", { class: "t2-caption", "aria-live": "polite" });
+    var box = el("div", { class: "t2-wrap" }, [el("div", { class: "t2-head" }, sw.nodes.slice(0, 1)), track, caption, sw.nodes[1], sw.nodes[2]]);
+    root.appendChild(box);
+
+    function place(id, frontCm) {
+      cars[id].front = frontCm;
+      cars[id].btn.style.left = pct(frontCm) + "%"; // 버튼의 오른쪽 끝 = 자동차 앞부분(transform으로 맞춤)
+    }
+    function layout() {
+      finishLine.style.left = pct(st.finish) + "%";
+      finishLabel.textContent = "결승선";
+      dim.style.left = pct(0) + "%";
+      dim.style.width = pct(st.finish) - pct(0) + "%";
+      dim.firstChild.textContent = "↔ " + distLabel(st.finish);
+      CAR_IDS.forEach(function (id) {
+        place(id, st.atFinish[id] === st.finish ? st.finish + COAST : 0);
+      });
+      caption.textContent = "출발선에서 결승선까지 " + distLabel(st.finish) + " (모형)";
+    }
+    var selNow = {};
+    layout();
+
+    function animate(ms, fn) {
+      return new Promise(function (resolve) {
+        var t0 = null;
+        if (document.hidden || disposed) {
+          fn(1);
+          resolve();
+          return;
+        }
+        (function tick(now) {
+          if (disposed) {
+            resolve();
+            return;
+          }
+          if (t0 == null) t0 = now;
+          var t = Math.min(1, (now - t0) / ms);
+          fn(t);
+          if (t >= 1) resolve();
+          else requestAnimationFrame(tick);
+        })(performance.now());
+      });
+    }
+    function wait(ms) {
+      return new Promise(function (r) {
+        setTimeout(r, ms);
+      });
+    }
+
+    return {
+      highlight: function (s) {
+        selNow = Object.assign({}, s);
+        rememberSel(s);
+        if (s.dist) st.finish = Number(s.dist);
+        CAR_IDS.forEach(function (id) {
+          cars[id].btn.classList.toggle("is-sel", s.car === id);
+          cars[id].btn.setAttribute("aria-pressed", String(s.car === id));
+        });
+        layout();
+        showSelReading(sw, s);
+      },
+      run: async function (sel) {
+        var d = Number(sel.dist);
+        var key = keyOf(sel.car, d);
+        pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
+        var cs = measureCs(sel.car, d);
+        st.finish = d;
+        delete st.atFinish[sel.car];
+        layout();
+        sw.set(0, "ready");
+        sw.say("준비");
+        await wait(600);
+        sw.shout("출발!", 800);
+        sw.say("출발!");
+        await animate(cs * 10, function (t) {
+          place(sel.car, d * t);
+          sw.set(Math.min(cs, Math.floor(cs * t)), "run");
+        });
+        sw.set(cs, "stop");
+        finishLine.classList.add("is-flash");
+        setTimeout(function () {
+          finishLine.classList.remove("is-flash");
+        }, 700);
+        sw.say("앞부분이 결승선에 닿았어요. 초시계 " + csText(cs) + "초에서 멈춤");
+        await animate(350, function (t) {
+          place(sel.car, d + COAST * (1 - (1 - t) * (1 - t)));
+        });
+        st.atFinish[sel.car] = d;
+        pending = { key: key, cs: cs };
+        rememberCs(key, cs);
+      },
+      showInstant: function (sel) {
+        st.atFinish[sel.car] = Number(sel.dist);
+        layout();
+      },
+      clear: function () {
+        st.atFinish = {};
+        layout();
+        sw.set(0, "ready");
+      },
+      resetView: function () {},
+      dispose: function () {
+        disposed = true;
+        sw.remove();
+      },
+    };
+  }
+
+  /* ───────── 3D 화면 ───────── */
+  var U = 10; // 1 단위 = 10 cm
+  var START_X = -8;
+  function fx(cm) {
+    return START_X + cm / U;
+  }
+  function build3D(container, ctx) {
+    return S.Sim3D.create({
+      container: container,
+      frame: { width: 22, depth: 9, center: [-0.6, 0, 0.3] },
+      onPick: function (p) {
+        ctx.onPick(p);
+      },
+      onLost: ctx.onLost,
+    }).then(function (v) {
+      if (!v) return null;
+      var T = v.THREE;
+      var M = v.make;
+      var st = sceneState();
+      var sw = makeStopwatch();
+      sw.nodes.forEach(function (n) {
+        container.appendChild(n);
+      });
+
+      // 교실 바닥(모형)
+      var floor = M.table(32, 16, 0xd9c7a3);
+      floor.position.x = -0.6;
+      v.root.add(floor);
+      v.onThemeChange(function (dark) {
+        floor.material.color.set(dark ? 0x5b5042 : 0xd9c7a3);
+      });
+
+      var LANE_Z = { green: -1.5, yellow: 1.5 };
+      // 색 테이프 출발선·결승선(바닥에 붙인 얇은 띠, 폭 약 2.5 cm)
+      function tape(color) {
+        return new T.Mesh(new T.BoxGeometry(0.25, 0.03, 6), M.material(color, { roughness: 0.6 }));
+      }
+      var startTape = tape(0x2f6fd6);
+      startTape.position.set(START_X, 0.015, 0);
+      v.root.add(startTape);
+      var startLabel = M.label("출발선", { height: 1.0, bold: true, border: "#2f6fd6" });
+      startLabel.position.set(START_X, 0.6, -3.9);
+      v.root.add(startLabel);
+
+      var finishGroup = new T.Group();
+      var finishTape = tape(0xd8434f);
+      finishTape.position.y = 0.015;
+      finishGroup.add(finishTape);
+      var finishLabel = M.label("결승선", { height: 1.0, bold: true, border: "#d8434f" });
+      finishLabel.position.set(0, 0.6, -3.9);
+      finishGroup.add(finishLabel);
+      v.root.add(finishGroup);
+
+      // 거리 표시(출발선 ↔ 결승선): 가는 선 + 거리 이름표(거리마다 하나씩 만들어 두고 보이기만 바꾼다)
+      var dimMat = new T.MeshBasicMaterial({ color: 0x33404f });
+      var dimBar = new T.Mesh(new T.BoxGeometry(1, 0.02, 0.05), dimMat);
+      dimBar.position.set(0, 0.03, 3.1);
+      v.root.add(dimBar);
+      var dimLabels = {};
+      C.distances.forEach(function (d) {
+        var l = M.label("↔ " + distLabel(d), { height: 0.95, bold: true });
+        l.position.set(fx(d / 2), 0.5, 3.75);
+        l.visible = false;
+        v.root.add(l);
+        dimLabels[d] = l;
+      });
+      v.onThemeChange(function (dark) {
+        dimMat.color.set(dark ? 0xdbe3ee : 0x33404f);
+      });
+
+      // 줄자는 결승선을 표시할 때만 쓰고 말아서 보관(215쪽) → 트랙 옆에 말린 줄자
+      var tapeCase = new T.Group();
+      var caseBody = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.28, 28), M.material(0x3a4250));
+      caseBody.position.y = 0.14;
+      var caseRing = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.3, 28), M.material(0xf2a93b));
+      caseRing.position.y = 0.15;
+      var tab = new T.Mesh(new T.BoxGeometry(0.25, 0.05, 0.14), M.material(0xf2a93b));
+      tab.position.set(0.5, 0.05, 0);
+      tapeCase.add(caseBody, caseRing, tab);
+      tapeCase.position.set(fx(75), 0, -5.2);
+      v.root.add(tapeCase);
+      var tapeLabel = M.label("줄자(말아서 보관)", { height: 0.7 });
+      tapeLabel.position.set(fx(75), 0.95, -5.2);
+      v.root.add(tapeLabel);
+
+      // 태엽 자동차(모형): 몸체 + 지붕 + 바퀴 4개 + 태엽 열쇠. 무리의 원점 = 자동차 앞부분
+      var cars = {};
+      var BODY_L = 1.5;
+      C.cars.forEach(function (c) {
+        var g = new T.Group();
+        var bodyMat = M.material(c.color, { roughness: 0.45 });
+        var body = new T.Mesh(new T.BoxGeometry(BODY_L, 0.42, 0.9), bodyMat);
+        body.position.set(-BODY_L / 2, 0.42, 0);
+        var roof = new T.Mesh(new T.BoxGeometry(0.75, 0.36, 0.78), M.material(c.color, { roughness: 0.35 }));
+        roof.position.set(-BODY_L * 0.58, 0.8, 0);
+        var win = new T.Mesh(new T.BoxGeometry(0.04, 0.24, 0.66), M.material(0x9fc6e8, { roughness: 0.1 }));
+        win.position.set(-BODY_L * 0.58 + 0.39, 0.82, 0);
+        g.add(body, roof, win);
+        var wheelGeo = new T.CylinderGeometry(0.22, 0.22, 0.14, 18);
+        var wheelMat = M.material(0x2a2f38, { roughness: 0.8 });
+        var hubMat = M.material(0xdfe5ec);
+        var wheels = [];
+        [-0.3, -1.2].forEach(function (x) {
+          [-0.49, 0.49].forEach(function (z) {
+            var w = new T.Group();
+            var tire = new T.Mesh(wheelGeo, wheelMat);
+            tire.rotation.x = Math.PI / 2;
+            var hub = new T.Mesh(new T.BoxGeometry(0.26, 0.06, 0.16), hubMat);
+            w.add(tire, hub);
+            w.position.set(x, 0.22, z);
+            g.add(w);
+            wheels.push(w);
+          });
+        });
+        // 태엽 열쇠(뒤쪽 위)
+        var keyStem = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.3, 8), M.material(0xb8c0c8, { metalness: 0.5, roughness: 0.3 }));
+        keyStem.rotation.z = Math.PI / 2;
+        keyStem.position.set(-BODY_L - 0.12, 0.5, 0);
+        var keyWing = new T.Mesh(new T.BoxGeometry(0.05, 0.34, 0.14), M.material(0xb8c0c8, { metalness: 0.5, roughness: 0.3 }));
+        keyWing.position.set(-BODY_L - 0.28, 0.5, 0);
+        g.add(keyStem, keyWing);
+        var tag = M.label(c.mark + " " + c.name, { height: 0.9, bold: true, border: c.color });
+        tag.position.set(-BODY_L / 2, 1.75, 0);
+        g.add(tag);
+        // 고른 자동차 표시(바닥의 고리)
+        var ring = new T.Mesh(new T.TorusGeometry(1, 0.05, 8, 40), new T.MeshBasicMaterial({ color: 0xf2a93b }));
+        ring.rotation.x = -Math.PI / 2;
+        ring.scale.set(1.15, 0.72, 1);
+        ring.position.set(-BODY_L / 2, 0.03, 0);
+        ring.visible = false;
+        g.add(ring);
+        g.position.set(START_X, 0, LANE_Z[c.id]);
+        v.root.add(g);
+        v.pickable(g, { car: c.id });
+        cars[c.id] = { group: g, wheels: wheels, ring: ring, tag: tag, spin: 0 };
+      });
+
+      // 좁은 화면(휴대폰)에서는 이름표 글씨가 너무 작아지므로 이름표를 키우고, 줄자 이름표는 숨긴다
+      // (줄자 보관은 '안전 수칙' 카드에서 설명한다). review m4
+      var tags = [startLabel, finishLabel, tapeLabel].concat(
+        C.distances.map(function (d) {
+          return dimLabels[d];
+        }),
+        CAR_IDS.map(function (id) {
+          return cars[id].tag;
+        })
+      ).map(function (sp) {
+        return { sp: sp, sx: sp.scale.x, sy: sp.scale.y, y: sp.position.y };
+      });
+      var labelK = 0;
+      function fitLabels() {
+        var narrow = (container.clientWidth || 1024) < 480; // 휴대폰(375 px 등). 태블릿 가로의 3D 칸(약 560 px)은 그대로
+        var k = narrow ? 1.45 : 1;
+        tapeLabel.visible = !narrow;
+        if (k === labelK) return;
+        labelK = k;
+        tags.forEach(function (t) {
+          t.sp.scale.set(t.sx * k, t.sy * k, 1);
+          t.sp.position.y = t.y + (t.sy * (k - 1)) / 2; // 키운 만큼 위로 올려 바닥·자동차에 묻히지 않게
+        });
+        v.render();
+      }
+      fitLabels();
+      var labelRO = window.ResizeObserver ? new ResizeObserver(fitLabels) : null;
+      if (labelRO) labelRO.observe(container);
+
+      function place(id, x) {
+        var o = cars[id];
+        var dx = x - o.group.position.x;
+        o.group.position.x = x;
+        o.spin -= dx / 0.22; // 바퀴가 굴러가는 모습
+        o.wheels.forEach(function (w) {
+          w.rotation.z = o.spin;
+        });
+      }
+      var COAST_U = COAST / U;
+      function layout() {
+        var x = fx(st.finish);
+        finishGroup.position.x = x;
+        dimBar.scale.x = st.finish / U;
+        dimBar.position.x = (START_X + x) / 2;
+        C.distances.forEach(function (d) {
+          dimLabels[d].visible = d === st.finish;
+        });
+        CAR_IDS.forEach(function (id) {
+          place(id, st.atFinish[id] === st.finish ? x + COAST_U : START_X);
+        });
+      }
+      layout();
+
+      function flash() {
+        var base = new T.Color(0xd8434f);
+        var hi = new T.Color(0xffd166);
+        return v.tween(700, function (e, t) {
+          var k = Math.sin(t * Math.PI * 3) * (1 - t);
+          finishTape.material.color.copy(base).lerp(hi, Math.abs(k));
+        });
+      }
+
+      v.render();
+      return {
+        whenVisible: v.whenVisible,
+        highlight: function (s) {
+          rememberSel(s);
+          if (s.dist) st.finish = Number(s.dist);
+          CAR_IDS.forEach(function (id) {
+            cars[id].ring.visible = s.car === id;
+          });
+          layout();
+          showSelReading(sw, s);
+          v.render();
+        },
+        run: async function (sel) {
+          var d = Number(sel.dist);
+          var key = keyOf(sel.car, d);
+          pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
+          var cs = measureCs(sel.car, d);
+          var car = cars[sel.car];
+          st.finish = d;
+          await v.flyHome(300);
+          // 이 자동차를 출발선에 다시 놓는다(다른 자동차는 그대로)
+          var fromX = car.group.position.x;
+          delete st.atFinish[sel.car];
+          var keep = car.group.position.x;
+          layout();
+          if (Math.abs(fromX - START_X) > 0.01) {
+            place(sel.car, keep);
+            await v.tween(450, function (e) {
+              place(sel.car, keep + (START_X - keep) * e);
+            });
+          }
+          sw.set(0, "ready");
+          sw.say("준비");
+          await v.wait(600);
+          sw.shout("출발!", 800);
+          sw.say("출발!");
+          var x1 = fx(d);
+          // 실제 시간 그대로: 초시계 값(cs/100초) 동안 일정한 빠르기로 달린다
+          await v.tween(cs * 10, function (e, t) {
+            place(sel.car, START_X + (x1 - START_X) * t);
+            sw.set(Math.min(cs, Math.floor(cs * t)), "run");
+          });
+          sw.set(cs, "stop");
+          sw.say("앞부분이 결승선에 닿았어요. 초시계 " + csText(cs) + "초에서 멈춤");
+          var fl = flash();
+          await v.tween(380, function (e, t) {
+            place(sel.car, x1 + COAST_U * (1 - (1 - t) * (1 - t)));
+          });
+          await fl;
+          st.atFinish[sel.car] = d;
+          pending = { key: key, cs: cs };
+          rememberCs(key, cs);
+        },
+        showInstant: function (sel) {
+          st.atFinish[sel.car] = Number(sel.dist);
+          layout();
+          v.render();
+        },
+        clear: function () {
+          st.atFinish = {};
+          layout();
+          sw.set(0, "ready");
+          v.render();
+        },
+        resetView: v.resetView,
+        dispose: function () {
+          if (labelRO) labelRO.disconnect();
+          sw.remove();
+          v.dispose();
+        },
+      };
+    });
+  }
+
+  /* ───────── 3. 기록·분석하기 ───────── */
+  function drawResults() {
+    var T = S.TableChart;
+    var rows = [];
+    C.distances.forEach(function (d) {
+      C.cars.forEach(function (c) {
+        var tr = records.trials(keyOf(c.id, d));
+        var row = { dist: distLabel(d), car: carLabel(c.id), avg: avg(c.id, d) };
+        for (var i = 1; i <= C.trials; i++) {
+          var r = tr.filter(function (x) {
+            return x.trial === i;
+          })[0];
+          row["t" + i] = r ? r.time : null;
+        }
+        rows.push(row);
+      });
+    });
+    var cols = [
+      { id: "dist", label: "이동 거리" },
+      { id: "car", label: "자동차" },
+    ];
+    for (var i = 1; i <= C.trials; i++) cols.push({ id: "t" + i, label: i + "회", unit: "초", digits: 1 });
+    cols.push({ id: "avg", label: "평균", unit: "초", digits: 1 });
+    var tableRoot = $("result-table");
+    T.renderTable(tableRoot, { caption: "태엽 자동차가 결승선까지 이동하는 데 걸린 시간 (내 기록)", columns: cols, rows: rows });
+    tableRoot.appendChild(el("p", { class: "trend-note", text: "평균은 세 번 잰 시간을 더해 3으로 나눈 뒤, 반올림해 소수 첫째 자리까지 나타냈어요. 같은 이동 거리의 두 줄을 비교해 보세요." }));
+
+    var bar = $("bar-card");
+    bar.textContent = "";
+    var barRoot = el("div");
+    bar.appendChild(barRoot);
+    T.renderBar(
+      barRoot,
+      Object.assign({}, C.chart.bar, {
+        categories: C.distances.map(distLabel),
+        series: C.cars.map(function (c) {
+          return {
+            name: c.name,
+            values: C.distances.map(function (d) {
+              return avg(c.id, d);
+            }),
+          };
+        }),
+      })
+    );
+    bar.appendChild(el("p", { class: "trend-note", text: "막대가 짧을수록 결승선까지 걸린 시간이 짧아요. 같은 이동 거리에 있는 두 막대끼리 비교해요." }));
+
+    var line = $("line-card");
+    line.textContent = "";
+    var lineRoot = el("div");
+    line.appendChild(lineRoot);
+    T.renderLine(
+      lineRoot,
+      Object.assign({}, C.chart.line, {
+        series: C.cars.map(function (c) {
+          return {
+            name: c.name,
+            points: C.distances.map(function (d) {
+              return { x: d, y: avg(c.id, d) };
+            }),
+          };
+        }),
+      })
+    );
+    line.appendChild(el("p", { class: "trend-note", text: "⚠️ 이동 거리가 서로 다른 점끼리는 걸린 시간으로 빠르기를 비교할 수 없어요. 세로로 같은 줄(같은 이동 거리)에 있는 두 점끼리 비교해요." }));
+  }
+
+  /* ───────── 5. 마치기(결과 저장) ───────── */
+  function buildDetail() {
+    var q = quiz.result();
+    var analysis = {};
+    C.quiz.forEach(function (qq) {
+      var r = q[qq.id];
+      analysis[qq.id] = {
+        choice: r.choice.map(function (id) {
+          var o = qq.options.filter(function (x) {
+            return x.id === id;
+          })[0];
+          return o ? o.label : id;
+        }),
+        correct: r.correct,
+        tries: r.tries,
+      };
+    });
+    var cv = conclude.values();
+    return {
+      predict: predict.values(),
+      records: records.list().map(function (r) {
+        return { car: CARS[r.car] ? CARS[r.car].name : r.car, distanceCm: r.distance, trial: r.trial, time: r.time, stopwatch: r.reading };
+      }),
+      averages: C.distances.map(function (d) {
+        var o = { distanceCm: d };
+        C.cars.forEach(function (c) {
+          o[c.name] = avg(c.id, d);
+        });
+        return o;
+      }),
+      analysis: analysis,
+      conclusion: cv.conclusion,
+      apply: cv.apply,
+      extension: { q1: cv.ext1, q2: cv.ext2 },
+      curiosity: curiosity.value(),
+    };
+  }
+
+  lesson.finish({
+    button: $("btn-finish"),
+    msgEl: $("finish-msg"),
+    loginHintEl: $("login-hint"),
+    doneEl: $("done-card"),
+    canFinish: function () {
+      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+    },
+    detail: buildDetail,
+    summary: function () {
+      var q = quiz.result();
+      var correct = C.quiz.filter(function (qq) {
+        return q[qq.id].correct;
+      }).length;
+      return ["기록한 측정: " + records.count() + "번", "분석 질문: " + correct + "/" + C.quiz.length + " 맞힘"];
+    },
+  });
+  lesson.restart($("btn-restart"));
+
+  /* ───────── 단계 이동 ───────── */
+  lesson.nav({
+    el: $("stage-nav"),
+    stages: C.stages,
+    prevBtn: $("btn-prev"),
+    nextBtn: $("btn-next"),
+    gates: {
+      experiment: function () {
+        return predict.isDone() || "예상하기의 두 질문에 내 생각을 " + C.predict.minLength + "글자 이상 먼저 적어 주세요.";
+      },
+      analyze: function () {
+        var p = exp.progress();
+        return exp.allDone() || "자동차 " + C.cars.length + "대 × 이동 거리 " + C.distances.length + "가지를 " + C.trials + "번씩 모두 기록해야 넘어갈 수 있어요. (다 잰 칸: " + p.done + "/" + p.total + ")";
+      },
+      conclude: function () {
+        return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
+      },
+      curiosity: function () {
+        return conclude.isDone() || "결론, 생활 속 적용, 발전 질문 2개를 모두 차례로 제출해 주세요.";
+      },
+    },
+    done: {
+      predict: predict.isDone,
+      experiment: exp.allDone,
+      analyze: quiz.isDone,
+      conclude: conclude.isDone,
+      curiosity: function () {
+        return !!lesson.meta.finishedAt;
+      },
+    },
+    onEnter: {
+      experiment: activateExperiment,
+      analyze: drawResults,
+    },
+  });
+})();

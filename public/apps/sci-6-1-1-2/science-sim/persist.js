@@ -141,16 +141,51 @@
     return word + ((ch - 0xac00) % 28 ? a : b);
   };
 
-  /* 입력이 멈춘 뒤 저장(너무 자주 쓰지 않게) */
+  /* 입력이 멈춘 뒤 저장(너무 자주 쓰지 않게)
+   *   var save = SciSim.debounce(fn, 250);  save(...) → 250ms 동안 입력이 없으면 fn 실행
+   *   save.flush()  → 기다리는 저장이 있으면 지금 바로 실행
+   * 기다리는 저장은 페이지를 떠나거나(pagehide) 탭이 숨겨질 때(visibilitychange → hidden)
+   * 모두 바로 실행된다(새로고침·탭 닫기 직전에 적은 마지막 글자가 사라지지 않게). */
+  var pendingSaves = [];
+  function flushAllPending() {
+    pendingSaves.splice(0).forEach(function (f) {
+      try {
+        f();
+      } catch (e) {
+        /* 무시 */
+      }
+    });
+  }
+  if (!SciSim.__flushHooked) {
+    SciSim.__flushHooked = true;
+    window.addEventListener("pagehide", flushAllPending);
+    window.addEventListener("beforeunload", flushAllPending);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") flushAllPending();
+    });
+  }
+  SciSim.flushPendingSaves = flushAllPending;
+
   SciSim.debounce = function (fn, ms) {
     var t = null;
-    return function () {
-      var args = arguments;
-      var self = this;
+    var pending = null; // { self, args }
+    function runNow() {
       clearTimeout(t);
-      t = setTimeout(function () {
-        fn.apply(self, args);
-      }, ms || 300);
-    };
+      t = null;
+      var i = pendingSaves.indexOf(runNow);
+      if (i >= 0) pendingSaves.splice(i, 1);
+      if (!pending) return;
+      var p = pending;
+      pending = null;
+      fn.apply(p.self, p.args);
+    }
+    function debounced() {
+      pending = { self: this, args: arguments };
+      clearTimeout(t);
+      if (pendingSaves.indexOf(runNow) < 0) pendingSaves.push(runNow);
+      t = setTimeout(runNow, ms || 300);
+    }
+    debounced.flush = runNow;
+    return debounced;
   };
 })();

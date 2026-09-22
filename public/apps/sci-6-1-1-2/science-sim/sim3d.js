@@ -19,6 +19,7 @@
  *     forceFallback: false,                                 // true면 3D를 쓰지 않는다(2D 대체 화면 테스트용)
  *     minDistance: 2.5,                                     // 선택: 카메라가 다가갈 수 있는 가장 가까운 거리(기본: 화면 맞춤 거리의 45%).
  *                                                           //  가까이에서 보는 연출(종이 앞 낮은 시점 등)이 화면 크기 변화 때 뒤로 밀려나지 않게 할 때
+ *     viewDir: [0, 0.78, 0.62],                             // 선택: 처음 시점의 방향(중심에서 카메라 쪽). 야외처럼 낮게 보려면 [0, 0.55, 0.84] 등
  *     onPick: function (pick) {},                           // userData.pick이 있는 물체를 탭하면 호출
  *     onLost: function () {},                               // WebGL 컨텍스트를 잃었을 때(→ 2D로 전환)
  *   }).then(function (v) { if (!v) show2DFallback(); else buildScene(v); });
@@ -30,7 +31,15 @@
  *   v.fadeColor(material, "#hex", ms) → Promise
  *   v.focus([x,y,z], ratio, ms) / v.flyHome(ms) → 관찰할 곳으로 다가가기 / 처음 시점으로 돌아가기(Promise)
  *   v.pickable(obj, pickValue)    → 탭 선택 대상 등록
- *   v.discard(obj)                → 장면에서 빼고 geometry·material·texture까지 해제(잠깐 쓰는 방울·스포이트 등)
+ *   v.discard(obj)                → 장면에서 빼고 geometry·material·texture까지 해제(잠깐 쓰는 방울·스포이트 등).
+ *                                   obj 안에 pickable로 등록한 자식이 있으면 그 등록도 함께 뺀다(장면 통째 바꾸기에 안전)
+ *   v.cameraPose() / v.setCameraPose(pose) → 지금 시점 { position:[x,y,z], target:[x,y,z] } 얻기 / 되돌리기
+ *   v.project([x,y,z], pose?)     → 화면 위 자리 { x, y (0~1, 왼쪽 위 기준), inView }. pose를 주면 그 시점 기준
+ *   v.snapshot({ pose, width, marks, hide, type, quality }) → 지금 장면을 '사진'으로 찍는다(전/후 비교용).
+ *       pose: 이 시점에서 찍고 원래 시점으로 돌아온다(삼각대처럼 같은 자리에서 두 번 찍을 때) · width: 사진 가로 px(기본 480)
+ *       marks: [{ at: [x,y,z], radius: 0.06(사진 가로 대비), label: "" }] → 그 자리에 점선 표시 원을 그린다
+ *       hide: [obj, …] → 찍는 순간에만 숨길 물체(선택 표시 화살표·라벨 등)
+ *       반환 { url(dataURL), canvas(2D 캔버스), width, height, marks: [{ x, y, r, inView }](사진 px) } | null(해제된 뒤)
  *   v.onThemeChange(function (isDark) {})  → 지금 한 번 + 시스템 다크모드가 바뀔 때마다 호출(탁자 색 등)
  *   v.setTheme(isDark) / v.resetView() / v.render()(한 장면 즉시 그리기)
  *   v.dispose()                   → 리스너 해제 + 장면 전체 해제 + renderer.dispose() + forceContextLoss() + 캔버스 제거
@@ -107,7 +116,7 @@
 
     var frame = opts.frame || { width: 20, depth: 14, center: [0, 0, 0] };
     var center = new THREE.Vector3().fromArray(frame.center || [0, 0, 0]);
-    var viewDir = new THREE.Vector3(0, 0.78, 0.62).normalize();
+    var viewDir = new THREE.Vector3().fromArray(opts.viewDir || [0, 0.78, 0.62]).normalize();
 
     var controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -356,9 +365,111 @@
     function discard(obj) {
       if (!obj) return;
       if (obj.parent) obj.parent.remove(obj);
-      var i = pickables.indexOf(obj);
-      if (i >= 0) pickables.splice(i, 1);
+      // obj와 그 자식 가운데 탭 대상으로 등록한 것은 모두 뺀다(떼어 낸 물체가 계속 탭에 걸리지 않게)
+      obj.traverse(function (o) {
+        var i = pickables.indexOf(o);
+        if (i >= 0) pickables.splice(i, 1);
+      });
       freeObject(obj);
+    }
+
+    // ── 시점 저장·되돌리기 / 화면 위 자리 / 사진(스냅샷) ──
+    function cameraPose() {
+      return { position: camera.position.toArray(), target: controls.target.toArray() };
+    }
+    function applyPose(p) {
+      camera.position.fromArray(p.position);
+      controls.target.fromArray(p.target);
+      camera.lookAt(controls.target);
+      camera.updateMatrixWorld();
+    }
+    function setCameraPose(p) {
+      if (disposed || !p) return;
+      applyPose(p);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    function projectNow(at) {
+      var v3 = new THREE.Vector3().fromArray(at).project(camera);
+      var x = (v3.x + 1) / 2;
+      var y = (1 - v3.y) / 2;
+      return { x: x, y: y, inView: v3.z < 1 && x >= 0 && x <= 1 && y >= 0 && y <= 1 };
+    }
+    function project(at, pose) {
+      if (!pose) {
+        camera.updateMatrixWorld();
+        return projectNow(at);
+      }
+      var keep = cameraPose();
+      applyPose(pose);
+      var r = projectNow(at);
+      applyPose(keep);
+      return r;
+    }
+    function snapshot(o) {
+      if (disposed) return null;
+      o = o || {};
+      var keep = cameraPose();
+      var hidden = (o.hide || []).filter(function (h) {
+        return h && h.visible;
+      });
+      hidden.forEach(function (h) {
+        h.visible = false;
+      });
+      if (o.pose) applyPose(o.pose);
+      else camera.updateMatrixWorld();
+      renderer.render(scene, camera);
+      var src = renderer.domElement;
+      var w = Math.max(64, Math.round(o.width || 480));
+      var h = Math.max(1, Math.round((w * (src.height || 1)) / (src.width || 1)));
+      var c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      var g = c.getContext("2d");
+      g.drawImage(src, 0, 0, w, h); // 같은 작업 안에서 복사해야 WebGL 버퍼가 비워지기 전에 담긴다
+      var marks = (o.marks || []).map(function (m) {
+        var p = projectNow(m.at);
+        var r = (m.radius || 0.06) * w;
+        var mk = { x: p.x * w, y: p.y * h, r: r, inView: p.inView };
+        if (p.inView) {
+          g.save();
+          g.setLineDash([Math.max(4, r * 0.28), Math.max(3, r * 0.18)]);
+          g.lineWidth = Math.max(3, w / 110);
+          g.strokeStyle = "rgba(255,255,255,0.95)";
+          g.beginPath();
+          g.arc(mk.x, mk.y, r, 0, Math.PI * 2);
+          g.stroke();
+          g.lineWidth = Math.max(2, w / 180);
+          g.strokeStyle = m.color || "#e8590c";
+          g.stroke();
+          g.restore();
+          if (m.label) {
+            g.font = "700 " + Math.round(Math.max(12, w / 30)) + "px system-ui, sans-serif";
+            g.textAlign = "center";
+            g.textBaseline = "bottom";
+            g.lineWidth = 4;
+            g.strokeStyle = "rgba(255,255,255,0.95)";
+            var ty = mk.y - r - 4 < 14 ? mk.y + r + Math.max(14, w / 28) : mk.y - r - 4;
+            g.strokeText(m.label, mk.x, ty);
+            g.fillStyle = "#1f2733";
+            g.fillText(m.label, mk.x, ty);
+          }
+        }
+        return mk;
+      });
+      hidden.forEach(function (hd) {
+        hd.visible = true;
+      });
+      applyPose(keep);
+      controls.update();
+      renderer.render(scene, camera);
+      var url = "";
+      try {
+        url = c.toDataURL(o.type || "image/jpeg", o.quality || 0.86);
+      } catch (e) {
+        /* 무시(캔버스만 쓴다) */
+      }
+      return { url: url, canvas: c, width: w, height: h, marks: marks };
     }
 
     // ── 물체 만들기(저폴리곤 프리미티브) ──
@@ -589,6 +700,10 @@
         pickables.push(obj);
       },
       discard: discard,
+      cameraPose: cameraPose,
+      setCameraPose: setCameraPose,
+      project: project,
+      snapshot: snapshot,
       whenVisible: whenVisible,
       isDisposed: function () {
         return disposed;
