@@ -109,10 +109,10 @@ export const scienceTerms: Term[] = [
         title: "계절의 변화",
         lessons: [
           { id: "2", inquiry: 1, period: "2", title: "태양 고도 측정기를 만들자!", science: "14~15", workbook: "6~7" },
-          { id: "3", inquiry: 2, period: "3~4", title: "하루 동안 태양 고도, 그림자 길이, 기온의 관계는?", science: "16~19", workbook: "8~11" },
-          { id: "5", inquiry: 3, period: "5~6", title: "계절별 태양의 남중 고도와 낮의 길이의 관계는?", science: "20~21", workbook: "12~13" },
-          { id: "7", inquiry: 4, period: "7", title: "태양 고도와 태양 에너지양의 관계는?", science: "22~23", workbook: "14~15" },
-          { id: "8", inquiry: 5, period: "8~9", title: "계절 변화의 원인을 찾아라!", science: "24~27", workbook: "16~17" },
+          { id: "3", inquiry: 2, period: "3~4", title: "하루 동안 태양 고도, 그림자 길이, 기온의 관계는?", science: "16~19", workbook: "8~11", app: { id: "sci-6-2-1-2", kind: "sim" } },
+          { id: "5", inquiry: 3, period: "5~6", title: "계절별 태양의 남중 고도와 낮의 길이의 관계는?", science: "20~21", workbook: "12~13", app: { id: "sci-6-2-1-3", kind: "sim" } },
+          { id: "7", inquiry: 4, period: "7", title: "태양 고도와 태양 에너지양의 관계는?", science: "22~23", workbook: "14~15", app: { id: "sci-6-2-1-4", kind: "sim" } },
+          { id: "8", inquiry: 5, period: "8~9", title: "계절 변화의 원인을 찾아라!", science: "24~27", workbook: "16~17", app: { id: "sci-6-2-1-5", kind: "sim" } },
         ],
       },
       {

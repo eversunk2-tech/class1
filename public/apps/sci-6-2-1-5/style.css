@@ -1,0 +1,130 @@
+/* sci-6-2-1-5 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+
+/* 자전축 조건 아이콘(모양으로 구분: 곧은 막대 / 기운 막대) */
+.tilt-icon { flex: none; width: 30px; height: 30px; }
+.ti-globe { fill: #3f86d1; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1.5; }
+.ti-axis { stroke: var(--ss-text); stroke-width: 2.5; stroke-linecap: round; }
+
+/* ── 실험 화면 상태 표시(3D·2D 공통) ── */
+.hud {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 12px; border-radius: 12px;
+  background: rgba(20, 30, 45, 0.86); color: #fff; font-weight: 700; font-size: 0.92rem; pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.hud:empty { display: none; }
+.hud-val { color: #ffd166; font-size: 1.05rem; }
+.hud-val[hidden] { display: none; }
+.hud-ff {
+  padding: 5px 12px; border-radius: 999px; background: rgba(47, 111, 214, 0.92); color: #fff; font-weight: 800;
+  font-size: 0.9rem; pointer-events: none;
+}
+.hud-ff[hidden] { display: none; }
+.ss-view3d .hud { position: absolute; top: 10px; right: 10px; z-index: 3; max-width: calc(100% - 90px); justify-content: flex-end; }
+.ss-view3d .hud-ff { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 3; white-space: nowrap; }
+
+/* ── 관찰 카드: 값 패널 + 확대 눈금 ── */
+.val-panel {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border-radius: 14px;
+  background: #1f2733; color: #fff; border: 3px solid #ffd166;
+}
+.val-cond { font-size: 0.9rem; font-weight: 600; opacity: 0.92; }
+.val-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.val-label { font-weight: 700; }
+.val-num { font-size: 2.3rem; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.val-unit { font-size: 1.1rem; font-weight: 700; }
+.ruler-fig { margin: 10px 0 0; }
+.ruler-svg { display: block; width: 100%; height: auto; }
+.rl-plate { fill: #f7f7f2; stroke: #b9c0ca; stroke-width: 1.5; }
+.rl-shadow { fill: #3a414d; }
+.rl-stick { fill: #1f2733; stroke: #fff; stroke-width: 2; }
+.rl-tag { font: 700 15px system-ui, sans-serif; fill: #1f2733; }
+.rl-base { stroke: var(--ss-text); stroke-width: 2; }
+.rl-tick { stroke: var(--ss-text); stroke-width: 1.2; }
+.rl-major { stroke-width: 2.2; }
+.rl-num { font: 700 17px system-ui, sans-serif; fill: var(--ss-text); }
+.rl-unit { font: 700 15px system-ui, sans-serif; fill: var(--ss-text); }
+.rl-end { stroke: #d8434f; stroke-width: 2.5; stroke-dasharray: 5 3; }
+
+/* ── 2D 대체 화면: 비스듬히 본 궤도 ── */
+.o2-wrap { position: relative; }
+.o2-head { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; min-height: 34px; margin-bottom: 6px; }
+.orbit-svg { display: block; width: 100%; height: auto; max-height: 440px; background: var(--ss-surface-2); border-radius: 14px; }
+.o2-orbit { fill: none; stroke: #7c8797; stroke-width: 2.5; stroke-dasharray: 8 6; }
+.o2-arrow { fill: #2f6fd6; }
+.o2-small { font: 600 14px system-ui, sans-serif; fill: var(--ss-muted); }
+.o2-glow { fill: #ffd966; opacity: 0.35; }
+.o2-lamp { fill: #fff1b8; stroke: #e0a100; stroke-width: 3; }
+.o2-lbl { font: 700 16px system-ui, sans-serif; fill: var(--ss-text); }
+.o2-pos { cursor: pointer; }
+.o2-dot { fill: #7c8797; }
+.o2-tag { fill: var(--ss-surface); stroke: #2f6fd6; stroke-width: 3; }
+.o2-tag-t { font: 800 20px system-ui, sans-serif; fill: var(--ss-text); pointer-events: none; }
+.o2-pos.is-sel .o2-tag { fill: #f2a93b; stroke: #b7791f; }
+.o2-pos.is-sel .o2-tag-t { fill: #1f2733; }
+.o2-earth { fill: #3f86d1; stroke: #1f4f86; stroke-width: 2; }
+.o2-night { fill: rgba(10, 16, 30, 0.55); }
+.o2-axis { stroke: #33404f; stroke-width: 4; stroke-linecap: round; }
+.o2-eq { stroke: rgba(255, 230, 120, 0.9); stroke-width: 2; }
+.o2-dev { fill: #fff; stroke: #d8434f; stroke-width: 3; }
+.o2-vref { stroke: var(--ss-muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.o2-caption { margin: 6px 2px 0; font-size: 0.85rem; color: var(--ss-muted); }
+@media (prefers-color-scheme: dark) {
+  .o2-axis { stroke: #dbe3ee; }
+}
+
+/* ── 분석 ── */
+.chart-card { --ss-s1: #5b6676; --ss-s2: #d9622b; }
+@media (prefers-color-scheme: dark) { .chart-card { --ss-s1: #a6b1c2; --ss-s2: #ff9a66; } }
+.bar-box { max-width: 620px; margin: 0 auto; }
+
+/* ── 정리: 오개념 카드, 선택 읽을거리 ── */
+.misc-card { border-left: 6px solid var(--ss-accent); background: var(--ss-warn-bg); }
+.misc-title { margin: 0 0 6px; font-size: 1.05rem; }
+.misc-card p { margin: 0; line-height: 1.6; }
+.south-note summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.south-note p { margin: 6px 0 0; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+.wide { width: 100%; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .hud { font-size: 0.78rem; padding: 4px 8px; }
+  .hud-val { font-size: 0.9rem; }
+  .ss-view3d .hud { max-width: calc(100% - 70px); }
+  .ss-view3d .hud-ff { font-size: 0.78rem; bottom: 52px; }
+  .val-num { font-size: 2rem; }
+}
+#result-table table { min-width: 0; }
+.ss-num-unit { white-space: nowrap; }
+
+/* 궁금한 점은 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+/* fix-1: HUD의 '고른 위치' 줄 */
+.hud-next { flex-basis: 100%; text-align: right; font-size: 0.82rem; font-weight: 700; color: #9fd0ff; }
+.hud-next[hidden] { display: none; }
+.o2-head .hud-next { text-align: left; }
+
+/* fix-1: 막대그래프 — '자전축 기울임'(2계열)은 빗금 무늬, '자전축 수직'(1계열)은 민무늬 */
+.hatch-bg { fill: #d9622b; }
+.hatch-line { fill: rgba(255, 255, 255, 0.75); }
+#bar-card .ss-bar.ss-s2 { fill: url(#s6215-hatch); stroke: #8a3a12; stroke-width: 1.5; }
+#bar-card .ss-bar.ss-s1 { stroke: #2f3742; stroke-width: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .hatch-bg { fill: #ff9a66; }
+  .hatch-line { fill: rgba(17, 22, 31, 0.6); }
+  #bar-card .ss-bar.ss-s2 { stroke: #ffd2b8; }
+  #bar-card .ss-bar.ss-s1 { stroke: #e8edf4; }
+}

@@ -1,0 +1,188 @@
+/* sci-6-2-1-4 전용 스타일(실험 화면 틀·카드·그래프 공통 스타일: science-sim/style-common.css) */
+:root {
+  --ang: #2f6fd6;
+  --lux: #b77900;
+  --shadow-c: #3b4452;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ang: #6ea0ff; --lux: #ffd166; --shadow-c: #c5cfdc; }
+}
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+
+/* 실험 화면: 어두운 교실(모형). 세로 화면에서는 조금 낮춰 슬라이더·기록 버튼이 함께 보이게 */
+@media (orientation: portrait) and (min-width: 641px) { .ss-exp-view { height: min(36vh, 440px); } }
+@media (max-width: 640px) { .ss-exp-view { height: 270px; } }
+.ss-exp-view { background: #2a3140; }
+@media (prefers-color-scheme: dark) { .ss-exp-view { background: #141922; } }
+.ss-exp-view .ss-view-tip { color: #e6ecf5; text-shadow: 0 0 4px rgba(0, 0, 0, 0.9); }
+.ss-exp-view .ss-view-loading { color: #c9d3e0; }
+.ss-exp-view.is-2d .ss-view-tip { color: #c9d3e0; text-shadow: none; }
+.ss-view2d { padding: 44px 8px 8px; }
+
+/* 조도 측정 앱 화면(모형) — 3D·2D 공통, 실험 화면 오른쪽 위 */
+.lux-hud {
+  position: absolute; top: 10px; right: 10px; z-index: 3; pointer-events: none;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0; padding: 6px 12px 7px; border-radius: 12px;
+  background: rgba(12, 18, 28, 0.9); color: #fff; border: 2px solid #ffd166; line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.lux-app { font-size: 0.72rem; font-weight: 700; opacity: 0.85; }
+.lux-row { display: flex; align-items: baseline; gap: 8px; }
+.lux-label { font-size: 0.85rem; font-weight: 700; }
+.lux-num { font-size: 1.9rem; font-weight: 800; min-width: 3.2ch; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #ffd166; }
+.lux-sub { font-size: 0.78rem; font-weight: 600; opacity: 0.9; }
+@media (max-width: 640px) {
+  .lux-hud { padding: 4px 8px 5px; top: 6px; right: 6px; }
+  .lux-app { font-size: 0.64rem; }
+  .lux-num { font-size: 1.4rem; }
+  .lux-sub { font-size: 0.68rem; }
+}
+
+/* 2D 대체 화면(SVG) */
+.v2-svg { display: block; width: 100%; height: auto; max-height: 62vh; }
+.v2-cap { font-size: 2.3px; font-weight: 700; fill: #c9d3e0; }
+.v2-small { font-size: 2.2px; font-weight: 700; fill: #e6ecf5; }
+.v2-ang { font-size: 3px; font-weight: 800; fill: #7fd1ff; }
+.v2-table { fill: #565d6b; }
+.v2-phone { fill: #1c2129; stroke: #6d7a8e; stroke-width: 0.15; }
+.v2-phone-top { fill: #2b323d; stroke: #6d7a8e; stroke-width: 0.2; }
+.v2-halo-beam { fill: #fff0b8; opacity: 0.07; }
+.v2-halo-spot { stroke: #ffe28a; stroke-width: 0.9; opacity: 0.2; }
+.v2-halo-ell { fill: #ffe28a; opacity: 0.16; }
+.v2-beam { fill: #fff0b8; opacity: 0.22; }
+.v2-spot { stroke: #ffe28a; stroke-width: 0.9; stroke-linecap: round; }
+.v2-ell { fill: #ffe28a; stroke: #fff4c9; stroke-width: 0.15; }
+.v2-shadow { stroke: #000; stroke-width: 0.7; opacity: 0.85; }
+.v2-shadow-top { fill: #000; opacity: 0.8; }
+.v2-rod { stroke: #f0b44c; stroke-width: 0.5; stroke-linecap: round; }
+.v2-rod-top { fill: #f0b44c; }
+.v2-sensor { fill: #0a0d12; stroke: #8fb6ff; stroke-width: 0.3; }
+.v2-guide { stroke: #dfe8f5; stroke-width: 0.2; }
+.v2-dash { stroke-dasharray: 0.8 0.6; }
+.v2-arc { fill: none; stroke: #7fd1ff; stroke-width: 0.5; }
+.v2-torch-body { fill: #39424f; stroke: #8d99ab; stroke-width: 0.15; }
+.v2-torch-head { fill: #5b6780; stroke: #8d99ab; stroke-width: 0.15; }
+.v2-lens { stroke: #fff6d0; stroke-width: 0.6; }
+
+/* ① 각도 슬라이더 */
+.ang-card .ss-step-h { margin-bottom: 4px; }
+.ang-track { position: relative; padding-top: 58px; }
+.ang-snaps { position: absolute; left: 0; right: 0; top: 0; height: 54px; }
+.ang-snap {
+  position: absolute; top: 0; transform: translateX(-50%); min-height: 50px; min-width: 64px; padding: 2px 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15;
+  border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); cursor: pointer; touch-action: manipulation;
+}
+.ang-snap::after {
+  content: ""; position: absolute; left: 50%; bottom: -8px; width: 2px; height: 8px; background: var(--ss-border); transform: translateX(-50%);
+}
+.ang-snap-deg { font-weight: 800; font-size: 1.05rem; }
+.ang-snap-note { font-size: 0.72rem; font-weight: 600; color: var(--ss-muted); white-space: nowrap; }
+.ang-snap[aria-pressed="true"] { border-color: var(--ang); background: color-mix(in srgb, var(--ang) 14%, var(--ss-surface)); box-shadow: inset 0 0 0 1px var(--ang); }
+.ang-snap[aria-pressed="true"]::after { background: var(--ang); }
+
+.ang-range {
+  --p: 50%;
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 48px; margin: 0; padding: 0;
+  background: transparent; cursor: pointer; touch-action: pan-y;
+}
+.ang-range:focus { outline: none; }
+.ang-range:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; border-radius: 12px; }
+.ang-range::-webkit-slider-runnable-track {
+  height: 12px; border-radius: 999px; border: 1px solid var(--ss-border);
+  background: linear-gradient(to right, var(--ang) 0, var(--ang) var(--p), var(--ss-surface-2) var(--p));
+}
+.ang-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 44px; height: 44px; margin-top: -17px; border-radius: 50%;
+  background: var(--ss-surface); border: 4px solid var(--ang); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.ang-range::-moz-range-track { height: 12px; border-radius: 999px; border: 1px solid var(--ss-border); background: var(--ss-surface-2); }
+.ang-range::-moz-range-progress { height: 12px; border-radius: 999px; background: var(--ang); }
+.ang-range::-moz-range-thumb { box-sizing: border-box; width: 44px; height: 44px; border-radius: 50%; background: var(--ss-surface); border: 4px solid var(--ang); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+.ang-scale { position: relative; height: 18px; margin-top: 2px; }
+.ang-tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.78rem; color: var(--ss-muted); font-variant-numeric: tabular-nums; }
+
+.ang-how { margin: 0 0 6px; font-size: 0.82rem; color: var(--ss-muted); line-height: 1.35; }
+.ang-row { display: flex; align-items: flex-start; gap: 6px; }
+.ang-row .ang-track { flex: 1; min-width: 0; }
+.ang-step { flex: none; width: 48px; min-width: 48px; height: 48px; padding: 0; margin-top: 58px; font-size: 1rem; }
+
+/* 값 패널 */
+.val-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.val-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px;
+  background: var(--ss-surface-2); border: 2px solid var(--ss-border); text-align: center; min-width: 0;
+}
+.val-label { font-size: 0.8rem; font-weight: 700; color: var(--ss-muted); line-height: 1.2; }
+.val-line { display: flex; align-items: baseline; gap: 3px; }
+.val-num { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.val-unit { font-size: 0.9rem; font-weight: 700; color: var(--ss-muted); }
+.val-tile.is-angle { border-color: var(--ang); }
+.val-tile.is-angle .val-num { color: var(--ang); }
+.val-tile.is-lux { border-color: #e0a100; }
+.val-tile.is-lux .val-num { color: var(--lux); }
+.rec-msg { min-height: 1.4em; }
+.ang-card .ss-model-note { font-size: 0.82rem; }
+
+/* ② 내 기록 */
+.req-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.req-title { font-weight: 700; font-size: 0.92rem; }
+.req-chip {
+  min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--ss-border); background: var(--ss-surface);
+  font-weight: 800; cursor: pointer; touch-action: manipulation;
+}
+.req-chip.is-done { border-color: var(--ss-good); background: var(--ss-good-bg); color: var(--ss-good); }
+.extra-note { margin-top: 6px; }
+.rec-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.rec-item {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 4px 4px 12px; border-radius: 12px;
+  border: 1px solid var(--ss-border); background: var(--ss-surface); min-height: 48px;
+}
+.rec-item.is-req { border-color: var(--ss-good); }
+.rec-deg { font-weight: 800; min-width: 2.6em; font-variant-numeric: tabular-nums; }
+.rec-val { flex: 1; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.rec-tag { font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--ss-good-bg); color: var(--ss-good); margin-right: 6px; }
+.rec-del { min-height: 44px; padding: 0 10px; font-size: 0.85rem; }
+.rec-empty { color: var(--ss-muted); font-size: 0.9rem; }
+
+/* 분석 */
+.trend-note { margin: 10px 0 0; font-size: 0.9rem; color: var(--ss-muted); }
+.chart-card { --ss-s1: #b77900; }
+@media (prefers-color-scheme: dark) { .chart-card { --ss-s1: #ffd166; } }
+
+/* 마치기 */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+.wide { width: 100%; }
+
+/* 궁금한 점: 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .val-num { font-size: 1.3rem; }
+  .ang-row { gap: 4px; }
+  .ang-step { width: 44px; min-width: 44px; height: 48px; }
+  .ang-snap { min-width: 56px; padding: 2px 6px; }
+  .ang-snap-note { font-size: 0.66rem; }
+}
+
+/* 휴대폰: 꺾은선그래프 글자가 화면에서 12px 이상 되게(SVG 가로 600 → 약 320px로 줄어듦) */
+@media (max-width: 640px) {
+  #line-card .ss-chart .ss-tick, #line-card .ss-chart .ss-val, #line-card .ss-chart .ss-axis-label { font-size: 24px; }
+  #line-card .ss-chart .ss-val { font-size: 23px; }
+  /* 글자를 키우면 세로축 제목(회전)이 눈금 숫자와 겹치므로, 휴대폰에서는 그래프 위 한 줄 안내로 대신한다 */
+  #line-card .ss-chart .ss-axis-label[transform] { display: none; }
+  #line-card .axis-note { display: block; }
+}
+.axis-note { display: none; margin: 0 0 4px; font-size: 0.85rem; font-weight: 700; color: var(--ss-muted); }
+
+@media (max-width: 640px) { .ss-exp-view .ss-view-tip { font-size: 0.74rem; } }

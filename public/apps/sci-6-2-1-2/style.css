@@ -1,0 +1,193 @@
+/* sci-6-2-1-2 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.sub-h.first { margin-top: 0; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+
+/* 공통 틀의 실행 카드는 쓰지 않는다(시간 바의 눈금 버튼 + 기록하기로 측정) */
+#experiment-root .ss-run-card { display: none; }
+
+/* 가로 화면: 3D 장면 + 시간 바가 한 화면에 들어오게 장면 높이를 줄인다 */
+@media (min-width: 901px) and (orientation: landscape) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: clamp(280px, calc(100vh - var(--ss-header-h) - 260px), 560px); min-height: 280px; }
+  .vals-card .vp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (orientation: portrait) and (min-width: 641px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: min(40vh, 480px); }
+}
+
+/* 장면 위 표시: 지금 시각 · 빨리 감기 */
+.scene-clock {
+  position: absolute; top: 8px; left: 72px; z-index: 3; pointer-events: none;
+  padding: 3px 12px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff;
+  font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.scene-fast {
+  position: absolute; top: 10px; right: 10px; z-index: 3; pointer-events: none;
+  padding: 4px 12px; border-radius: 999px; background: #b7791f; color: #fff; font-weight: 700; font-size: 0.85rem;
+}
+
+/* ── 시간 바 ── */
+.tb-card { margin: 8px 0 8px; padding: 6px 10px 8px; }
+.vals-card .ss-step-h { margin-bottom: 6px; }
+.tb-track { position: relative; height: 56px; touch-action: none; cursor: pointer; border-radius: 14px; user-select: none; -webkit-user-select: none; }
+.tb-track:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+.tb-rail { position: absolute; left: 22px; right: 22px; top: 50%; height: 12px; margin-top: -6px; border-radius: 999px; background: var(--ss-surface-2); border: 1px solid var(--ss-border); }
+.tb-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #f7c86a, #f2a93b); }
+.tb-rail-ticks { position: absolute; inset: 0; pointer-events: none; }
+.tb-rt { position: absolute; top: -7px; width: 2px; height: 6px; margin-left: -1px; background: var(--ss-muted); opacity: 0.6; }
+.tb-rt.is-big { top: -10px; height: 32px; opacity: 0.9; background: var(--ss-text); }
+.tb-thumb {
+  position: absolute; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+  background: #fff; border: 4px solid #d9822b; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  display: grid; place-items: center;
+}
+.tb-thumb::after { content: "☀"; color: #d9822b; font-size: 20px; line-height: 1; }
+.tb-track.is-drag .tb-thumb { transform: scale(1.08); }
+@media (prefers-color-scheme: dark) { .tb-thumb { background: #2a3140; } }
+
+.tb-ticks { position: relative; height: 52px; margin-top: 2px; }
+.tb-tick {
+  position: absolute; top: 0; transform: translateX(-50%); width: 44px; min-height: 48px; padding: 2px 0;
+  border: 2px solid var(--ss-border); border-radius: 10px; background: var(--ss-surface); color: var(--ss-text);
+  font: inherit; font-weight: 700; font-size: 0.8rem; cursor: pointer; touch-action: manipulation;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tb-tick-ok { font-size: 0.8rem; color: var(--ss-good); visibility: hidden; }
+.tb-tick.is-rec { border-color: var(--ss-good); background: var(--ss-good-bg); }
+.tb-tick.is-rec .tb-tick-ok { visibility: visible; }
+.tb-tick.is-at { border-color: #d9822b; box-shadow: 0 0 0 3px color-mix(in srgb, #d9822b 35%, transparent); }
+.tb-tick.is-next { border-style: dashed; border-color: var(--ss-primary); }
+@media (min-width: 700px) { .tb-tick { width: 52px; font-size: 0.9rem; } }
+/* 좁은 화면: 눈금 버튼을 위아래 두 줄로 엇갈려 놓아 서로 겹치지 않게(각 52px) */
+@media (max-width: 520px) {
+  .tb-ticks { height: 104px; }
+  .tb-tick { width: 52px; }
+  .tb-tick:nth-child(even) { top: 52px; }
+}
+
+/* 값 패널: 아이콘 + 이름 + 값(색만으로 구분하지 않는다) */
+.vp { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.vp-cell { padding: 8px 10px; border-radius: 12px; background: var(--ss-surface-2); border-left: 5px solid var(--ss-border); min-width: 0; }
+.vp-name { display: block; font-size: 0.82rem; color: var(--ss-muted); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vp-val { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vp-time { border-left-color: #d9822b; }
+.vp-solar { border-left-color: #d8434f; }
+.vp-shadow { border-left-color: #2f8a3a; }
+.vp-temp { border-left-color: #3b6fd1; }
+.vp.is-model .vp-cell:not(.vp-time) { background: repeating-linear-gradient(135deg, var(--ss-surface-2) 0 10px, color-mix(in srgb, var(--ss-surface-2) 70%, var(--ss-warn-bg)) 10px 20px); }
+@media (max-width: 760px) { .vp { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.vp-src { margin: 6px 0 0; font-size: 0.88rem; font-weight: 600; color: var(--ss-muted); }
+.vp-south { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--ss-warn-bg); font-weight: 600; }
+.vals-card .ss-btn-big { margin-top: 10px; }
+.tb-msg { margin-top: 6px; }
+
+/* 실험 패널의 내 기록 표 */
+.my-records .ss-table-wrap { max-height: none; }
+.my-records caption { display: none; }
+
+/* ── 2D 장면(SVG) ── */
+.d2-wrap { display: grid; gap: 8px; }
+.d2-svg { display: block; width: 100%; height: auto; }
+.d2-skybg { fill: #dcecfb; }
+.d2-groundbg { fill: #d9c7a0; }
+.d2-devbg { fill: #f4efe3; }
+.d2-title { font: 700 20px system-ui, sans-serif; fill: #1f2733; }
+.d2-small { font: 600 16px system-ui, sans-serif; fill: #33404f; }
+.d2-dir { font: 800 20px system-ui, sans-serif; fill: #1f2733; }
+.d2-num { font: 700 15px system-ui, sans-serif; fill: #1f2733; }
+.d2-grid { stroke: #9fb6cc; stroke-width: 1; stroke-dasharray: 4 5; }
+.d2-horizon { stroke: #6b5a3a; stroke-width: 3; }
+.d2-path { fill: none; stroke: #e0901a; stroke-width: 3; stroke-dasharray: 8 6; }
+.d2-pathdot { fill: #e0901a; }
+.d2-sun circle { fill: #ffc928; stroke: #d98f00; stroke-width: 3; }
+.d2-board { fill: #e6cfa0; stroke: #a8895a; stroke-width: 1.5; }
+.d2-ruler { fill: #fff6cf; stroke: #b99a1e; stroke-width: 1.5; }
+.d2-tick { stroke: #1f2733; stroke-width: 2; }
+.d2-stick { fill: #8b5a2b; }
+.d2-shadow { fill: #2b2b2b; opacity: 0.8; }
+.d2-ray { stroke: #f2a900; stroke-width: 4; stroke-dasharray: 10 6; opacity: 0.8; }
+.d2-thread { stroke: #3a3f4a; stroke-width: 3; }
+.d2-protbg { fill: rgba(235, 245, 255, 0.8); stroke: #1f2733; stroke-width: 2; }
+.d2-arc { fill: rgba(216, 67, 79, 0.45); stroke: #d8434f; stroke-width: 2; }
+.d2-tip { fill: #2f8a3a; }
+.d2-val { font: 800 22px system-ui, sans-serif; }
+.d2-val-solar { fill: #b3202e; }
+.d2-val-shadow { fill: #1d6a2a; }
+.d2-val-temp { fill: #1f4a9e; }
+.d2-tboard { fill: #ffffff; stroke: #9aa6b5; stroke-width: 1.5; }
+.d2-tube { fill: #eef2f7; stroke: #9aa6b5; stroke-width: 1.5; }
+.d2-liquid { fill: #d8434f; }
+
+/* ── 분석 ── */
+.charts3 { display: grid; gap: 10px; }
+.chart-help { margin: 0 0 8px; }
+.chart-solar { --ss-s1: #d8434f; }
+.chart-shadow { --ss-s1: #2f8a3a; }
+.chart-temp { --ss-s1: #3b6fd1; }
+@media (prefers-color-scheme: dark) {
+  .chart-solar { --ss-s1: #ff7b84; }
+  .chart-shadow { --ss-s1: #5fd36f; }
+  .chart-temp { --ss-s1: #7aa2ff; }
+}
+.chart-box { max-width: 640px; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .scene-clock { font-size: 0.9rem; padding: 3px 10px; }
+  .scene-fast { top: 44px; font-size: 0.78rem; }
+  .vp-val { font-size: 1.15rem; }
+  .tb-card { padding: 4px 6px 8px; }
+}
+.ss-num-unit { white-space: nowrap; }
+
+/* ── fix-1 ── */
+/* 2D 화면 높이 제한(세로 태블릿에서 시간 바·기록 버튼이 한 화면에 들어오게) */
+.d2-sky { max-height: 12vh; }
+.d2-dev { max-height: 22vh; }
+@media (max-width: 900px), (orientation: portrait) {
+  .vals-card .ss-step-h { display: none; }
+}
+/* 2D 도움말은 SVG 제목(하늘 남쪽 모습 / 측정기 옆모습)과 겹쳐서 숨긴다 */
+.ss-exp-view.is-2d .ss-view-tip { display: none; }
+@media (min-width: 901px) and (orientation: landscape) {
+  .d2-sky { max-height: 16vh; }
+  .d2-dev { max-height: 26vh; }
+}
+@media (max-width: 640px) {
+  .d2-sky { max-height: none; }
+  .d2-dev { max-height: none; }
+}
+.ss-exp-view.is-2d .ss-view2d { padding-top: 40px; }
+
+/* 분석 그래프: 8:30(모형 추정) 점은 속이 빈 점 */
+.chart-box .ss-dot.is-est { fill: var(--ss-surface); stroke: var(--ss-s1); stroke-width: 2.5; stroke-dasharray: 3 2; }
+.est-note { display: flex; align-items: center; gap: 6px; }
+.est-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2.5px dashed var(--ss-muted); flex: none; }
+
+/* 휴대폰: 기록할 때 스크롤을 줄인다(3D 장면을 조금 낮추고 값 패널을 한 줄로) */
+@media (max-width: 520px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: 240px; }
+  .vals-card { padding: 10px; }
+  .vals-card .ss-step-h { display: none; }
+  .vp { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 0; }
+  .vp-cell { padding: 5px 5px 5px 7px; border-left-width: 4px; }
+  .vp-name { font-size: 0.7rem; }
+  .vp-name > span:first-child { display: none; }
+  .vp-val { font-size: 0.95rem; }
+  .vp-src { font-size: 0.78rem; }
+  .vals-card .ss-btn-big { margin-top: 6px; }
+  .tb-card { margin: 6px 0; }
+  .tb-track { height: 50px; }
+}

@@ -1,0 +1,116 @@
+/* sci-6-2-1-3 전용 스타일(실험 화면 틀 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.sub-h.first { margin-top: 0; }
+.intro-body p { margin: 0 0 6px; }
+
+/* ── 계절 색(글자·아이콘과 함께 쓴다 — 색만으로 구분하지 않음) ── */
+.season-spring { --sc: #2e9e5b; }
+.season-summer { --sc: #e0602b; }
+.season-autumn { --sc: #b7791f; }
+.season-winter { --sc: #3b73d9; }
+@media (prefers-color-scheme: dark) {
+  .season-spring { --sc: #5fd394; }
+  .season-summer { --sc: #ff9a62; }
+  .season-autumn { --sc: #e6b35a; }
+  .season-winter { --sc: #7aa2ff; }
+}
+
+/* ── 달 바: 계절별 3달씩, 넓은 화면은 12달 한 줄, 좁으면 두 줄 ── */
+.month-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.season-group { border-top: 4px solid var(--sc); border-radius: 10px; background: color-mix(in srgb, var(--sc) 9%, var(--ss-surface)); padding: 4px 4px 6px; min-width: 0; }
+.season-head { font-weight: 700; font-size: 0.85rem; text-align: center; padding: 2px 0 4px; color: var(--ss-text); }
+.season-months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.month-btn {
+  position: relative; min-height: 48px; min-width: 44px; padding: 4px 2px; border-radius: 10px;
+  border: 2px solid var(--ss-border); background: var(--ss-surface); color: var(--ss-text);
+  font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer; touch-action: manipulation;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; line-height: 1.15;
+}
+.month-btn .month-state { font-size: 0.8rem; min-height: 1em; color: var(--ss-good); }
+.month-btn.is-rec { border-color: color-mix(in srgb, var(--ss-good) 60%, var(--ss-border)); }
+.month-btn[aria-pressed="true"] {
+  border-color: var(--sc); background: color-mix(in srgb, var(--sc) 22%, var(--ss-surface)); box-shadow: inset 0 0 0 2px var(--sc);
+}
+.month-btn[aria-disabled="true"] { cursor: wait; opacity: 0.7; }
+.month-btn.is-next { animation: nextPulse 1.6s ease-in-out infinite; border-style: dashed; border-color: var(--ss-primary); }
+@keyframes nextPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-primary) 45%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ss-primary) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .month-btn.is-next { animation: none; } }
+.month-btn:focus-visible { outline: 3px solid var(--ss-primary); outline-offset: 2px; }
+/* 한 칸 배치(세로 태블릿 등)에서 폭이 넉넉하면 12달을 한 줄로. 가로 태블릿 오른쪽 칸·휴대폰은 계절 두 개씩 두 줄 */
+@media (min-width: 561px) and (max-width: 900px), (min-width: 561px) and (orientation: portrait) {
+  .month-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ── 값 패널 ── */
+.obs-card .ss-help-inline { font-weight: 500; color: var(--ss-muted); font-size: 0.82rem; }
+.value-card { margin-top: 12px; padding: 12px 0 0 12px; border-top: 1px solid var(--ss-border); border-left: 6px solid var(--season, var(--ss-border)); }
+.value-card .ss-step-h { margin-bottom: 6px; }
+.ov-values {
+  position: absolute; left: 10px; top: 42px; z-index: 3; max-width: calc(100% - 20px); padding: 5px 10px; border-radius: 10px;
+  background: rgba(255, 248, 230, 0.94); color: #5a2d05; border: 2px solid #e0802b; font-weight: 800; font-size: 0.9rem; pointer-events: none;
+}
+@media (orientation: portrait) and (min-width: 561px) { .ss-exp-view.sky-view { height: min(36vh, 420px); } }
+.value-head { font-weight: 800; }
+.value-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.value-item { padding: 6px 12px; border-radius: 12px; background: var(--ss-warn-bg); min-width: 0; }
+.value-item dt { font-size: 0.85rem; font-weight: 700; color: var(--ss-muted); }
+.value-item dd { margin: 2px 0 0; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.value-item dd.is-wait { font-size: 0.9rem; font-weight: 600; color: var(--ss-muted); }
+.safety-line { margin-top: 10px; }
+
+/* ── 하늘 모형 ── */
+.ff-badge {
+  position: absolute; top: 10px; right: 10px; left: 72px; margin-left: auto; width: fit-content; max-width: calc(100% - 82px); z-index: 3;
+  padding: 5px 12px; border-radius: 999px; background: rgba(20, 30, 45, 0.86); color: #fff; font-weight: 700; font-size: 0.85rem;
+  pointer-events: none; text-align: center;
+}
+.sky2d { display: block; width: 100%; height: auto; }
+.sky2d-ground { fill: #b9cfa9; }
+.sky2d-grid { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.5; stroke-dasharray: 6 6; }
+.sky2d-tick { font: 700 14px system-ui, sans-serif; fill: #fff; paint-order: stroke; stroke: rgba(20, 30, 45, 0.6); stroke-width: 3px; }
+.sky2d-horizon { stroke: #3a4452; stroke-width: 3; }
+.sky2d-dir { font: 800 20px system-ui, sans-serif; fill: #1f2733; }
+.sky2d-dir2 { font: 600 13px system-ui, sans-serif; fill: #3a4452; }
+.sky2d-cap { font: 600 12px system-ui, sans-serif; fill: #3a4452; }
+.sky2d-path { stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.sky2d-sun { fill: #ffc93a; stroke: #b7791f; stroke-width: 2.5; }
+.sky2d-noon { stroke: #e0802b; stroke-width: 3; stroke-dasharray: 7 5; }
+.sky2d-noon-bg { fill: rgba(255, 248, 230, 0.95); stroke: #e0802b; stroke-width: 2; }
+.sky2d-noon-txt { font: 800 16px system-ui, sans-serif; fill: #7a3c07; }
+.sky2d-glabel { font: 700 13px system-ui, sans-serif; fill: #1f2733; paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 3px; }
+.ss-exp-view.is-2d.sky-view { background: #b9cfa9; }
+.ss-view2d { padding: 40px 6px 6px; }
+
+/* ── 분석 그래프 ── */
+.chart-grid { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 760px; margin: 0 auto; }
+.chart-card .ss-figure { margin: 0; }
+.chart-card figcaption { text-align: center; font-weight: 800; margin: 0 0 2px; font-size: 1.02rem; }
+.season-lbl { font-weight: 700; }
+.chart-note { font-weight: 600; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .ss-main { padding: 12px 12px 96px; }
+  .ff-badge { font-size: 0.72rem; padding: 4px 8px; }
+  .value-item dd { font-size: 1.2rem; }
+  .season-head { font-size: 0.8rem; }
+  /* 휴대폰에서 그래프 글자가 너무 작아지지 않게(viewBox 600 기준) */
+  .chart-card .ss-chart .ss-tick { font-size: 18px; }
+  .chart-card .ss-chart .ss-val { font-size: 16px; }
+  .chart-card .ss-chart .ss-axis-label { font-size: 18px; }
+}
+
+/* 기록 표: 좁은 화면에서도 "10월", "12시간 10분"이 두 줄로 끊기지 않게 */
+#result-table th, #result-table td { white-space: nowrap; }
+@media (max-width: 640px) {
+  #result-table .ss-matrix { font-size: 0.85rem; }
+  #result-table .ss-matrix th, #result-table .ss-matrix td { padding: 6px 4px; }
+}
