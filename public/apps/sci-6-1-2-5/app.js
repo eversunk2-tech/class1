@@ -5,8 +5,9 @@
  *   ② 관찰 카드(줄자 확대 그림·초시계 + 계산기 + 값 확인)
  *   ③ 자동차 표·막대그래프, 교통수단 속력 표(계산해 둔 자료), 퀴즈 연결 만 만든다.
  * 2026-09-22 질문 축소판(7분 기준): 교통수단 계산기·순서 쓰기·비교해 쓰기·발전 질문·궁금한 점 단계를 뺐다(spec.md 개정 절).
- * 2026-09-22 slim-review 반영(v3): 학생은 파랑·초록 두 대만 실행하고, 계산기에 식을 직접 눌러 속력을 구한 뒤 반올림한 값을 직접 적는다
- *   (자동 채우기 없음, 한 번 틀린 뒤에만 도움). 빨강·노랑은 교과서 예시 값으로 표에 미리 채운다(실행은 선택).
+ * 2026-09-22 slim-review 반영(v3): 학생은 파랑·초록 두 대만 실행한다. 빨강·노랑은 교과서 예시 값으로 표에 미리 채운다(실행은 선택).
+ * 2026-09-22 측정 단순화(v4): 자동차마다 이동 거리 1번·걸린 시간 1번만 읽는다(값은 처음부터 소수 첫째 자리: 122.0 cm·5.0초, 100.0 cm·4.2초).
+ *   계산기에 '이동 거리 ÷ 걸린 시간'을 직접 누르면 결과를 소수 첫째 자리로 바로 보여 준다(학생이 반올림하지 않는다).
  * 수치는 LessonConfig의 지도서 값만 쓴다(탐구 3·4의 예시 자료, 오차 없음). 자동차는 일정한 빠르기로 움직이는 모형이다.
  * 학생 입력은 모두 textContent/value로만 다룬다(innerHTML을 쓰지 않는다).
  */
@@ -43,7 +44,10 @@
   }
   function speedOf(id) {
     var t = truth(id);
-    return round1(t.distance / t.time); // 반올림하여 소수 첫째 자리까지
+    return round1(t.distance / t.time); // 소수 첫째 자리까지
+  }
+  function f1(x) {
+    return Number(x).toFixed(1); // 화면의 수치는 소수 첫째 자리 형식으로 통일
   }
   function isExample(id) {
     return C.exampleCars.indexOf(id) >= 0;
@@ -57,12 +61,6 @@
   function finalFront(id) {
     var t = truth(id);
     return phaseOf(id) === 1 ? t.distance : t.distance + (t.distance / t.time) * EXTRA_S;
-  }
-  function fmtNum(x) {
-    // 계산기 표시(최대 10자리 유효숫자, 뒤의 0은 뺀다)
-    if (!isFinite(x)) return "오류";
-    var s = String(Number(x.toPrecision(10)));
-    return s;
   }
   function sleep(ms) {
     return new Promise(function (r) {
@@ -95,7 +93,8 @@
   $("curiosity-root").appendChild(curInput);
 
   /* ───────── 계산기(실험관찰 28쪽 계산기 애플리케이션을 본뜬 작은 화면) ───────── */
-  // opts: { label, onResult({ a, b, raw, rounded }) }  → { node, setExpr(a, b), clear() }
+  // 결과는 소수 첫째 자리까지만 보여 준다(학생이 반올림하지 않게).
+  // opts: { label, onResult({ a, b, value }) }  → { node, setExpr(a, b), clear() }
   function makeCalc(opts) {
     var a = "";
     var op = false;
@@ -114,7 +113,7 @@
       if (shown != null && (/[0-9.]/.test(k) || k === "÷")) {
         // 결과가 나온 뒤에 숫자를 누르면 새 계산
         if (k === "÷") {
-          a = String(shown);
+          a = isFinite(Number(shown)) ? String(shown) : "";
           b = "";
           op = true;
           shown = null;
@@ -161,10 +160,10 @@
           draw();
           return;
         }
-        var raw = na / nb;
-        shown = fmtNum(raw);
+        var value = round1(na / nb);
+        shown = f1(value);
         draw();
-        if (opts.onResult) opts.onResult({ a: na, b: nb, raw: raw, rounded: round1(raw) });
+        if (opts.onResult) opts.onResult({ a: na, b: nb, value: value });
         return;
       }
       draw();
@@ -186,7 +185,7 @@
         });
       })
     );
-    var node = el("div", { class: "calc", role: "group", "aria-label": opts.label || "계산기" }, [el("div", { class: "calc-title", text: "🧮 계산기" }), screen, pad, live]);
+    var node = el("div", { class: "calc", role: "group", "aria-label": opts.label || "계산기" }, [el("div", { class: "calc-title", text: "🧮 계산기 (결과는 소수 첫째 자리까지)" }), screen, pad, live]);
     draw();
     return {
       node: node,
@@ -214,9 +213,11 @@
     return n;
   }
   function zoomRuler(id) {
+    // 앞부분 근처 8 cm만 크게: 숫자는 1 cm마다, 작은 눈금 한 칸은 0.1 cm(1 mm) → 값을 소수 첫째 자리까지 읽는다
     var d = truth(id).distance;
-    var lo = d - 13; // 앞부분이 가운데보다 조금 오른쪽에 오게(10 cm 눈금이 두 개 이상 보인다)
-    var hi = d + 9;
+    var ph = phaseOf(id);
+    var lo = Math.floor(d) - 5;
+    var hi = Math.floor(d) + 3;
     var W = 620;
     var PX = W / (hi - lo);
     function x(cm) {
@@ -228,55 +229,65 @@
     s.appendChild(svg("text", { x: Math.max(70, x(d) - 90), y: 62, "text-anchor": "middle", class: "zoom-car-text", fill: S.TableChart.textOn(CAR[id].color) }, CAR[id].short + " 자동차"));
     // 줄자
     s.appendChild(svg("rect", { x: 0, y: 100, width: W, height: 70, fill: "#f7d44c", stroke: "#9a7a12", "stroke-width": 1.5 }));
-    for (var cm = lo; cm <= hi; cm++) {
-      var big = cm % 10 === 0;
-      var mid = cm % 5 === 0;
-      var h = big ? 34 : mid ? 24 : 14;
-      s.appendChild(svg("line", { x1: x(cm), x2: x(cm), y1: 100, y2: 100 + h, stroke: "#1a1a1a", "stroke-width": big ? 3 : mid ? 2 : 1.4 }));
-      if (big) s.appendChild(svg("text", { x: x(cm), y: 160, "text-anchor": "middle", class: "zoom-num" }, String(cm)));
+    for (var mm = lo * 10; mm <= hi * 10; mm++) {
+      var big = mm % 10 === 0;
+      var mid = mm % 5 === 0;
+      var h = big ? 34 : mid ? 24 : 12;
+      var xx = x(mm / 10);
+      s.appendChild(svg("line", { x1: xx, x2: xx, y1: 100, y2: 100 + h, stroke: "#1a1a1a", "stroke-width": big ? 3 : mid ? 2 : 1.2 }));
+      if (big && mm > lo * 10 && mm < hi * 10) s.appendChild(svg("text", { x: xx, y: 162, "text-anchor": "middle", class: "zoom-num" }, String(mm / 10)));
     }
+    // 2단계: 100 cm 결승선
+    if (ph === 2) s.appendChild(svg("line", { x1: x(P2.distance), x2: x(P2.distance), y1: 88, y2: 100, stroke: "#7b3fa0", "stroke-width": 6 }));
     // 앞부분 표시선
     s.appendChild(svg("line", { x1: x(d), x2: x(d), y1: 22, y2: 140, stroke: "#c2185b", "stroke-width": 3, "stroke-dasharray": "7 5" }));
-    s.appendChild(svg("text", { x: x(d), y: 18, "text-anchor": "middle", class: "zoom-front" }, "▼ 앞부분"));
-    return el("figure", { class: "zoom" }, [s, el("figcaption", { class: "ss-help", text: "🔍 줄자 확대(모형) — 긴 눈금 10 cm마다 숫자, 중간 눈금 5 cm, 작은 눈금 한 칸 1 cm" })]);
+    s.appendChild(svg("text", { x: x(d), y: 18, "text-anchor": "middle", class: "zoom-front" }, ph === 2 ? "▼ 앞부분(결승선에 닿은 순간)" : "▼ 앞부분"));
+    return el("figure", { class: "zoom" }, [s, el("figcaption", { class: "ss-help", text: "🔍 줄자 확대(모형) — 숫자는 cm, 작은 눈금 한 칸은 0.1 cm(1 mm)" })]);
   }
   function stopwatchFace(sec, caption) {
     return el("div", { class: "sw-face" }, [
-      el("div", { class: "sw-face-digits", "aria-label": "초시계 " + sec.toFixed(1) + "초" }, [el("span", { text: "⏱ " }), el("strong", { text: sec.toFixed(1) }), el("span", { text: " 초" })]),
+      el("div", { class: "sw-face-digits", "aria-label": "초시계 " + f1(sec) + "초" }, [el("span", { text: "⏱ " }), el("strong", { text: f1(sec) }), el("span", { text: " 초" })]),
       el("p", { class: "ss-help", text: caption }),
     ]);
   }
 
   /* ───────── 관찰·기록 카드 ───────── */
-  // 학생이 ① 읽은 값을 적고 ② 계산기에 '이동 거리 ÷ 걸린 시간'을 직접 눌러 계산한 뒤 ③ 반올림한 속력을 직접 적는다.
-  // 앱은 식이나 속력을 자동으로 채우지 않는다. '확인하기'에서 한 번 틀린 뒤에만 도움(계산기에 식 넣어 주기)을 준다.
+  // 자동차마다 ① 줄자에서 이동 거리 1번, 초시계에서 걸린 시간 1번을 읽어 적고(값은 소수 첫째 자리까지 보이게 제시)
+  // ② 계산기에 '이동 거리 ÷ 걸린 시간'을 직접 누른다 → 결과가 소수 첫째 자리로 바로 나온다 → ③ 기록하기.
+  // 계산기 식이 맞으면 '확인하기'를 자동으로 누른다. 한 번 틀린 뒤에만 도움(계산기에 식 넣어 주기)을 준다.
   function observeCard(sel) {
     var id = sel.car;
     var car = CAR[id];
     var t = truth(id);
     var sp = speedOf(id);
     var ph = phaseOf(id);
-    var measureId = ph === 1 ? "distance" : "time";
-    var measureVal = ph === 1 ? t.distance : t.time;
     var calcOk = false; // 계산기에 이 자동차의 '이동 거리 ÷ 걸린 시간'을 눌러 계산했는지
     var body = el("div", { class: "obs-body" });
-    if (ph === 1) {
-      body.appendChild(zoomRuler(id));
-      body.appendChild(el("p", { class: "fixed-line", text: "⏱ 걸린 시간: 5초 (같게 한 조건)" }));
-    } else {
-      body.appendChild(stopwatchFace(t.time, "🏁 앞부분이 100 cm 결승선에 닿은 순간 멈춘 초시계예요."));
-      body.appendChild(el("p", { class: "fixed-line", text: "📏 이동 거리: 100 cm (같게 한 조건)" }));
-    }
+    body.appendChild(zoomRuler(id));
+    body.appendChild(stopwatchFace(t.time, ph === 1 ? "⏱ 5초가 되는 순간 멈춘 초시계예요." : "🏁 앞부분이 100 cm 결승선에 닿은 순간 멈춘 초시계예요."));
     var msg = el("p", { class: "obs-msg", "aria-live": "polite" });
+    var speedOut = el("p", { class: "calc-speed", "aria-live": "polite", text: "속력: — cm/s" });
+    var calcBox;
     var calc = makeCalc({
       label: car.name + " 속력 계산기",
       onIncomplete: function () {
         msg.textContent = "‘이동 거리 ÷ 걸린 시간’을 끝까지 누른 뒤 = 를 눌러요.";
       },
       onResult: function (r) {
+        // 숨은 칸에 마지막 계산식을 적어 둔다 → 틀의 '같은 답 다시 확인' 판단에 계산기 상태도 들어가게
+        var cInp = document.getElementById("ss-num-calc");
+        if (cInp) {
+          cInp.value = r.a + "÷" + r.b;
+          cInp.dispatchEvent(new Event("input"));
+        }
         if (Math.abs(r.a - t.distance) < 1e-9 && Math.abs(r.b - t.time) < 1e-9) {
           calcOk = true;
-          msg.textContent = "✅ 식이 맞아요. 반올림하여 소수 첫째 자리까지 속력 칸에 적어요.";
+          speedOut.textContent = "속력: " + f1(sp) + " cm/s";
+          msg.textContent = "";
+          // 계산이 맞으면 곧바로 확인(읽은 값도 함께 확인한다) → 통과하면 '기록하기'가 켜진다
+          var card = calcBox && calcBox.closest(".ss-observe");
+          var btn = card && card.querySelector(".ss-check-btn");
+          if (btn && !btn.closest("[hidden]")) btn.click();
         } else if (Math.abs(r.a - t.time) < 1e-9 && Math.abs(r.b - t.distance) < 1e-9) {
           msg.textContent = "나누는 순서를 확인해요. 속력 = 이동 거리 ÷ 걸린 시간";
         } else {
@@ -284,64 +295,43 @@
         }
       },
     });
-    body.appendChild(calc.node);
-    body.appendChild(msg);
+    calcBox = el("div", { class: "calc-box" }, [calc.node, speedOut, msg]);
+    body.appendChild(calcBox);
 
-    // 입력칸은 공통 틀이 만든 뒤에 순서를 바꾼다: 읽은 값 → 계산기 → 속력 → 확인하기
+    // 계산기는 공통 틀이 만든 입력칸(이동 거리·걸린 시간) 바로 아래로 옮긴다: 읽은 값 → 계산기 → 기록하기
     setTimeout(function () {
-      var mInp = document.getElementById("ss-num-" + measureId);
-      var sInp = document.getElementById("ss-num-speed");
-      if (!mInp || !sInp) return;
-      var grid = mInp.closest(".ss-num-grid");
-      var sField = sInp.closest("label");
-      if (grid && sField) {
-        var calcBox = el("div", { class: "calc-box" }, [calc.node, msg]);
-        grid.parentNode.insertBefore(calcBox, grid.nextSibling);
-        var sGrid = el("div", { class: "ss-num-grid" }, [sField]);
-        calcBox.parentNode.insertBefore(sGrid, calcBox.nextSibling);
-      }
-      mInp.addEventListener("change", function () {
-        var v = mInp.value === "" ? NaN : Number(mInp.value);
-        if (!isFinite(v)) return;
-        msg.textContent =
-          Math.abs(v - measureVal) < 1e-9
-            ? "✅ 바르게 읽었어요. 이제 계산기로 속력을 구해요."
-            : ph === 1
-            ? "🔎 앞부분이 가리키는 눈금을 다시 읽어 보세요. (작은 눈금 한 칸은 1 cm)"
-            : "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
-      });
+      var dInp = document.getElementById("ss-num-distance");
+      var tInp = document.getElementById("ss-num-time");
+      if (!dInp || !tInp) return;
+      var grid = dInp.closest(".ss-num-grid");
+      if (grid) grid.parentNode.insertBefore(calcBox, grid.nextSibling);
+      var cInp = document.getElementById("ss-num-calc");
+      var cField = cInp && cInp.closest("label");
+      if (cField) cField.style.display = "none";
     }, 0);
 
     function help(tries) {
-      // 한 번 틀린 뒤에만: 계산기에 식을 넣어 준다(= 누르기와 반올림은 학생이 한다)
+      // 한 번 틀린 뒤에만: 계산기에 식을 넣어 준다(= 누르기는 학생이 한다)
       if (tries < 1) return "";
-      calc.setExpr(t.distance, t.time);
-      return " 💡 계산기에 ‘" + t.distance + " ÷ " + t.time + "’를 넣어 두었어요. = 를 눌러 보세요.";
+      calc.setExpr(f1(t.distance), f1(t.time));
+      return " 💡 계산기에 ‘" + f1(t.distance) + " ÷ " + f1(t.time) + "’를 넣어 두었어요. = 를 눌러 보세요.";
     }
 
     return {
-      question:
-        ph === 1
-          ? "📏 " + car.name + ": 이동 거리 읽기 → 계산기로 속력 구하기"
-          : "⏱ " + car.name + ": 걸린 시간 읽기 → 계산기로 속력 구하기",
+      question: "📏⏱ " + car.name + ": 이동 거리·걸린 시간 읽기 → 계산기로 속력 구하기",
       body: body,
       type: "numeric",
       fields: [
-        ph === 1
-          ? { id: "distance", label: "이동 거리", unit: "cm", step: 1, min: 0, max: C.trackMaxCm }
-          : { id: "time", label: "걸린 시간", unit: "초", step: 0.1, min: 0, max: 60 },
-        { id: "speed", label: "속력 (소수 첫째 자리)", unit: "cm/s", step: 0.1, min: 0, max: 1000 },
+        { id: "distance", label: "이동 거리", unit: "cm", step: 0.1, min: 0, max: C.trackMaxCm },
+        { id: "time", label: "걸린 시간", unit: "초", step: 0.1, min: 0, max: 60 },
+        { id: "calc", kind: "text", label: "계산기 식", minLength: 0, maxLength: 40 }, // 숨은 칸(계산기가 채운다)
       ],
       check: function (v, ctx) {
-        if (Math.abs(v[measureId] - measureVal) > 1e-9)
-          return ph === 1 ? "🔎 줄자에서 앞부분이 가리키는 눈금을 다시 읽어 보세요." : "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
-        if (!calcOk) return "🧮 계산기에 ‘이동 거리 ÷ 걸린 시간’을 누르고 = 로 계산해요." + help(ctx.tries);
-        if (Math.abs(v.speed - sp) < 1e-9) return { ok: true, message: "⭕ 맞아요! " + sp.toFixed(1) + " cm/s예요. ‘📝 기록하기’를 눌러요." };
-        var raw = t.distance / t.time;
-        var tooLong = Math.abs(v.speed * 10 - Math.round(v.speed * 10)) > 1e-6; // 소수 둘째 자리 이하가 있다
-        if (Math.abs(v.speed - raw) < 0.1 && tooLong) return "소수 첫째 자리까지만 나타내요(소수 둘째 자리에서 반올림)." + help(ctx.tries);
-        if (Math.abs(v.speed - raw) < 0.1) return "반올림을 확인해요. 소수 둘째 자리 숫자가 5 이상이면 올려요.";
-        return "계산기 결과를 다시 보고, 반올림하여 소수 첫째 자리까지 적어요." + help(ctx.tries);
+        if (Math.abs(v.distance - t.distance) > 1e-9)
+          return ph === 1 ? "🔎 줄자에서 앞부분이 가리키는 눈금을 다시 읽어 보세요. (작은 눈금 한 칸은 0.1 cm)" : "🔎 결승선에 닿은 앞부분의 눈금을 다시 읽어 보세요.";
+        if (Math.abs(v.time - t.time) > 1e-9) return "🔎 초시계에 멈춘 숫자를 다시 읽어 보세요.";
+        if (!calcOk) return "🧮 계산기에 ‘이동 거리 ÷ 걸린 시간’을 누르고 = 를 눌러요." + help(ctx.tries);
+        return { ok: true, message: "⭕ 맞아요! 속력은 " + f1(sp) + " cm/s예요. ‘📝 기록하기’를 눌러요." };
       },
     };
   }
@@ -392,8 +382,8 @@
           if (!sel.car) return null;
           if (isExample(sel.car)) return "교과서 예시 자료예요. 표에 이미 들어 있으니 달려 보기는 선택이에요.";
           return phaseOf(sel.car) === 1
-            ? "1단계 · 걸린 시간을 5초로 같게 하고, 이동 거리를 재요."
-            : "2단계 · 이동 거리를 100 cm로 같게 하고, 걸린 시간을 재요.";
+            ? "1단계 · 5초 동안 달려요. 이동 거리와 걸린 시간을 한 번씩 읽어요."
+            : "2단계 · 100 cm 결승선까지 달려요. 이동 거리와 걸린 시간을 한 번씩 읽어요.";
         },
       },
     ],
@@ -432,16 +422,11 @@
     },
     observe: observeCard,
     makeRecord: function (sel, v) {
-      var t = truth(sel.car);
-      return {
-        car: sel.car,
-        distance: phaseOf(sel.car) === 1 ? v.distance : t.distance,
-        time: phaseOf(sel.car) === 1 ? t.time : v.time,
-        speed: v.speed,
-      };
+      // 확인하기를 통과한 값만 기록된다(이동 거리·걸린 시간 = 지도서 값). 속력은 계산기와 같은 소수 첫째 자리 값.
+      return { car: sel.car, distance: v.distance, time: v.time, speed: speedOf(sel.car) };
     },
     describeRecord: function (r) {
-      return CAR[r.car].name + " " + r.distance + " cm ÷ " + r.time + " s = " + Number(r.speed).toFixed(1) + " cm/s";
+      return CAR[r.car].name + " " + f1(r.distance) + " cm ÷ " + f1(r.time) + " 초 = " + f1(r.speed) + " cm/s";
     },
     miniTable: {
       title: "기록한 자동차 한눈에 보기",
@@ -844,7 +829,7 @@
   /* ───────── 3. 기록·분석하기 ───────── */
   var T = S.TableChart;
   function trSpeed(t) {
-    return round1(t.distanceKm / t.hours); // 반올림하여 소수 첫째 자리까지
+    return round1(t.distanceKm / t.hours); // 소수 첫째 자리까지
   }
   // 교통수단(활동해요2): 주어진 자료를 계산해 둔 표(학생이 계산하지 않는다 — 7분 기준 축소)
   (function drawTransportTable() {
@@ -853,13 +838,13 @@
       columns: [
         { id: "name", label: "교통수단" },
         { id: "calc", label: "속력 = 이동 거리 ÷ 걸린 시간" },
-        { id: "speed", label: "속력", unit: "km/h" },
+        { id: "speed", label: "속력", unit: "km/h", digits: 1 },
       ],
       rows: C.transports.map(function (t) {
         return {
           name: t.icon + " " + t.name,
           calc: t.distanceKm.toLocaleString("ko-KR") + " km ÷ " + t.hours + " h",
-          speed: fmtNum(trSpeed(t)),
+          speed: trSpeed(t),
         };
       }),
     });
@@ -909,16 +894,15 @@
       caption: "태엽 자동차의 이동 거리, 걸린 시간, 속력",
       columns: [
         { id: "name", label: "태엽 자동차" },
-        { id: "distance", label: "이동 거리", unit: "cm" },
-        { id: "time", label: "걸린 시간", unit: "초" },
+        { id: "distance", label: "이동 거리", unit: "cm", digits: 1 },
+        { id: "time", label: "걸린 시간", unit: "초", digits: 1 },
         { id: "speed", label: "속력", unit: "cm/s", digits: 1 },
       ],
       rows: C.cars.map(function (c, i) {
         var r = recs[i];
-        return { name: c.name + (r && r.example ? " (교과서 예시)" : ""), distance: r ? r.distance : null, time: r ? r.time : null, speed: r ? Number(r.speed) : null };
+        return { name: c.name + (r && r.example ? " (교과서 예시)" : ""), distance: r ? Number(r.distance) : null, time: r ? Number(r.time) : null, speed: r ? Number(r.speed) : null };
       }),
     });
-    $("car-table").appendChild(el("p", { class: "ss-help", text: "속력은 그동안의 평균적인 빠르기예요. (파랑 24.4 cm/s는 5초 동안의 평균)" }));
 
     T.renderBar(
       $("car-chart"),

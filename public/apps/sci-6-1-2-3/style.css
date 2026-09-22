@@ -13,7 +13,7 @@
 }
 
 /* ── 경주로 그림(2D 화면·사진) — 사진처럼 밝은 바닥을 쓴다(다크모드에서도 같은 색) ── */
-.track-svg, .zoom-svg { display: block; width: 100%; height: auto; }
+.track-svg { display: block; width: 100%; height: auto; }
 .tk-floor { fill: #e4e8ec; }
 .tk-tape { fill: #f6d34a; stroke: #b99a1e; stroke-width: 1; }
 .tk-tick { stroke: #1f2733; stroke-width: 2; }
@@ -46,23 +46,15 @@
 .photo-flash.is-on { animation: shutter 0.5s ease-out; }
 @keyframes shutter { 0% { opacity: 0.95; } 100% { opacity: 0; } }
 
-/* ── 관찰 카드: 사진 + 확대 ── */
-.obs-photo p { margin: 8px 0 0; }
+/* ── 관찰 카드: 사진 + 측정 결과 ── */
 .photo { margin: 0; }
 .photo-frame { border: 6px solid #2a2f36; border-radius: 14px; overflow: hidden; background: #2a2f36; }
 .photo-cap { font-size: 0.85rem; color: var(--ss-muted); margin-top: 4px; font-weight: 600; }
-.zoom-btn { width: 100%; margin-top: 10px; }
-.zoom-box { margin-top: 10px; border: 3px solid #b7791f; border-radius: 14px; overflow: hidden; }
-.zm-num { font: 600 14px system-ui, sans-serif; fill: #1f2733; }
-.zm-num.is-5 { font-weight: 800; font-size: 16px; }
-.zm-unit { font: 600 13px system-ui, sans-serif; fill: #3a4452; }
-.zm-carname { font: 700 22px system-ui, sans-serif; fill: #fff; }
-.zm-front { stroke: #111; stroke-width: 2.5; stroke-dasharray: 7 5; }
-.read-check:empty { display: none; }
-.read-check { font-weight: 600; color: var(--ss-text); background: var(--ss-warn-bg); padding: 6px 10px; border-radius: 10px; }
+.measure-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.measure-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-radius: 10px; background: var(--ss-warn-bg); font-weight: 600; }
+.measure-list strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ── 분석 ── */
-.recheck { background: var(--ss-warn-bg); font-weight: 600; }
 .chart-card { --ss-s1: #d93a3a; --ss-s2: #2f63d6; }
 @media (prefers-color-scheme: dark) { .chart-card { --ss-s1: #ff7b7b; --ss-s2: #7aa2ff; } }
 .q-with-fig { display: block; }
@@ -96,5 +88,4 @@
   .run-timer { font-size: 0.78rem; padding: 4px 10px; top: 8px; max-width: calc(100% - 64px); white-space: normal; }
 }
 .ss-num-unit { white-space: nowrap; }
-.zoom-box .zoom-svg + .zoom-svg { border-top: 3px solid #b7791f; }
 .bar-box { max-width: 460px; margin: 0 auto; } /* 막대 두 개뿐이라 너무 커지지 않게 */

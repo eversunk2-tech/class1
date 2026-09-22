@@ -2,17 +2,16 @@
  * app.js — sci-6-1-2-4 "같은 거리를 이동한 물체의 빠르기를 비교해 보자!" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·실험 패널·기록·저장을 맡고, 이 파일은
  *   ① 3D/2D 장면(출발선·결승선 색 테이프, 태엽 자동차 2대, 초시계 화면)
- *   ② 관찰 카드(멈춘 초시계 값 → 반올림해 소수 첫째 자리까지 적기, 앱 전용 확인)
- *   ③ 분석 표·막대그래프·꺾은선그래프, 내 기록으로 채점하는 분석 질문  만 만든다.
+ *   ② 관찰 카드(멈춘 초시계 값을 그대로 적기, 앱 전용 확인)
+ *   ③ 분석 표·막대그래프, 내 기록으로 채점하는 분석 질문  만 만든다.
  *
- * 시간 모형(지도서 외, spec "확정 결정"):
- *   참값(1/100초) = 100 cm에서의 지도서 예시 시간(초록 4.2초, 노랑 5.8초) × 이동 거리 / 100 × 100
- *   초시계 값 = 참값 + (−0.10초 ~ +0.10초 사이의 작은 차이)  → 학생이 반올림해 소수 첫째 자리로 기록
- *   자동차는 이번 측정의 초시계 값 동안 출발선에서 결승선까지 일정한 빠르기로 움직인다(애니메이션 = 실제 시간).
+ * 시간 모형(개정 3, 2026-09-22 측정 1회·소수 첫째 자리):
+ *   초시계는 처음부터 소수 첫째 자리(1/10초)로 표시한다. 100 cm 걸린 시간 = 지도서 예시 값 그대로(초록 4.2초, 노랑 5.8초).
+ *   무작위 차이·반올림 단계 없음. 자동차는 그 시간 동안 일정한 빠르기로 움직인다(애니메이션 = 실제 시간).
  * 이 차시는 다음 차시 용어("속력", 거리 ÷ 시간)를 화면에 쓰지 않는다.
  *
  * 2026-09-22 개정(질문 축소·7분 기준): 이동 거리는 100 cm 하나(D)만 쓰고 거리 고르기를 없앴다.
- * 자동차 2대 × 1번 측정(slim-review 반영, 지도서처럼 평균 없음), 분석은 표 + 막대그래프 + 보기 2개, 정리하기에 결론 1개와 선택 한 줄(궁금한 점)만 둔다.
+ * 자동차 2대 × 1번 측정(평균 없음), 분석은 표 + 막대그래프 + 보기 2개, 정리하기에 결론 1개와 선택 한 줄(궁금한 점)만 둔다.
  */
 (function () {
   "use strict";
@@ -38,21 +37,12 @@
   var D = C.baseDistance; // 이 앱이 쓰는 유일한 이동 거리(100 cm)
 
   /* ───────── 시간 계산(모형) ───────── */
-  // 참값(1/100초 단위 정수): 4.2초 × 50/100 = 2.1초 → 210
-  function trueCs(carId, dist) {
-    return Math.round(CARS[carId].ref100 * Number(dist));
+  // 걸린 시간(1/10초 단위 정수): 100 cm에서 초록 4.2초 → 42, 노랑 5.8초 → 58. 잴 때마다 같다.
+  function measureTs(carId) {
+    return Math.round(CARS[carId].ref100 * 10);
   }
-  function measureCs(carId, dist) {
-    var n = C.noiseCs;
-    var noise = Math.floor(Math.random() * (2 * n + 1)) - n; // −10 ~ +10
-    return Math.max(10, trueCs(carId, dist) + noise);
-  }
-  // 반올림해 소수 첫째 자리(1/10초 단위 정수): 423 → 42 (4.2초), 425 → 43 (4.3초)
-  function roundTenths(cs) {
-    return Math.floor((cs + 5) / 10);
-  }
-  function csText(cs) {
-    return (cs / 100).toFixed(2);
+  function tsText(ts) {
+    return (ts / 10).toFixed(1);
   }
   function round1(x) {
     return x == null ? null : Math.round(x * 10 + 1e-9) / 10;
@@ -61,7 +51,7 @@
     return car + "|" + Number(dist);
   }
   function distLabel(d) {
-    return d + " cm";
+    return Number(d).toFixed(1) + " cm"; // 화면의 수치는 소수 첫째 자리로 통일(100.0 cm)
   }
   function carLabel(id) {
     return CARS[id].mark + " " + CARS[id].name;
@@ -77,13 +67,15 @@
       lesson.refresh();
     },
   });
-  function avg(car, dist) {
-    return round1(records.mean(keyOf(car, dist), "time"));
+  // 자동차마다 한 번 잰 걸린 시간(마지막 기록)
+  function timeOf(car, dist) {
+    var r = records.get(keyOf(car, dist));
+    return r ? round1(r.time) : null;
   }
   // 한 거리에서 걸린 시간이 더 짧은(더 빠른) 자동차: "green" | "yellow" | "same" | null(기록 부족)
   function fasterAt(dist) {
-    var g = avg("green", dist);
-    var y = avg("yellow", dist);
+    var g = timeOf("green", dist);
+    var y = timeOf("yellow", dist);
     if (g == null || y == null) return null;
     return g < y ? "green" : y < g ? "yellow" : "same";
   }
@@ -147,12 +139,12 @@
     return i;
   }
 
-  // 방금 잰 초시계 값(관찰 카드에서 씀)과 칸마다 마지막 초시계 값(화면 복원용)
-  var pending = null; // { key, cs }
-  var lastCs = store.get("lastCs", {}) || {};
-  function rememberCs(key, cs) {
-    lastCs[key] = cs;
-    store.set("lastCs", lastCs);
+  // 방금 잰 초시계 값(관찰 카드에서 씀)과 칸마다 마지막 초시계 값(화면 복원용), 1/10초 단위
+  var pending = null; // { key, ts }
+  var lastTs = store.get("lastTs", {}) || {};
+  function rememberTs(key, ts) {
+    lastTs[key] = ts;
+    store.set("lastTs", lastTs);
   }
 
   var exp = S.Experiment.create({
@@ -187,13 +179,13 @@
         id: "M",
         name: "측정",
         lead: "자동차를 하나 골라 출발시키고, 두 자동차를 모두 기록해요.",
-        trials: C.trials,
+        trials: 1, // 자동차마다 한 번
         cells: C.cars.map(function (c) {
           return { car: c.id };
         }),
       },
     ],
-    doneLead: "모든 측정을 기록했어요. '다음 단계'로 가서 내 기록을 살펴봐요. (다시 재면 기록이 바뀌어요)",
+    doneLead: "두 자동차를 모두 기록했어요. '다음 단계'로 가서 내 기록을 살펴봐요.",
     cellKey: function (sel) {
       return keyOf(sel.car, D);
     },
@@ -209,11 +201,11 @@
     observe: observeCard,
     makeRecord: function (sel, v) {
       var key = keyOf(sel.car, D);
-      var cs = pending && pending.key === key ? pending.cs : lastCs[key];
-      return { car: sel.car, distance: D, time: round1(v.time), reading: cs == null ? null : cs / 100 };
+      var ts = pending && pending.key === key ? pending.ts : lastTs[key];
+      return { car: sel.car, distance: D, time: round1(v.time), reading: ts == null ? null : ts / 10 };
     },
     describeRecord: function (r) {
-      return CARS[r.car].name + " " + distLabel(r.distance) + " → " + r.time.toFixed(1) + "초" + (r.trial ? " (" + r.trial + "회)" : "");
+      return CARS[r.car].name + " " + distLabel(r.distance) + " → " + r.time.toFixed(1) + "초";
     },
     miniTable: {
       title: "기록한 칸 한눈에 보기",
@@ -229,47 +221,37 @@
     onChange: lesson.refresh,
   });
 
-  /* ── 관찰·기록 카드: 멈춘 초시계 값을 보고 반올림해 적기 ── */
-  var check = null; // { expect: 1/10초 정수, cs, msg }
+  /* ── 관찰·기록 카드: 멈춘 초시계 값(소수 첫째 자리)을 보고 그대로 적기 ── */
+  var check = null; // { expect: 1/10초 정수, msg }
   function observeCard(sel) {
     var key = keyOf(sel.car, D);
-    var cs = pending && pending.key === key ? pending.cs : null;
-    if (cs == null) {
+    var ts = pending && pending.key === key ? pending.ts : null;
+    if (ts == null) {
       // 애니메이션이 중간에 끝난 경우 등: 이번 측정값을 여기서 정한다
-      cs = measureCs(sel.car, D);
-      pending = { key: key, cs: cs };
-      rememberCs(key, cs);
+      ts = measureTs(sel.car);
+      pending = { key: key, ts: ts };
+      rememberTs(key, ts);
     }
     var body = el("div", { class: "obs-body" });
     body.appendChild(
-      el("div", { class: "obs-watch", role: "img", "aria-label": "멈춘 초시계: " + csText(cs) + "초" }, [
+      el("div", { class: "obs-watch", role: "img", "aria-label": "멈춘 초시계: " + tsText(ts) + "초" }, [
         el("span", { class: "obs-watch-icon", "aria-hidden": "true", text: "⏱" }),
-        el("span", { class: "obs-watch-num", "aria-hidden": "true", text: csText(cs) }),
+        el("span", { class: "obs-watch-num", "aria-hidden": "true", text: tsText(ts) }),
         el("span", { class: "obs-watch-unit", "aria-hidden": "true", text: "초" }),
       ])
     );
-    body.appendChild(
-      el("p", { class: "ss-help" }, [
-        S.rich(CARS[sel.car].name + " · 이동 거리 " + distLabel(D) + " · 자동차의 **앞부분이 결승선에 닿은 순간** 멈춘 초시계예요.", "span"),
-      ])
-    );
-    var help = el("details", { class: "round-help" }, [
-      el("summary", { text: "🔢 반올림이 헷갈리면 눌러요" }),
-      S.rich("소수 **둘째** 자리 숫자를 봐요. **0, 1, 2, 3, 4**이면 버리고, **5, 6, 7, 8, 9**이면 소수 첫째 자리에 1을 더해요.", "p"),
-      S.rich("예: 3.**7**4초 → 3.7초,  3.7**6**초 → 3.8초", "p"),
-    ]);
-    body.appendChild(help);
-    var msg = el("p", { class: "round-msg", "aria-live": "polite" });
+    body.appendChild(el("p", { class: "ss-help", text: CARS[sel.car].name + "가 " + distLabel(D) + "를 이동하는 데 걸린 시간이에요." }));
+    var msg = el("p", { class: "read-msg", "aria-live": "polite" });
     body.appendChild(msg);
-    check = { expect: roundTenths(cs), cs: cs, msg: msg };
+    check = { expect: ts, msg: msg };
     return {
-      question: "초시계에 나온 걸린 시간을 반올림해 소수 첫째 자리까지 적어요.",
+      question: "초시계에 나온 걸린 시간을 적어요.",
       body: body,
       type: "numeric",
       fields: [{ id: "time", label: "걸린 시간", unit: "초", step: C.measure.step, min: C.measure.min, max: C.measure.max }],
     };
   }
-  // 공통 틀의 입력 확인(범위) 뒤에, 반올림이 맞는지 앱이 한 번 더 확인한다(입력 이벤트가 위로 올라올 때).
+  // 공통 틀의 입력 확인(범위) 뒤에, 초시계 값과 같은지 앱이 한 번 더 확인한다(입력 이벤트가 위로 올라올 때).
   $("experiment-root").addEventListener("input", function (e) {
     var t = e.target;
     if (!t || !t.classList || !t.classList.contains("ss-num-input") || !check) return;
@@ -278,18 +260,14 @@
     var v = raw === "" ? NaN : Number(raw);
     var ok = false;
     var text = "";
-    var digit2 = Math.floor(check.cs) % 10; // 소수 둘째 자리 숫자
     if (raw === "") text = "";
     else if (!isFinite(v)) text = "숫자로 적어 주세요.";
-    else if (Math.abs(v * 10 - Math.round(v * 10)) > 1e-6) text = "소수 첫째 자리까지만 적어요. 초시계의 소수 둘째 자리 숫자를 보고 반올림해요.";
-    else if (Math.round(v * 10) === check.expect) {
+    else if (Math.abs(v * 10 - check.expect) < 1e-6) {
       ok = true;
       text = "✅ 잘 읽었어요. '기록하기'를 눌러요.";
-    } else if (Math.round(v * 10) === Math.floor(check.cs / 10) && digit2 >= 5) text = "소수 둘째 자리 숫자가 " + digit2 + "이에요. 5 이상이면 어떻게 하는지 떠올려 보세요.";
-    else if (Math.round(v * 10) === Math.floor(check.cs / 10) + 1 && digit2 < 5) text = "소수 둘째 자리 숫자가 " + digit2 + "이에요. 4 이하이면 어떻게 하는지 떠올려 보세요.";
-    else text = "초시계에 나온 숫자를 다시 확인해 보세요.";
+    } else text = "초시계에 나온 숫자를 다시 확인해 보세요.";
     check.msg.textContent = text;
-    check.msg.className = "round-msg" + (text ? (ok ? " is-ok" : " is-bad") : "");
+    check.msg.className = "read-msg" + (text ? (ok ? " is-ok" : " is-bad") : "");
     t.setAttribute("aria-invalid", String(!ok && raw !== ""));
     if (btn && !ok) btn.disabled = true;
   });
@@ -323,15 +301,15 @@
 
   /* ── 두 화면이 함께 쓰는 것: 초시계 화면, "출발!" 알림 ── */
   function makeStopwatch() {
-    var num = el("span", { class: "sw-num", text: "0.00" });
+    var num = el("span", { class: "sw-num", text: "0.0" });
     var state = el("span", { class: "sw-state", text: "준비" });
     var node = el("div", { class: "sw-hud is-ready", "aria-hidden": "true" }, [el("span", { class: "sw-icon", text: "⏱" }), num, el("span", { class: "sw-unit", text: "초" }), state]);
     var live = el("p", { class: "ss-sr", "aria-live": "polite" });
     var shout = el("div", { class: "sw-shout", "aria-hidden": "true", hidden: true });
     return {
       nodes: [node, live, shout],
-      set: function (cs, st) {
-        num.textContent = csText(cs || 0);
+      set: function (ts, st) {
+        num.textContent = tsText(ts || 0);
         node.className = "sw-hud is-" + st;
         state.textContent = st === "run" ? "재는 중" : st === "stop" ? "멈춤" : "준비";
       },
@@ -361,7 +339,7 @@
     return { finish: C.baseDistance, atFinish: {} };
   }
   function showSelReading(sw, s) {
-    if (s && s.car && lastCs[keyOf(s.car, D)] != null) sw.set(lastCs[keyOf(s.car, D)], "stop");
+    if (s && s.car && lastTs[keyOf(s.car, D)] != null) sw.set(lastTs[keyOf(s.car, D)], "stop");
     else sw.set(0, "ready");
   }
 
@@ -470,7 +448,7 @@
         var d = D;
         var key = keyOf(sel.car, d);
         pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
-        var cs = measureCs(sel.car, d);
+        var ts = measureTs(sel.car);
         st.finish = d;
         delete st.atFinish[sel.car];
         layout();
@@ -479,22 +457,22 @@
         await wait(600);
         sw.shout("출발!", 800);
         sw.say("출발!");
-        await animate(cs * 10, function (t) {
+        await animate(ts * 100, function (t) {
           place(sel.car, d * t);
-          sw.set(Math.min(cs, Math.floor(cs * t)), "run");
+          sw.set(Math.min(ts, Math.floor(ts * t)), "run");
         });
-        sw.set(cs, "stop");
+        sw.set(ts, "stop");
         finishLine.classList.add("is-flash");
         setTimeout(function () {
           finishLine.classList.remove("is-flash");
         }, 700);
-        sw.say("앞부분이 결승선에 닿았어요. 초시계 " + csText(cs) + "초에서 멈춤");
+        sw.say("앞부분이 결승선에 닿았어요. 초시계 " + tsText(ts) + "초에서 멈춤");
         await animate(350, function (t) {
           place(sel.car, d + COAST * (1 - (1 - t) * (1 - t)));
         });
         st.atFinish[sel.car] = d;
-        pending = { key: key, cs: cs };
-        rememberCs(key, cs);
+        pending = { key: key, ts: ts };
+        rememberTs(key, ts);
       },
       showInstant: function (sel) {
         st.atFinish[sel.car] = D;
@@ -724,7 +702,7 @@
           var d = D;
           var key = keyOf(sel.car, d);
           pending = null; // 실행이 중간에 끊겨도 이전 초시계 값을 다시 쓰지 않게(review i3)
-          var cs = measureCs(sel.car, d);
+          var ts = measureTs(sel.car);
           var car = cars[sel.car];
           st.finish = d;
           await v.flyHome(300);
@@ -745,21 +723,21 @@
           sw.shout("출발!", 800);
           sw.say("출발!");
           var x1 = fx(d);
-          // 실제 시간 그대로: 초시계 값(cs/100초) 동안 일정한 빠르기로 달린다
-          await v.tween(cs * 10, function (e, t) {
+          // 실제 시간 그대로: 초시계 값(ts/10초) 동안 일정한 빠르기로 달린다
+          await v.tween(ts * 100, function (e, t) {
             place(sel.car, START_X + (x1 - START_X) * t);
-            sw.set(Math.min(cs, Math.floor(cs * t)), "run");
+            sw.set(Math.min(ts, Math.floor(ts * t)), "run");
           });
-          sw.set(cs, "stop");
-          sw.say("앞부분이 결승선에 닿았어요. 초시계 " + csText(cs) + "초에서 멈춤");
+          sw.set(ts, "stop");
+          sw.say("앞부분이 결승선에 닿았어요. 초시계 " + tsText(ts) + "초에서 멈춤");
           var fl = flash();
           await v.tween(380, function (e, t) {
             place(sel.car, x1 + COAST_U * (1 - (1 - t) * (1 - t)));
           });
           await fl;
           st.atFinish[sel.car] = d;
-          pending = { key: key, cs: cs };
-          rememberCs(key, cs);
+          pending = { key: key, ts: ts };
+          rememberTs(key, ts);
         },
         showInstant: function (sel) {
           st.atFinish[sel.car] = D;
@@ -786,30 +764,13 @@
   function drawResults() {
     var T = S.TableChart;
     var rows = C.cars.map(function (c) {
-      var tr = records.trials(keyOf(c.id, D));
-      var row = { car: carLabel(c.id), avg: avg(c.id, D) };
-      for (var i = 1; i <= C.trials; i++) {
-        var r = tr.filter(function (x) {
-          return x.trial === i;
-        })[0];
-        row["t" + i] = r ? r.time : null;
-      }
-      return row;
+      return { car: carLabel(c.id), time: timeOf(c.id, D) };
     });
-    var cols = [{ id: "car", label: "자동차" }];
-    if (C.trials > 1) {
-      for (var i = 1; i <= C.trials; i++) cols.push({ id: "t" + i, label: i + "회", unit: "초", digits: 1 });
-      cols.push({ id: "avg", label: "평균", unit: "초", digits: 1 });
-    } else {
-      cols.push({ id: "avg", label: "걸린 시간", unit: "초", digits: 1 }); // 한 번만 재면 그 기록 그대로
-    }
-    var tableRoot = $("result-table");
-    T.renderTable(tableRoot, { caption: "태엽 자동차가 " + distLabel(D) + "를 이동하는 데 걸린 시간 (내 기록)", columns: cols, rows: rows });
-    if (C.trials > 1) {
-      tableRoot.appendChild(
-        el("p", { class: "trend-note", text: "평균은 " + C.trials + "번 잰 시간을 더해 " + C.trials + "로 나눈 뒤, 반올림해 소수 첫째 자리까지 나타냈어요." })
-      );
-    }
+    var cols = [
+      { id: "car", label: "자동차" },
+      { id: "time", label: "걸린 시간", unit: "초", digits: 1 },
+    ];
+    T.renderTable($("result-table"), { caption: "태엽 자동차가 " + distLabel(D) + "를 이동하는 데 걸린 시간 (내 기록)", columns: cols, rows: rows });
 
     var bar = $("bar-card");
     bar.textContent = "";
@@ -820,7 +781,7 @@
       Object.assign({}, C.chart.bar, {
         categories: [distLabel(D)],
         series: C.cars.map(function (c) {
-          return { name: c.name, values: [avg(c.id, D)] };
+          return { name: c.name, values: [timeOf(c.id, D)] };
         }),
       })
     );
@@ -845,16 +806,16 @@
       };
     });
     var cv = conclude.values();
-    var avgs = { distanceCm: D };
+    var times = { distanceCm: D };
     C.cars.forEach(function (c) {
-      avgs[c.name] = avg(c.id, D);
+      times[c.name] = timeOf(c.id, D);
     });
     return {
       predict: predict.values(),
       records: records.list().map(function (r) {
-        return { car: CARS[r.car] ? CARS[r.car].name : r.car, distanceCm: r.distance, trial: r.trial, time: r.time, stopwatch: r.reading };
+        return { car: CARS[r.car] ? CARS[r.car].name : r.car, distanceCm: r.distance, time: r.time, stopwatch: r.reading };
       }),
-      averages: [avgs],
+      times: [times],
       analysis: analysis,
       conclusion: cv.conclusion,
       curiosity: curiosity.value(),
@@ -893,7 +854,7 @@
       },
       analyze: function () {
         var p = exp.progress();
-        return exp.allDone() || "두 자동차를 " + (C.trials > 1 ? C.trials + "번씩 " : "") + "모두 기록해야 넘어갈 수 있어요. (다 잰 칸: " + p.done + "/" + p.total + ")";
+        return exp.allDone() || "두 자동차를 모두 기록해야 넘어갈 수 있어요. (기록한 자동차: " + p.done + "/" + p.total + ")";
       },
       conclude: function () {
         return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";

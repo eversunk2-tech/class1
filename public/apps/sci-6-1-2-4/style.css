@@ -51,12 +51,9 @@
 .obs-watch-icon { font-size: 1.4rem; }
 .obs-watch-num { font-size: 2.4rem; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
 .obs-watch-unit { font-size: 1.1rem; }
-.round-help { margin: 8px 0; }
-.round-help summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; color: var(--ss-primary); }
-.round-help p { margin: 6px 0; }
-.round-msg { min-height: 1.4em; margin: 6px 0 0; font-weight: 600; }
-.round-msg.is-ok { color: var(--ss-good); }
-.round-msg.is-bad { color: var(--ss-bad); }
+.read-msg { min-height: 1.4em; margin: 6px 0 0; font-weight: 600; }
+.read-msg.is-ok { color: var(--ss-good); }
+.read-msg.is-bad { color: var(--ss-bad); }
 
 /* ── 2D 대체 화면: 위에서 본 트랙 ── */
 .t2-wrap { position: relative; }

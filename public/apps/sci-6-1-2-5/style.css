@@ -112,3 +112,6 @@
 /* 궁금한 점: 선택 입력 한 줄 (2026-09-22 축소판) */
 .cur-line { display: block; width: 100%; min-height: 48px; padding: 8px 12px; border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); color: inherit; font: inherit; font-size: 1rem; }
 .cur-line:focus { border-color: var(--ss-primary); outline: none; }
+/* v4: 계산기 결과(속력) 한 줄 */
+.calc-speed { max-width: 300px; margin: 6px auto 2px; text-align: center; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) { .calc-speed { max-width: none; } }
