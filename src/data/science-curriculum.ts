@@ -1,13 +1,13 @@
 /**
  * 과학수업 교육과정(학기 → 단원 → 차시) 데이터.
  *
- * 출처: 6학년 1학기 과학 교사용 지도서 각 단원의 "단원 지도 계획" 표.
+ * 출처: 6학년 1·2학기 과학 교사용 지도서 각 단원의 "단원 지도 계획" 표.
+ * (2학기 4단원은 지도서 계획 표 쪽이 깨져 있어 차시별 평가 자료의 관련 쪽수와 실험관찰 목차로 확인)
  * - 단원 순서·이름은 지도서 표기를 따른다.
  * - 교과 내용 차시인 "과학 탐구"만 싣는다(열려라 과학·창의가 팡팡·과학이 톡톡·마무리하기는 제외).
  * - `inquiry`는 교과서의 탐구 번호(예: "3. 줄기의 생김새와…"의 3), `period`는 지도서의 차시.
  * - 쪽수는 학생용 교과서(`science`)와 실험관찰(`workbook`)만 적는다. 없으면 빈 문자열.
  *
- * 2학기 단원을 추가할 때는 `terms`의 "6-2" 항목 `units` 배열에 같은 형식으로 넣는다.
  * 화면·사이드바는 이 배열을 순회하므로 따로 고칠 필요가 없다.
  */
 
@@ -103,8 +103,51 @@ export const scienceTerms: Term[] = [
   {
     id: "6-2",
     label: "6학년 2학기",
-    // 2학기 단원은 추후 지도서를 받아 추가한다. 비어 있으면 화면에 "준비 중"으로 표시한다.
-    units: [],
+    units: [
+      {
+        number: 1,
+        title: "계절의 변화",
+        lessons: [
+          { id: "2", inquiry: 1, period: "2", title: "태양 고도 측정기를 만들자!", science: "14~15", workbook: "6~7" },
+          { id: "3", inquiry: 2, period: "3~4", title: "하루 동안 태양 고도, 그림자 길이, 기온의 관계는?", science: "16~19", workbook: "8~11" },
+          { id: "5", inquiry: 3, period: "5~6", title: "계절별 태양의 남중 고도와 낮의 길이의 관계는?", science: "20~21", workbook: "12~13" },
+          { id: "7", inquiry: 4, period: "7", title: "태양 고도와 태양 에너지양의 관계는?", science: "22~23", workbook: "14~15" },
+          { id: "8", inquiry: 5, period: "8~9", title: "계절 변화의 원인을 찾아라!", science: "24~27", workbook: "16~17" },
+        ],
+      },
+      {
+        number: 2,
+        title: "물질의 연소",
+        lessons: [
+          { id: "2", inquiry: 1, period: "2", title: "서로 다른 물질을 섞으면 어떻게 될까?", science: "38~39", workbook: "22~23" },
+          { id: "3", inquiry: 2, period: "3", title: "물질이 탈 때 어떤 현상이 나타날까?", science: "40~41", workbook: "24~25" },
+          { id: "4", inquiry: 3, period: "4~5", title: "물질이 타려면 무엇이 필요할까?", science: "42~45", workbook: "26~27" },
+          { id: "6", inquiry: 4, period: "6", title: "연소 후의 변화가 궁금해!", science: "46~47", workbook: "28~29" },
+          { id: "7", inquiry: 5, period: "7", title: "연소 생성물은 생태계에 어떤 피해를 줄까?", science: "48~49", workbook: "30~31" },
+        ],
+      },
+      {
+        number: 3,
+        title: "전기의 이용",
+        lessons: [
+          { id: "2", inquiry: 1, period: "2", title: "전구에 불을 켜려면 어떻게 해야 할까?", science: "60~61", workbook: "36~37" },
+          { id: "3", inquiry: 2, period: "3", title: "전기 회로에 전지 한 개를 더 연결하면 어떻게 될까?", science: "62~63", workbook: "38~39" },
+          { id: "4", inquiry: 3, period: "4~5", title: "전자석의 성질이 궁금해!", science: "64~67", workbook: "40~43" },
+          { id: "6", inquiry: 4, period: "6", title: "전자석을 사용하는 예를 알아볼까?", science: "68~69", workbook: "44~45" },
+          { id: "7", inquiry: 5, period: "7~8", title: "전기, 어떻게 사용해야 할까?", science: "70~73", workbook: "46~47" },
+        ],
+      },
+      {
+        number: 4,
+        title: "과학과 나의 진로",
+        lessons: [
+          { id: "2", inquiry: 1, period: "2", title: "미래 사회에 일어날 수 있는 문제를 찾아라!", science: "84~85", workbook: "52~53" },
+          { id: "3", inquiry: 2, period: "3~4", title: "미래 사회의 문제를 과학이 해결할 수 있을까?", science: "86~87", workbook: "54~55" },
+          { id: "5", inquiry: 3, period: "5", title: "다양한 진로가 과학과 관련됨을 알아볼까?", science: "88~91", workbook: "56~57" },
+          { id: "6", inquiry: 4, period: "6~7", title: "나의 진로는 과학과 어떤 관련이 있을까?", science: "92~95", workbook: "58~59" },
+        ],
+      },
+    ],
   },
 ];
 
