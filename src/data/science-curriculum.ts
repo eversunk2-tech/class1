@@ -2,7 +2,7 @@
  * 과학수업 교육과정(학기 → 단원 → 차시) 데이터.
  *
  * 출처: 6학년 1·2학기 과학 교사용 지도서 각 단원의 "단원 지도 계획" 표.
- * (2학기 4단원은 지도서 계획 표 쪽이 깨져 있어 차시별 평가 자료의 관련 쪽수와 실험관찰 목차로 확인)
+ * (2학기 4단원 "과학과 나의 진로"는 사용자 결정으로 싣지 않는다.)
  * - 단원 순서·이름은 지도서 표기를 따른다.
  * - 교과 내용 차시인 "과학 탐구"만 싣는다(열려라 과학·창의가 팡팡·과학이 톡톡·마무리하기는 제외).
  * - `inquiry`는 교과서의 탐구 번호(예: "3. 줄기의 생김새와…"의 3), `period`는 지도서의 차시.
@@ -135,16 +135,6 @@ export const scienceTerms: Term[] = [
           { id: "4", inquiry: 3, period: "4~5", title: "전자석의 성질이 궁금해!", science: "64~67", workbook: "40~43" },
           { id: "6", inquiry: 4, period: "6", title: "전자석을 사용하는 예를 알아볼까?", science: "68~69", workbook: "44~45" },
           { id: "7", inquiry: 5, period: "7~8", title: "전기, 어떻게 사용해야 할까?", science: "70~73", workbook: "46~47" },
-        ],
-      },
-      {
-        number: 4,
-        title: "과학과 나의 진로",
-        lessons: [
-          { id: "2", inquiry: 1, period: "2", title: "미래 사회에 일어날 수 있는 문제를 찾아라!", science: "84~85", workbook: "52~53" },
-          { id: "3", inquiry: 2, period: "3~4", title: "미래 사회의 문제를 과학이 해결할 수 있을까?", science: "86~87", workbook: "54~55" },
-          { id: "5", inquiry: 3, period: "5", title: "다양한 진로가 과학과 관련됨을 알아볼까?", science: "88~91", workbook: "56~57" },
-          { id: "6", inquiry: 4, period: "6~7", title: "나의 진로는 과학과 어떤 관련이 있을까?", science: "92~95", workbook: "58~59" },
         ],
       },
     ],
