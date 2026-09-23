@@ -110,7 +110,7 @@ Edge Function `admin-reset-password` 배포 완료(Verify JWT 켬).
 * 설계 `docs/science/answer-check/spec.md`(끝 "개정 1"), 구현 `docs/science/answer-check/build-report.md`, 검증 `review.md`.
 * 과학 앱 **23개 전부** 적용. 앱 안 규칙(확실한 무의미 5종)은 키 없이도 동작 — 지금도 "ㅇㅇㄹㅎㄷㄴ"류는 막힌다.
 * 판정 3단계: 통과 / 다시 생각(질문당 1회, 통과 허용) / 통과 불가(무의미·주제 무관). 틀렸지만 주제에 맞는 답은 막지 않는다. Gemini 실패(오프라인·한도·오류·시간 초과)면 **차단 없음**. 같은 질문 3번째 차단부터 "🙋 선생님과 확인했어요" 버튼.
-* Edge Function `supabase/functions/check-answer` — **아직 배포 전**. 사용자가 키 발급 → `supabase secrets set GEMINI_API_KEY=...` → `supabase functions deploy check-answer`(Verify JWT 켠 채) 하면 Gemini 판단이 켜진다.
+* Edge Function `supabase/functions/check-answer` — 배포 완료(2026-09-23). **사용자가 실제 Gemini 피드백을 확인했고 "괜찮다"고 평가**(말투·판정 모두). 함수를 고치면 다시 배포해야 한다.
 * 저장 키·저장 구조 불변(`app_progress.state`, `detail.qa`). 새 필드는 값이 있을 때만 덧붙음. SQL 없음.
 
 ## 관리자 기능 (2026-09-23)

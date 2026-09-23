@@ -11,10 +11,12 @@ import {
   KeyRoundIcon,
   SearchIcon,
   UserMinusIcon,
+  UserPlusIcon,
   XIcon,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { MemberCreateDialog } from "@/components/admin/member-create-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
@@ -92,6 +94,7 @@ export function MemberList() {
   const [resetOpen, setResetOpen] = useState(false);
   const [withdrawTarget, setWithdrawTarget] = useState<MemberRow | null>(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async (): Promise<State> => {
     try {
@@ -190,6 +193,12 @@ export function MemberList() {
         description={
           state.status === "ready" ? `전체 ${formatCount(state.rows.length)}명` : "가입한 회원을 찾아보고 관리합니다."
         }
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <UserPlusIcon />
+            회원 추가
+          </Button>
+        }
       />
 
       <div className="relative max-w-sm">
@@ -223,7 +232,16 @@ export function MemberList() {
       ) : state.status === "error" ? (
         <ErrorState message={state.missing ? MISSING_SCHEMA_MESSAGE : "회원 목록을 불러오지 못했습니다."} onRetry={reload} />
       ) : !state.rows.length ? (
-        <EmptyState title="아직 가입한 회원이 없습니다" description="회원이 가입하거나 계정을 등록하면 여기에 나타납니다." />
+        <EmptyState
+          title="아직 가입한 회원이 없습니다"
+          description="‘회원 추가’로 계정을 만들거나, 방문자가 가입하면 여기에 나타납니다."
+          action={
+            <Button onClick={() => setCreateOpen(true)}>
+              <UserPlusIcon />
+              회원 추가
+            </Button>
+          }
+        />
       ) : !rows.length ? (
         <EmptyState
           title="검색 결과가 없습니다"
@@ -378,6 +396,13 @@ export function MemberList() {
         </>
       )}
 
+      <MemberCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          void reload();
+        }}
+      />
       <PasswordResetDialog target={resetTarget} open={resetOpen} onOpenChange={setResetOpen} onReset={markReset} />
       <MemberWithdrawDialog
         target={withdrawTarget}
