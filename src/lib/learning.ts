@@ -2,6 +2,7 @@ import { webApps } from "@/data/apps";
 import { isMissingSchemaError, MISSING_SCHEMA_MESSAGE } from "@/lib/admin";
 import { chunk, fetchAllPages } from "@/lib/paging";
 import { supabase } from "@/lib/supabase";
+import { AUTHOR_PROFILE_COLUMNS } from "@/lib/types";
 import type {
   AppResult,
   Assignment,
@@ -150,7 +151,7 @@ export function startOfTodayIso(): string {
 // 웹앱 결과
 // ─────────────────────────────────────────────
 
-type ProfileMini = Pick<Profile, "display_name" | "avatar_url">;
+type ProfileMini = Pick<Profile, "display_name" | "avatar_url" | "withdrawn_at">;
 
 export type AppResultWithStudent = AppResult & { profiles: ProfileMini | null };
 
@@ -172,7 +173,7 @@ export async function fetchUserAppResults(userId: string, limit = 500): Promise<
 export async function fetchAppResultsWithStudents(opts: { appId?: string; limit?: number } = {}): Promise<AppResultWithStudent[]> {
   let q = supabase
     .from("app_results")
-    .select(`${APP_RESULT_COLUMNS},profiles(display_name,avatar_url)`)
+    .select(`${APP_RESULT_COLUMNS},profiles(${AUTHOR_PROFILE_COLUMNS})`)
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 1000);
   if (opts.appId) q = q.eq("app_id", opts.appId);
@@ -356,6 +357,8 @@ export type StudentEngagementRow = {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  /** 탈퇴 처리된 시각. 있으면 화면에서 이름을 "탈퇴한 학생"으로 바꾼다. */
+  withdrawn_at: string | null;
   role: Profile["role"];
   comments: number;
   likes: number;
@@ -370,7 +373,7 @@ export async function fetchStudentEngagement(): Promise<StudentEngagementRow[]> 
     supabase
       .from("profiles")
       .select(
-        "id,display_name,avatar_url,role,comments(count),likes(count),post_reads(count),app_results(count),assignment_submissions(count)",
+        `id,${AUTHOR_PROFILE_COLUMNS},role,comments(count),likes(count),post_reads(count),app_results(count),assignment_submissions(count)`,
         { count: "exact" },
       )
       .order("display_name", { ascending: true })
@@ -381,6 +384,7 @@ export async function fetchStudentEngagement(): Promise<StudentEngagementRow[]> 
     id: string;
     display_name: string | null;
     avatar_url: string | null;
+    withdrawn_at: string | null;
     role: Profile["role"];
     comments: CountEmbed;
     likes: CountEmbed;
@@ -391,6 +395,7 @@ export async function fetchStudentEngagement(): Promise<StudentEngagementRow[]> 
     id: p.id,
     display_name: p.display_name,
     avatar_url: p.avatar_url,
+    withdrawn_at: p.withdrawn_at ?? null,
     role: p.role,
     comments: p.comments?.[0]?.count ?? 0,
     likes: p.likes?.[0]?.count ?? 0,
@@ -562,12 +567,12 @@ export async function fetchRecentActivity(limit: number): Promise<ActivityItem[]
   const [resultsRes, subsRes] = await Promise.all([
     supabase
       .from("app_results")
-      .select(`${APP_RESULT_COLUMNS},profiles(display_name,avatar_url)`)
+      .select(`${APP_RESULT_COLUMNS},profiles(${AUTHOR_PROFILE_COLUMNS})`)
       .order("created_at", { ascending: false })
       .limit(limit),
     supabase
       .from("assignment_submissions")
-      .select(`${SUBMISSION_COLUMNS},profiles(display_name,avatar_url),assignments(id,title,due_at)`)
+      .select(`${SUBMISSION_COLUMNS},profiles(${AUTHOR_PROFILE_COLUMNS}),assignments(id,title,due_at)`)
       .order("submitted_at", { ascending: false })
       .limit(limit),
   ]);
@@ -650,7 +655,7 @@ export const FEEDBACK_MESSAGES_MAX = 1000;
 export async function fetchFeedbackMessages(threadId: string): Promise<{ messages: FeedbackMessageWithSender[]; total: number }> {
   const { data, error, count } = await supabase
     .from("feedback_messages")
-    .select("id,thread_id,sender_id,body,created_at,profiles(display_name,avatar_url,role)", { count: "exact" })
+    .select(`id,thread_id,sender_id,body,created_at,profiles(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
     .eq("thread_id", threadId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -664,7 +669,7 @@ export async function sendFeedbackMessage(threadId: string, body: string): Promi
   const { data, error } = await supabase
     .from("feedback_messages")
     .insert({ thread_id: threadId, body })
-    .select("id,thread_id,sender_id,body,created_at,profiles(display_name,avatar_url,role)")
+    .select(`id,thread_id,sender_id,body,created_at,profiles(${AUTHOR_PROFILE_COLUMNS},role)`)
     .single();
   if (error) throw error;
   return data as unknown as FeedbackMessageWithSender;
@@ -736,7 +741,7 @@ export async function fetchThreadSummaries(
       let q = supabase
         .from("feedback_threads")
         .select(
-          "id,student_id,context_type,context_id,context_key,created_at,profiles!feedback_threads_student_id_fkey(display_name,avatar_url)",
+          `id,student_id,context_type,context_id,context_key,created_at,profiles!feedback_threads_student_id_fkey(${AUTHOR_PROFILE_COLUMNS})`,
           { count: "exact" },
         )
         .order("created_at", { ascending: false })
@@ -885,13 +890,19 @@ export async function fetchLearningStats(): Promise<LearningStats> {
 }
 
 /** 학생(일반 회원) 목록: 과제 제출 현황의 "미제출" 행을 만들 때 쓴다. */
-export type StudentMini = { id: string; display_name: string | null; avatar_url: string | null; email: string | null };
+export type StudentMini = {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  withdrawn_at: string | null;
+  email: string | null;
+};
 
 export async function fetchStudents(): Promise<StudentMini[]> {
   const data = await fetchAllPages<unknown>((from, to) =>
     supabase
       .from("member_directory")
-      .select("id,email,profiles!inner(display_name,avatar_url,role)", { count: "exact" })
+      .select(`id,email,profiles!inner(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
       .eq("profiles.role", "user")
       .order("id")
       .range(from, to),
@@ -901,6 +912,7 @@ export async function fetchStudents(): Promise<StudentMini[]> {
     email: m.email,
     display_name: m.profiles?.display_name ?? null,
     avatar_url: m.profiles?.avatar_url ?? null,
+    withdrawn_at: m.profiles?.withdrawn_at ?? null,
   }));
 }
 
@@ -916,7 +928,7 @@ export async function fetchAllAppResults(appId: string): Promise<AppResultWithSt
   return fetchAllPages<AppResultWithStudent>((from, to) =>
     supabase
       .from("app_results")
-      .select(`${APP_RESULT_COLUMNS},profiles(display_name,avatar_url)`, { count: "exact" })
+      .select(`${APP_RESULT_COLUMNS},profiles(${AUTHOR_PROFILE_COLUMNS})`, { count: "exact" })
       .eq("app_id", appId)
       .order("created_at", { ascending: false })
       .order("id")

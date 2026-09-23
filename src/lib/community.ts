@@ -1,7 +1,7 @@
-import { isMissingSchemaError } from "@/lib/admin";
+import { isMissingSchemaError, profileDisplayName } from "@/lib/admin";
 import { BASE_PATH } from "@/lib/base-path";
 import { supabase } from "@/lib/supabase";
-import type { Profile } from "@/lib/types";
+import { AUTHOR_PROFILE_COLUMNS, type Profile } from "@/lib/types";
 
 /**
  * 자유게시판 · 학습게임 업로드 공용 데이터 계층 (docs/community/spec.md §5, §13).
@@ -22,7 +22,7 @@ export type CommunityPost = {
   hidden: boolean;
   created_at: string;
   updated_at: string;
-  profiles: Pick<Profile, "display_name" | "avatar_url"> | null;
+  profiles: Pick<Profile, "display_name" | "avatar_url" | "withdrawn_at"> | null;
 };
 
 export type CommunityPostSummary = Pick<
@@ -40,18 +40,20 @@ export type CommunityComment = {
   body: string;
   hidden: boolean;
   created_at: string;
-  profiles: Pick<Profile, "display_name" | "avatar_url"> | null;
+  profiles: Pick<Profile, "display_name" | "avatar_url" | "withdrawn_at"> | null;
 };
 
 // 관계 이름(!fk)을 명시한다: community_likes/community_reports가 연결 테이블로도 인식되어
 // profiles·community_comments embed가 모호(PGRST201)해지는 것을 막는다. 응답 키는 테이블 이름 그대로다.
+const POST_AUTHOR = `profiles!community_posts_author_id_fkey(${AUTHOR_PROFILE_COLUMNS})`;
+const COMMENT_AUTHOR = `profiles!community_comments_user_id_fkey(${AUTHOR_PROFILE_COLUMNS})`;
+
 export const POST_COLUMNS =
-  "id,kind,title,body,game_path,game_size,author_id,hidden,created_at,updated_at,profiles!community_posts_author_id_fkey(display_name,avatar_url)";
+  `id,kind,title,body,game_path,game_size,author_id,hidden,created_at,updated_at,${POST_AUTHOR}`;
 export const POST_SUMMARY_COLUMNS =
-  "id,kind,title,body,author_id,hidden,created_at,profiles!community_posts_author_id_fkey(display_name,avatar_url)," +
+  `id,kind,title,body,author_id,hidden,created_at,${POST_AUTHOR},` +
   "community_comments!community_comments_post_id_fkey(count),community_likes!community_likes_post_id_fkey(count)";
-export const COMMENT_COLUMNS =
-  "id,post_id,user_id,body,hidden,created_at,profiles!community_comments_user_id_fkey(display_name,avatar_url)";
+export const COMMENT_COLUMNS = `id,post_id,user_id,body,hidden,created_at,${COMMENT_AUTHOR}`;
 
 /** 글자 수 제한(DB check 제약과 같은 값) */
 export const LIMITS = {
@@ -98,8 +100,9 @@ export function loginHrefHere(): string {
   return loginHref(path + window.location.search);
 }
 
-export function authorName(p: { profiles: Pick<Profile, "display_name"> | null }): string {
-  return p.profiles?.display_name || "익명";
+/** 글·댓글 작성자 이름. 탈퇴한 회원이면 "탈퇴한 학생"(profileDisplayName). */
+export function authorName(p: { profiles: Pick<Profile, "display_name" | "withdrawn_at"> | null }): string {
+  return profileDisplayName(p.profiles, "익명");
 }
 
 export function embeddedCount(list: { count: number }[] | null | undefined): number {
@@ -111,7 +114,8 @@ export function embeddedCount(list: { count: number }[] | null | undefined): num
 // ─────────────────────────────────────────────
 
 export const SETUP_REQUIRED_MESSAGE =
-  "커뮤니티 기능이 아직 준비 중이에요. 선생님이 Supabase SQL Editor에서 20260922040000_community.sql을 실행하면 열려요.";
+  "커뮤니티 기능이 아직 준비 중이에요. 선생님이 Supabase SQL Editor에서 20260922040000_community.sql과 " +
+  "20260923000000_member_withdrawal.sql을 실행하면 열려요.";
 
 type ErrorLike = { code?: string; message?: string; statusCode?: string | number; status?: number } | null | undefined;
 

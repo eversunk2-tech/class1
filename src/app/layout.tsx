@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Jua } from "next/font/google";
 import { ForcePasswordChangeGate } from "@/components/force-password-change-gate";
+import { LoginGate } from "@/components/login-gate";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SITE_NAME, Topbar } from "@/components/layout/topbar";
 import { SiteFooter } from "@/components/site-footer";
@@ -58,7 +59,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Sidebar />
               {/* 각 페이지가 자기 본문 폭(max-w-*)을 직접 정한다. */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <main className="flex w-full flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-8">{children}</main>
+                <main className="flex w-full flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+                  {/* "로그인해야만 이용"이 켜져 있으면 비로그인 방문자에게 로그인 안내를 보여 준다. */}
+                  <LoginGate>{children}</LoginGate>
+                </main>
                 <SiteFooter />
               </div>
             </div>

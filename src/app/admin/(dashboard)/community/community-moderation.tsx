@@ -41,6 +41,7 @@ import {
   removeGameFile,
   type CommunityKind,
 } from "@/lib/community";
+import { adminDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -54,21 +55,21 @@ type ReportRow = {
   target_kind: CommunityKind | "comment" | null;
   target_title: string | null;
   target_body: string | null;
-  target_author: { display_name: string | null } | null;
+  target_author: { display_name: string | null; withdrawn_at: string | null } | null;
   reason: ReportReason;
   detail: string;
   status: "open" | "resolved";
   created_at: string;
   resolved_at: string | null;
-  profiles: { display_name: string | null } | null;
+  profiles: { display_name: string | null; withdrawn_at: string | null } | null;
   community_posts: { id: string; kind: CommunityKind; title: string; hidden: boolean; game_path: string | null } | null;
   community_comments: { id: string; body: string; hidden: boolean } | null;
 };
 
 const REPORT_COLUMNS =
   "id,post_id,comment_id,reason,detail,status,created_at,resolved_at,target_kind,target_title,target_body," +
-  "profiles!community_reports_reporter_id_fkey(display_name)," +
-  "target_author:profiles!community_reports_target_author_id_fkey(display_name)," +
+  "profiles!community_reports_reporter_id_fkey(display_name,withdrawn_at)," +
+  "target_author:profiles!community_reports_target_author_id_fkey(display_name,withdrawn_at)," +
   "community_posts!community_reports_post_id_fkey(id,kind,title,hidden,game_path)," +
   "community_comments!community_reports_comment_id_fkey(id,body,hidden)";
 
@@ -79,12 +80,12 @@ type PostRow = {
   hidden: boolean;
   game_path: string | null;
   created_at: string;
-  profiles: { display_name: string | null } | null;
+  profiles: { display_name: string | null; withdrawn_at: string | null } | null;
   community_reports: { count: number }[] | null;
 };
 
 const ADMIN_POST_COLUMNS =
-  "id,kind,title,hidden,game_path,created_at,profiles!community_posts_author_id_fkey(display_name)," +
+  "id,kind,title,hidden,game_path,created_at,profiles!community_posts_author_id_fkey(display_name,withdrawn_at)," +
   "community_reports!community_reports_post_id_fkey(count)";
 const PAGE = 50;
 
@@ -229,7 +230,7 @@ function ReportsPanel() {
                     </Badge>
                   ) : null}
                   <span className="text-muted-foreground">
-                    신고: {r.profiles?.display_name || "이름 없음"} · {formatDateTime(r.created_at)}
+                    신고: {adminDisplayName(r.profiles, "이름 없음")} · {formatDateTime(r.created_at)}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1 rounded-lg bg-muted/40 p-3 text-sm">
@@ -249,8 +250,10 @@ function ReportsPanel() {
                   ) : !post && r.target_body ? (
                     <p className="line-clamp-3 break-all whitespace-pre-wrap text-muted-foreground">{r.target_body}</p>
                   ) : null}
-                  {r.target_author?.display_name ? (
-                    <span className="text-xs text-muted-foreground">작성자: {r.target_author.display_name}</span>
+                  {r.target_author ? (
+                    <span className="text-xs text-muted-foreground">
+                      작성자: {adminDisplayName(r.target_author, "이름 없음")}
+                    </span>
                   ) : null}
                 </div>
                 {r.detail ? <p className="text-sm break-all whitespace-pre-wrap">“{r.detail}”</p> : null}

@@ -31,6 +31,7 @@ import {
   loginHrefHere,
   type CommunityComment,
 } from "@/lib/community";
+import { isWithdrawnProfile } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 
@@ -267,7 +268,9 @@ function CommentItem({
   return (
     <li className="flex gap-3">
       <Avatar size="sm" className="mt-0.5">
-        {c.profiles?.avatar_url ? <AvatarImage src={c.profiles.avatar_url} alt="" /> : null}
+        {c.profiles?.avatar_url && !isWithdrawnProfile(c.profiles) ? (
+          <AvatarImage src={c.profiles.avatar_url} alt="" />
+        ) : null}
         <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col gap-1">

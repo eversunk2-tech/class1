@@ -7,6 +7,7 @@ import { EmptyState, ErrorState } from "@/components/states";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { adminDisplayName, isWithdrawnProfile } from "@/lib/admin";
 import type { AsyncState } from "@/hooks/use-async-data";
 import { errorMessage, SUBMISSION_STATUS_LABELS } from "@/lib/learning";
 import type { SubmissionStatus } from "@/lib/types";
@@ -129,7 +130,8 @@ export function TableWrap({ children, label }: { children: ReactNode; label: str
 export const thClass = "border-b bg-muted/50 px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground";
 export const tdClass = "border-b px-3 py-2.5 align-middle last:border-r-0 [tr:last-child_&]:border-b-0";
 
-/** 관리자 화면의 학생 이름(아바타 + 회원 상세 링크) */
+/** 관리자 화면의 학생 이름(아바타 + 회원 상세 링크).
+ *  관리자 전용이라 탈퇴 학생은 "탈퇴한 학생(원래 이름)"으로 구분해 보여 준다(review U2). */
 export function StudentLink({
   id,
   profile,
@@ -137,19 +139,20 @@ export function StudentLink({
   tab,
 }: {
   id: string;
-  profile: { display_name: string | null; avatar_url: string | null } | null;
+  profile: { display_name: string | null; avatar_url: string | null; withdrawn_at: string | null } | null;
   fallback?: string;
   /** 회원 상세에서 열 탭 */
   tab?: string;
 }) {
-  const name = profile?.display_name || fallback;
+  const name = adminDisplayName(profile, fallback);
+  const withdrawn = isWithdrawnProfile(profile);
   return (
     <Link
       href={`/admin/members/?id=${id}${tab ? `&tab=${tab}` : ""}`}
       className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-md font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <Avatar size="sm">
-        {profile?.avatar_url ? <AvatarImage src={profile.avatar_url} alt="" /> : null}
+        {profile?.avatar_url && !withdrawn ? <AvatarImage src={profile.avatar_url} alt="" /> : null}
         <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
       </Avatar>
       <span className="truncate">{name}</span>

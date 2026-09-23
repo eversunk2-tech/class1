@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { LoginRequiredCard } from "@/components/admin/login-required-card";
 import { MemberAvatar, ProviderBadges } from "@/components/admin/member-badges";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { EmptyState, ErrorState } from "@/components/states";
@@ -184,6 +185,8 @@ export function AdminOverview() {
   return (
     <div className="flex flex-col gap-8">
       <AdminPageHeader title="관리자 대시보드" description={`${greeting} 오늘의 반 현황을 확인하세요.`} />
+
+      <LoginRequiredCard />
 
       <section aria-label="현황 숫자">
         <LearningStatTiles />

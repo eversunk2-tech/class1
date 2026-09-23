@@ -21,12 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/use-session";
+import { isWithdrawnProfile, profileDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import type { CommentWithAuthor } from "@/lib/types";
+import { AUTHOR_PROFILE_COLUMNS, type CommentWithAuthor } from "@/lib/types";
 
 const MAX_LENGTH = 2000;
-const COMMENT_COLUMNS = "id,body,created_at,user_id,profiles(display_name,avatar_url)";
+const COMMENT_COLUMNS = `id,body,created_at,user_id,profiles(${AUTHOR_PROFILE_COLUMNS})`;
 
 async function fetchComments(postId: string): Promise<CommentWithAuthor[]> {
   const { data, error } = await supabase
@@ -135,12 +136,14 @@ export function CommentSection({ postId, published }: { postId: string; publishe
       ) : (
         <ul className="flex flex-col gap-5">
           {comments.map((c) => {
-            const name = c.profiles?.display_name || "익명";
+            const name = profileDisplayName(c.profiles, "익명");
             const canDelete = !!user && (user.id === c.user_id || isAdmin);
             return (
               <li key={c.id} className="flex gap-3">
                 <Avatar size="sm" className="mt-0.5">
-                  {c.profiles?.avatar_url ? <AvatarImage src={c.profiles.avatar_url} alt="" /> : null}
+                  {c.profiles?.avatar_url && !isWithdrawnProfile(c.profiles) ? (
+                    <AvatarImage src={c.profiles.avatar_url} alt="" />
+                  ) : null}
                   <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex min-w-0 flex-1 flex-col gap-1">

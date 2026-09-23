@@ -3,12 +3,28 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, KeyRoundIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
+  EllipsisVerticalIcon,
+  KeyRoundIcon,
+  SearchIcon,
+  UserMinusIcon,
+  XIcon,
+} from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
@@ -20,6 +36,7 @@ import {
   memberProviders,
   MISSING_SCHEMA_MESSAGE,
   passwordResetBlockReason,
+  withdrawBlockReason,
 } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
 import type { MemberRow } from "@/lib/types";
@@ -73,6 +90,8 @@ export function MemberList() {
   const [sort, setSort] = useState<Sort>({ key: "signed_up_at", dir: "desc" });
   const [resetTarget, setResetTarget] = useState<MemberRow | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [withdrawTarget, setWithdrawTarget] = useState<MemberRow | null>(null);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const load = useCallback(async (): Promise<State> => {
     try {
@@ -129,11 +148,38 @@ export function MemberList() {
     );
   }
 
+  function openWithdraw(row: MemberRow) {
+    setWithdrawTarget(row);
+    setWithdrawOpen(true);
+  }
+
+  function markWithdrawn(userId: string, withdrawnAt: string) {
+    setState((s) =>
+      s.status === "ready"
+        ? {
+            ...s,
+            rows: s.rows.map((r) =>
+              r.id === userId && r.profiles ? { ...r, profiles: { ...r.profiles, withdrawn_at: withdrawnAt } } : r,
+            ),
+          }
+        : s,
+    );
+  }
+
   const detailHref = (row: MemberRow) => `/admin/members/?id=${row.id}`;
 
-  // 행 아무 곳이나 눌러도 상세로 이동한다(버튼·링크를 누른 경우는 제외).
+  // 행 아무 곳이나 눌러도 상세로 이동한다(버튼·링크·메뉴·다이얼로그를 누른 경우는 제외).
+  // ⚠ React 포털(드롭다운 메뉴·다이얼로그)은 DOM이 아니라 React 트리로 이벤트를 올리므로
+  //   메뉴 항목 클릭이 이 <tr>까지 도달한다(review U1). MemberActions를 stopPropagation으로 감싸
+  //   1차로 막고, 아래 선택자로 한 번 더 막는다(둘 중 하나만 있어도 동작하도록 이중으로 둔다).
   function onRowClick(e: MouseEvent<HTMLElement>, row: MemberRow) {
-    if ((e.target as HTMLElement).closest("a,button,input,label")) return;
+    if (
+      (e.target as HTMLElement).closest(
+        'a,button,input,label,[role="menu"],[role="menuitem"],[role="dialog"],[role="alertdialog"],[data-slot^="dropdown-menu"]',
+      )
+    ) {
+      return;
+    }
     router.push(detailHref(row));
   }
 
@@ -263,7 +309,12 @@ export function MemberList() {
                       <RoleBadge member={row} />
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <ResetButton row={row} myId={myId} onClick={() => openReset(row)} />
+                      <MemberActions
+                        row={row}
+                        myId={myId}
+                        onReset={() => openReset(row)}
+                        onWithdraw={() => openWithdraw(row)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -313,7 +364,12 @@ export function MemberList() {
                     </span>
                   </div>
                   <div className="flex justify-end">
-                    <ResetButton row={row} myId={myId} onClick={() => openReset(row)} />
+                    <MemberActions
+                      row={row}
+                      myId={myId}
+                      onReset={() => openReset(row)}
+                      onWithdraw={() => openWithdraw(row)}
+                    />
                   </div>
                 </li>
               ))}
@@ -323,23 +379,66 @@ export function MemberList() {
       )}
 
       <PasswordResetDialog target={resetTarget} open={resetOpen} onOpenChange={setResetOpen} onReset={markReset} />
+      <MemberWithdrawDialog
+        target={withdrawTarget}
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        onWithdrawn={markWithdrawn}
+      />
     </div>
   );
 }
 
-function ResetButton({ row, myId, onClick }: { row: MemberRow; myId: string | null; onClick: () => void }) {
-  const block = passwordResetBlockReason(row, myId);
-  if (block) {
-    return (
-      <Button variant="ghost" size="sm" disabled title={block.long} aria-label={`${memberName(row)} 비밀번호 초기화 불가: ${block.long}`}>
-        {block.short}
-      </Button>
-    );
-  }
+/**
+ * 파괴적인 동작(비밀번호 초기화·탈퇴 처리)을 케밥 메뉴로 묶어 실수 클릭을 막는다(spec §1.3 Q3).
+ * 할 수 없는 항목은 지우지 않고 비활성 + 이유를 보여 준다(왜 못 하는지 알 수 있게).
+ */
+function MemberActions({
+  row,
+  myId,
+  onReset,
+  onWithdraw,
+}: {
+  row: MemberRow;
+  myId: string | null;
+  onReset: () => void;
+  onWithdraw: () => void;
+}) {
+  const name = memberName(row);
+  const resetBlock = passwordResetBlockReason(row, myId);
+  const withdrawBlock = withdrawBlockReason(row, myId);
   return (
-    <Button variant="outline" size="sm" onClick={onClick} aria-label={`${memberName(row)} 비밀번호 초기화`}>
-      <KeyRoundIcon />
-      비밀번호 초기화
-    </Button>
+    // 메뉴는 포털로 그려지지만 이벤트는 React 트리를 타고 올라온다.
+    // 여기서 막지 않으면 항목 클릭이 표의 행(onRowClick)까지 올라가 회원 상세로 이동해 버린다(review U1).
+    <span onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`${name} 관리 메뉴`} />}>
+          <EllipsisVerticalIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem
+            disabled={!!resetBlock}
+            onClick={onReset}
+            title={resetBlock?.long}
+            aria-label={resetBlock ? `비밀번호 초기화 불가: ${resetBlock.long}` : `${name} 비밀번호 초기화`}
+          >
+            <KeyRoundIcon />
+            비밀번호 초기화
+            {resetBlock ? <span className="ml-auto text-xs text-muted-foreground">{resetBlock.short}</span> : null}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={!!withdrawBlock}
+            onClick={onWithdraw}
+            title={withdrawBlock?.long}
+            aria-label={withdrawBlock ? `탈퇴 처리 불가: ${withdrawBlock.long}` : `${name} 탈퇴 처리`}
+          >
+            <UserMinusIcon />
+            탈퇴 처리
+            {withdrawBlock ? <span className="ml-auto text-xs text-muted-foreground">{withdrawBlock.short}</span> : null}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
   );
 }

@@ -1,17 +1,28 @@
-import { KeyRoundIcon, ShieldCheckIcon } from "lucide-react";
+import { KeyRoundIcon, ShieldCheckIcon, UserMinusIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { memberName, memberProviders, providerLabel } from "@/lib/admin";
+import { isWithdrawnMember, memberName, memberProviders, providerLabel } from "@/lib/admin";
 import type { MemberRow } from "@/lib/types";
 
-/** 회원 아바타(이미지가 없으면 이름 첫 글자) */
+/** 회원 아바타(이미지가 없으면 이름 첫 글자). 탈퇴한 회원은 원래 사진을 쓰지 않는다. */
 export function MemberAvatar({ member, size = "default" }: { member: MemberRow; size?: "default" | "sm" | "lg" }) {
   const name = memberName(member);
+  const withdrawn = isWithdrawnMember(member);
   return (
     <Avatar size={size}>
-      {member.profiles?.avatar_url ? <AvatarImage src={member.profiles.avatar_url} alt="" /> : null}
+      {member.profiles?.avatar_url && !withdrawn ? <AvatarImage src={member.profiles.avatar_url} alt="" /> : null}
       <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
     </Avatar>
+  );
+}
+
+/** 탈퇴 처리된 회원 표시 */
+export function WithdrawnBadge() {
+  return (
+    <Badge variant="outline" title="계정이 삭제되어 로그인할 수 없습니다. 학습 기록은 그대로 남아 있습니다.">
+      <UserMinusIcon aria-hidden />
+      탈퇴함
+    </Badge>
   );
 }
 
@@ -30,11 +41,12 @@ export function ProviderBadges({ member }: { member: MemberRow }) {
   );
 }
 
-/** 역할 배지 + 비밀번호 변경 대기 표시 */
+/** 역할 배지 + 비밀번호 변경 대기 + 탈퇴 표시 */
 export function RoleBadge({ member }: { member: MemberRow }) {
   const isAdmin = member.profiles?.role === "admin";
   return (
     <span className="flex flex-wrap gap-1">
+      {isWithdrawnMember(member) ? <WithdrawnBadge /> : null}
       {isAdmin ? (
         <Badge>
           <ShieldCheckIcon aria-hidden />

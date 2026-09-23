@@ -11,6 +11,11 @@ export type Profile = {
    *  컬럼 권한상 profiles에서 직접 읽지 않고 my_must_change_password()/admin_must_change_password_ids() RPC로 채운다.
    *  확인하지 못했으면 undefined. */
   must_change_password?: boolean;
+  /** 관리자가 완전 탈퇴 처리한 시각(20260923000000_member_withdrawal.sql).
+   *  null = 정상 회원. 값이 있으면 계정(auth.users)은 이미 삭제됐고 기록만 남은 상태다.
+   *  이름은 화면 전체에서 "탈퇴한 학생"으로 바꿔 보여 준다(profileDisplayName).
+   *  **필수 필드로 둔다**: select 목록에서 빠뜨리면 타입 오류가 나 실명 노출을 막는다(review U5). */
+  withdrawn_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,7 +54,7 @@ export type Comment = {
 
 /** 댓글 + 작성자 프로필(profiles 조인) */
 export type CommentWithAuthor = Pick<Comment, "id" | "body" | "created_at" | "user_id"> & {
-  profiles: Pick<Profile, "display_name" | "avatar_url"> | null;
+  profiles: Pick<Profile, "display_name" | "avatar_url" | "withdrawn_at"> | null;
 };
 
 export type Like = {
@@ -83,15 +88,19 @@ export type MemberDirectory = {
 
 /** 회원 목록 1행: member_directory + profiles 조인 */
 export type MemberRow = MemberDirectory & {
-  profiles: Pick<Profile, "display_name" | "avatar_url" | "role" | "must_change_password"> | null;
+  profiles: Pick<Profile, "display_name" | "avatar_url" | "role" | "must_change_password" | "withdrawn_at"> | null;
 };
 
-/** must_change_password는 컬럼 권한으로 막혀 있어(20260922000000) embed하지 않는다 → admin.ts가 RPC로 채운다. */
+/** must_change_password는 컬럼 권한으로 막혀 있어(20260922000000) embed하지 않는다 → admin.ts가 RPC로 채운다.
+ *  withdrawn_at은 20260923000000에서 공개 컬럼으로 열어 두었다. */
 export const MEMBER_ROW_COLUMNS =
-  "id,email,provider,providers,signed_up_at,last_sign_in_at,updated_at,profiles(display_name,avatar_url,role)";
+  "id,email,provider,providers,signed_up_at,last_sign_in_at,updated_at,profiles(display_name,avatar_url,role,withdrawn_at)";
 
 /** profiles에서 클라이언트가 읽을 수 있는 컬럼(select("*")는 컬럼 권한 때문에 실패한다). */
-export const PROFILE_COLUMNS = "id,display_name,avatar_url,role,created_at,updated_at";
+export const PROFILE_COLUMNS = "id,display_name,avatar_url,role,created_at,updated_at,withdrawn_at";
+
+/** 작성자 이름 표시에 필요한 최소 컬럼(profiles embed). withdrawn_at이 있어야 "탈퇴한 학생"으로 바꿀 수 있다. */
+export const AUTHOR_PROFILE_COLUMNS = "display_name,avatar_url,withdrawn_at";
 
 export type AppResult = {
   id: string;

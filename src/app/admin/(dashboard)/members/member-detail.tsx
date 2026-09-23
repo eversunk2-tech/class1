@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, KeyRoundIcon, Loader2Icon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
+import { ArrowLeftIcon, KeyRoundIcon, Loader2Icon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
 import {
@@ -24,13 +25,17 @@ import {
   AdminActionError,
   accountLabel,
   canResetPassword,
+  fetchLatestWithdrawal,
   fetchMember,
+  isWithdrawnMember,
+  memberRealName,
   passwordResetBlockReason,
   isMissingSchemaError,
   memberName,
   MISSING_SCHEMA_MESSAGE,
   setMemberRole,
   UUID_RE,
+  withdrawBlockReason,
 } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import type { MemberRow, Role } from "@/lib/types";
@@ -62,6 +67,8 @@ export function MemberDetail({ id }: { id: string }) {
   const [resetOpen, setResetOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
   const [roleBusy, setRoleBusy] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawInfo, setWithdrawInfo] = useState<{ created_at: string; actor_name: string | null } | null>(null);
 
   const load = useCallback(async (): Promise<State> => {
     try {
@@ -87,6 +94,22 @@ export function MemberDetail({ id }: { id: string }) {
     setState({ status: "loading" });
     setState(await load());
   }
+
+  // 탈퇴한 회원이면 "언제·누가" 처리했는지 감사 로그에서 최근 1건을 읽는다(표가 없으면 조용히 건너뛴다).
+  const withdrawn = state.status === "ready" && isWithdrawnMember(state.member);
+  useEffect(() => {
+    if (!withdrawn) return;
+    let active = true;
+    fetchLatestWithdrawal(id).then(
+      (info) => {
+        if (active) setWithdrawInfo(info);
+      },
+      () => {},
+    );
+    return () => {
+      active = false;
+    };
+  }, [withdrawn, id]);
 
   if (state.status === "loading") {
     return (
@@ -121,10 +144,14 @@ export function MemberDetail({ id }: { id: string }) {
 
   const member = state.member;
   const name = memberName(member);
+  // 관리자 화면에서는 기록의 주인을 알아볼 수 있게 탈퇴 전 이름도 함께 보여 준다.
+  const realName = memberRealName(member);
+  const isWithdrawn = isWithdrawnMember(member);
   const isAdmin = member.profiles?.role === "admin";
   const isSelf = user?.id === member.id;
   const nextRole: Role = isAdmin ? "user" : "admin";
   const resetBlock = passwordResetBlockReason(member, user?.id);
+  const withdrawBlock = withdrawBlockReason(member, user?.id);
 
   function patchMember(patch: (m: MemberRow) => MemberRow) {
     setState((s) => (s.status === "ready" ? { ...s, member: patch(s.member) } : s));
@@ -158,7 +185,10 @@ export function MemberDetail({ id }: { id: string }) {
             <h1 id="member-name" className="truncate font-heading text-2xl leading-tight font-normal sm:text-3xl">
               {name}
             </h1>
-            <p className="truncate text-sm text-muted-foreground">{accountLabel(member.email)}</p>
+            <p className="truncate text-sm text-muted-foreground">
+              {accountLabel(member.email)}
+              {isWithdrawn ? ` · 탈퇴 전 이름: ${realName}` : ""}
+            </p>
           </div>
           <RoleBadge member={member} />
         </div>
@@ -174,13 +204,28 @@ export function MemberDetail({ id }: { id: string }) {
           </Field>
           <Field label="역할">{isAdmin ? "관리자" : "학생(일반 회원)"}</Field>
           <Field label="비밀번호">
-            {member.profiles?.must_change_password
-              ? "임시 비밀번호 발급됨 — 다음 로그인 때 변경 필요"
-              : canResetPassword(member)
-                ? "설정됨"
-                : "없음(OAuth 전용 계정)"}
+            {isWithdrawn
+              ? "없음(계정 삭제됨)"
+              : member.profiles?.must_change_password
+                ? "임시 비밀번호 발급됨 — 다음 로그인 때 변경 필요"
+                : canResetPassword(member)
+                  ? "설정됨"
+                  : "없음(OAuth 전용 계정)"}
           </Field>
+          {isWithdrawn ? (
+            <Field label="탈퇴 처리">
+              {member.profiles?.withdrawn_at ? formatDateTime(member.profiles.withdrawn_at) : "처리됨"}
+              {withdrawInfo?.actor_name ? ` · ${withdrawInfo.actor_name}` : ""}
+            </Field>
+          ) : null}
         </dl>
+
+        {isWithdrawn ? (
+          <p className="rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground" role="note">
+            이 학생의 계정은 삭제되어 더 이상 로그인할 수 없습니다. 아래 학습 기록과 게시글은 그대로 남아 있으며,
+            학생·다른 사람에게는 이름이 “탈퇴한 학생”으로 보입니다. 되돌릴 수 없습니다.
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap items-start gap-2 border-t pt-4">
           {resetBlock ? (
@@ -203,16 +248,35 @@ export function MemberDetail({ id }: { id: string }) {
               관리자 해제(본인 불가)
             </Button>
           ) : (
-            <Button variant={isAdmin ? "destructive" : "outline"} onClick={() => setRoleOpen(true)}>
+            <Button
+              variant={isAdmin ? "destructive" : "outline"}
+              disabled={isWithdrawn}
+              title={isWithdrawn ? "탈퇴한 학생의 역할은 바꿀 수 없습니다." : undefined}
+              onClick={() => setRoleOpen(true)}
+            >
               {isAdmin ? <ShieldOffIcon /> : <ShieldCheckIcon />}
               {isAdmin ? "관리자 해제" : "관리자로 지정"}
+            </Button>
+          )}
+          {withdrawBlock ? (
+            <div className="flex flex-col gap-1">
+              <Button variant="outline" disabled title={withdrawBlock.long} className="self-start">
+                <UserMinusIcon />
+                탈퇴 처리 불가({withdrawBlock.short})
+              </Button>
+              <p className="max-w-md text-xs text-muted-foreground">{withdrawBlock.long}</p>
+            </div>
+          ) : (
+            <Button variant="destructive" onClick={() => setWithdrawOpen(true)}>
+              <UserMinusIcon />
+              탈퇴 처리
             </Button>
           )}
         </div>
       </section>
 
-      {/* 학습활동 영역: 웹앱 결과 / 읽은 글 / 댓글·좋아요 / 과제 제출 / 피드백 대화 */}
-      <MemberLearning memberId={member.id} memberName={name} />
+      {/* 학습활동 영역: 웹앱 결과 / 읽은 글 / 댓글·좋아요 / 과제 제출 / 피드백 대화 (탈퇴해도 그대로 남는다) */}
+      <MemberLearning memberId={member.id} memberName={name} memberWithdrawn={isWithdrawn} />
 
       <PasswordResetDialog
         target={member}
@@ -220,6 +284,15 @@ export function MemberDetail({ id }: { id: string }) {
         onOpenChange={setResetOpen}
         onReset={() =>
           patchMember((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, must_change_password: true } } : m))
+        }
+      />
+
+      <MemberWithdrawDialog
+        target={member}
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        onWithdrawn={(_id, withdrawnAt) =>
+          patchMember((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, withdrawn_at: withdrawnAt } } : m))
         }
       />
 

@@ -42,13 +42,28 @@ type SessionState = {
 const SessionContext = createContext<SessionState | null>(null);
 
 /**
+ * 20260923000000_member_withdrawal.sql 실행 전에는 withdrawn_at 컬럼이 없다.
+ * 그때 프로필 조회가 통째로 실패하면 관리자도 /admin/에 들어가지 못해 SQL을 고칠 방법이 막힌다(자물쇠).
+ * → 컬럼이 없다는 오류면 그 컬럼만 빼고 한 번 더 읽는다.
+ */
+async function selectProfile(userId: string, columns: string) {
+  const res = await supabase.from("profiles").select(columns).eq("id", userId).maybeSingle();
+  if (!res.error || !isMissingSchemaError(res.error) || !columns.includes("withdrawn_at")) return res;
+  const legacy = columns
+    .split(",")
+    .filter((c) => c !== "withdrawn_at")
+    .join(",");
+  return supabase.from("profiles").select(legacy).eq("id", userId).maybeSingle();
+}
+
+/**
  * profiles(공개 컬럼) + must_change_password(본인만 조회 가능한 RPC).
  * profiles는 컬럼 권한 때문에 select("*")를 쓸 수 없다(20260922000000_admin_learning_fixes.sql).
  * 실패하면 throw한다(호출하는 쪽이 이전 값을 유지하도록).
  */
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const [profileRes, flagRes] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle(),
+    selectProfile(userId, PROFILE_COLUMNS),
     supabase.rpc("my_must_change_password"),
   ]);
   if (profileRes.error) throw profileRes.error;
@@ -66,7 +81,8 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
       must = (legacy.data as { must_change_password?: boolean } | null)?.must_change_password === true;
     }
   } else throw flagRes.error;
-  return { ...row, must_change_password: must };
+  // withdrawn_at 컬럼이 없던 경로(위 selectProfile 대비 코드)로 읽었으면 undefined다 → null로 맞춘다.
+  return { ...row, withdrawn_at: row.withdrawn_at ?? null, must_change_password: must };
 }
 
 /** 실패 후 자동 재시도 간격(ms). 마지막 값을 계속 쓴다. 창 포커스 때도 다시 시도한다. */

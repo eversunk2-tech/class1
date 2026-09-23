@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useSession } from "@/hooks/use-session";
+import { adminDisplayName, profileDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   errorMessage,
@@ -45,6 +46,7 @@ export function FeedbackThread({
   context,
   audience,
   studentName,
+  studentWithdrawn,
   className,
   autoFocus,
 }: {
@@ -53,6 +55,8 @@ export function FeedbackThread({
   audience: "admin" | "student";
   /** 관리자 화면에서 학생 메시지에 붙일 이름 */
   studentName?: string;
+  /** 탈퇴 처리된 학생인지(관리자 화면). 새 메시지를 보내도 학생이 읽을 수 없으므로 안내한다(review U6). */
+  studentWithdrawn?: boolean;
   className?: string;
   autoFocus?: boolean;
 }) {
@@ -144,8 +148,13 @@ export function FeedbackThread({
   function senderLabel(m: FeedbackMessageWithSender): string {
     if (m.sender_id === me) return "나";
     if (audience === "student") return "선생님";
-    if (m.sender_id === studentId) return studentName || m.profiles?.display_name || "학생";
-    return `선생님${m.profiles?.display_name ? ` (${m.profiles.display_name})` : ""}`;
+    // 관리자 화면에서는 탈퇴 학생도 "탈퇴한 학생(원래 이름)"으로 구분한다(review U2).
+    if (m.sender_id === studentId) {
+      return studentName || (audience === "admin" ? adminDisplayName : profileDisplayName)(m.profiles, "학생");
+    }
+    // 선생님(관리자)은 탈퇴 대상이 아니지만, 표시는 같은 헬퍼로 통일한다.
+    const teacher = m.profiles?.display_name ? profileDisplayName(m.profiles, "") : "";
+    return `선생님${teacher ? ` (${teacher})` : ""}`;
   }
 
   return (
@@ -207,6 +216,12 @@ export function FeedbackThread({
         </ol>
         </>
       )}
+
+      {state.status === "ready" && studentWithdrawn && audience === "admin" ? (
+        <p role="note" className="rounded-xl border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          탈퇴 처리된 학생이라 계정이 없습니다. 지금 보내는 메시지는 <strong>학생이 읽을 수 없고</strong> 기록으로만 남습니다.
+        </p>
+      ) : null}
 
       {state.status === "ready" ? (
         <form onSubmit={onSubmit} className="flex flex-col gap-2">

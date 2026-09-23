@@ -24,7 +24,16 @@ function isTab(v: string | null): v is TabId {
  * 회원 상세의 학습활동 영역(docs/admin/spec.md §3.5).
  * 탭은 ?tab= 으로 유지한다(/admin/members/?id=…&tab=feedback&thread=…). 탭마다 독립 로딩/빈/오류.
  */
-export function MemberLearning({ memberId, memberName }: { memberId: string; memberName: string }) {
+export function MemberLearning({
+  memberId,
+  memberName,
+  memberWithdrawn,
+}: {
+  memberId: string;
+  memberName: string;
+  /** 탈퇴 처리된 학생인지 — 피드백 대화에 "학생이 읽을 수 없음" 안내를 띄운다(review U6). */
+  memberWithdrawn?: boolean;
+}) {
   const params = useSearchParams();
   const router = useRouter();
   const raw = params.get("tab");
@@ -64,7 +73,13 @@ export function MemberLearning({ memberId, memberName }: { memberId: string; mem
           <UserSubmissions userId={memberId} studentName={memberName} />
         </TabsContent>
         <TabsContent value="feedback">
-          <FeedbackCenter studentId={memberId} audience="admin" studentName={memberName} initialKey={params.get("thread")} />
+          <FeedbackCenter
+            studentId={memberId}
+            audience="admin"
+            studentName={memberName}
+            studentWithdrawn={memberWithdrawn}
+            initialKey={params.get("thread")}
+          />
         </TabsContent>
       </Tabs>
     </section>

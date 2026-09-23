@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
 import {
   deleteSubmission,
@@ -85,8 +86,8 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
       if (!students.some((st) => st.id === s.user_id)) list.push({ studentId: s.user_id, student: null, submission: s });
     }
     return list.sort((a, b) => {
-      const an = a.student?.display_name || a.student?.email || "";
-      const bn = b.student?.display_name || b.student?.email || "";
+      const an = adminDisplayName(a.student, a.student?.email || "");
+      const bn = adminDisplayName(b.student, b.student?.email || "");
       return an.localeCompare(bn, "ko");
     });
   }, [state]);
@@ -228,7 +229,7 @@ function SubmissionRow({
   const [statusBusy, setStatusBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const name = row.student?.display_name || row.student?.email?.split("@")[0] || "이름 없음";
+  const name = adminDisplayName(row.student, row.student?.email?.split("@")[0] || "이름 없음");
 
   async function onStatus(next: SubmissionStatus) {
     if (!s || next === s.status) return;
@@ -264,7 +265,11 @@ function SubmissionRow({
         <span className="min-w-0 flex-1 basis-40">
           <StudentLink
             id={row.studentId}
-            profile={row.student ? { display_name: name, avatar_url: row.student.avatar_url } : null}
+            profile={
+              row.student
+                ? { display_name: name, avatar_url: row.student.avatar_url, withdrawn_at: row.student.withdrawn_at }
+                : null
+            }
             tab="assignments"
           />
         </span>
@@ -303,6 +308,7 @@ function SubmissionRow({
             context={{ type: "assignment_submission", id: s.id }}
             audience="admin"
             studentName={name}
+            studentWithdrawn={Boolean(row.student?.withdrawn_at)}
             title={`${name} · ${assignment.title}`}
             label="피드백 남기기"
           />

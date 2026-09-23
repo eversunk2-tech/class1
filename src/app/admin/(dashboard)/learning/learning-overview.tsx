@@ -18,6 +18,7 @@ import {
 import { EmptyState } from "@/components/states";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useSession } from "@/hooks/use-session";
+import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
 import {
   appLabelAdmin,
@@ -157,7 +158,7 @@ function FeedbackInbox() {
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className="truncate font-medium">{t.student?.display_name || "이름 없음"}</span>
+                      <span className="truncate font-medium">{adminDisplayName(t.student, "이름 없음")}</span>
                       <span className="truncate text-xs text-muted-foreground">{t.context.label}</span>
                     </span>
                     <span className="truncate text-sm text-muted-foreground">

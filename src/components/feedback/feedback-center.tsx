@@ -84,11 +84,14 @@ export function FeedbackCenter({
   studentId,
   audience,
   studentName,
+  studentWithdrawn,
   initialKey,
 }: {
   studentId: string;
   audience: "admin" | "student";
   studentName?: string;
+  /** 탈퇴 처리된 학생인지(review U6) */
+  studentWithdrawn?: boolean;
   /** 처음 열 스레드의 context_key(예: "assignment_submission:<id>") */
   initialKey?: string | null;
 }) {
@@ -164,6 +167,7 @@ export function FeedbackCenter({
                 context={current.context}
                 audience={audience}
                 studentName={studentName}
+                studentWithdrawn={studentWithdrawn}
               />
             </section>
           </div>
@@ -180,6 +184,7 @@ export function FeedbackDialogButton({
   audience,
   title,
   studentName,
+  studentWithdrawn,
   label,
   size = "sm",
   variant = "outline",
@@ -189,6 +194,8 @@ export function FeedbackDialogButton({
   audience: "admin" | "student";
   title: string;
   studentName?: string;
+  /** 탈퇴 처리된 학생인지 — 대화창에 "학생이 읽을 수 없음" 안내를 띄운다(review U6). */
+  studentWithdrawn?: boolean;
   label?: string;
   size?: "sm" | "xs" | "default";
   variant?: "outline" | "ghost" | "secondary";
@@ -211,7 +218,14 @@ export function FeedbackDialogButton({
             </DialogDescription>
           </DialogHeader>
           {open ? (
-            <FeedbackThread studentId={studentId} context={context} audience={audience} studentName={studentName} autoFocus />
+            <FeedbackThread
+              studentId={studentId}
+              context={context}
+              audience={audience}
+              studentName={studentName}
+              studentWithdrawn={studentWithdrawn}
+              autoFocus
+            />
           ) : null}
         </DialogContent>
       </Dialog>

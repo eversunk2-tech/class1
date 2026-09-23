@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { findResponseApp, getResponseSchema, responseApps, type ResponseSchema } from "@/data/app-responses";
 import { useAsyncData } from "@/hooks/use-async-data";
-import { accountLabel } from "@/lib/admin";
+import { accountLabel, adminDisplayName } from "@/lib/admin";
 import { extractResponses, groupByStage, progressInfo, questionIdentity, stageLabel, versionLabel } from "@/lib/app-responses";
 import { formatDateTime } from "@/lib/format";
 import { praiseNameOf } from "@/lib/praise";
@@ -46,7 +46,7 @@ type Status = "done" | "progress" | "none";
 type StudentEntry = {
   id: string;
   name: string;
-  profile: { display_name: string | null; avatar_url: string | null } | null;
+  profile: { display_name: string | null; avatar_url: string | null; withdrawn_at: string | null } | null;
   /** 가장 최근 완료 결과(없으면 가장 최근 결과) */
   latest: AppResultWithStudent | null;
   completedCount: number;
@@ -117,8 +117,10 @@ async function loadResponses(appId: string): Promise<Data> {
     const s = studentById.get(id);
     const list = byUser.get(id) ?? [];
     const latest = latestByUser.get(id) ?? null;
-    const profile = s ? { display_name: s.display_name, avatar_url: s.avatar_url } : (latest?.profiles ?? null);
-    const name = profile?.display_name?.trim() || (s ? accountLabel(s.email).split("@")[0] : "") || "이름 없음";
+    const profile = s
+      ? { display_name: s.display_name, avatar_url: s.avatar_url, withdrawn_at: s.withdrawn_at }
+      : (latest?.profiles ?? null);
+    const name = adminDisplayName(profile, (s ? accountLabel(s.email).split("@")[0] : "") || "이름 없음");
     const prog = progressByUser.get(id) ?? null;
     const status: Status = latest?.completed ? "done" : latest || prog ? "progress" : "none";
     return {
@@ -130,7 +132,7 @@ async function loadResponses(appId: string): Promise<Data> {
       progress: prog,
       status,
       teacherMessages: counts.get(id) ?? 0,
-      praiseName: praiseNameOf(profile?.display_name),
+      praiseName: praiseNameOf(profile?.withdrawn_at ? name : profile?.display_name),
       inRoster: students == null || studentById.has(id),
     };
   });
@@ -272,7 +274,14 @@ function StudentCard({
               <p className="text-xs text-muted-foreground">
                 {entry.name}에게 보이는 대화 · {appTitle} · {formatDateTime(r.created_at)} 결과
               </p>
-              <FeedbackThread studentId={entry.id} context={{ type: "app_result", id: r.id }} audience="admin" studentName={entry.name} autoFocus />
+              <FeedbackThread
+                studentId={entry.id}
+                context={{ type: "app_result", id: r.id }}
+                audience="admin"
+                studentName={entry.name}
+                studentWithdrawn={Boolean(entry.profile?.withdrawn_at)}
+                autoFocus
+              />
             </section>
           ) : null}
         </>
@@ -468,6 +477,7 @@ function QuestionView({
                   context={{ type: "app_result", id: result.id }}
                   audience="admin"
                   studentName={entry.name}
+                  studentWithdrawn={Boolean(entry.profile?.withdrawn_at)}
                   title={`${appTitle} · ${entry.name}`}
                   size="xs"
                   variant="ghost"

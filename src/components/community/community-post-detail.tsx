@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
-import { UUID_RE } from "@/lib/admin";
+import { isWithdrawnProfile, UUID_RE } from "@/lib/admin";
 import {
   authorName,
   communityEditHref,
@@ -165,7 +165,9 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <Avatar size="sm">
-              {post.profiles?.avatar_url ? <AvatarImage src={post.profiles.avatar_url} alt="" /> : null}
+              {post.profiles?.avatar_url && !isWithdrawnProfile(post.profiles) ? (
+                <AvatarImage src={post.profiles.avatar_url} alt="" />
+              ) : null}
               <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
             </Avatar>
             <span className="font-medium text-foreground">{name}</span>

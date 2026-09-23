@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { findResponseApp } from "@/data/app-responses";
 import { webApps } from "@/data/apps";
 import { useAsyncData } from "@/hooks/use-async-data";
+import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { appLabel, appLabelAdmin, fetchAppResultsWithStudents, formatDuration, formatScore } from "@/lib/learning";
 
@@ -117,7 +118,8 @@ export function AppResultsView({ initialApp }: { initialApp: string | null }) {
                       studentId={r.user_id}
                       context={{ type: "app_result", id: r.id }}
                       audience="admin"
-                      studentName={r.profiles?.display_name ?? undefined}
+                      studentName={r.profiles ? adminDisplayName(r.profiles, "") || undefined : undefined}
+                      studentWithdrawn={Boolean(r.profiles?.withdrawn_at)}
                       title={`${appLabelAdmin(r.app_id)} · ${formatDateTime(r.created_at)}`}
                       size="xs"
                       variant="ghost"
