@@ -1,10 +1,12 @@
 // admin-create-member — 관리자가 새 계정(학생·교사)을 한 번에 여러 개 만든다.
 // docs/admin/create-members/build-instructions.md. 배포 방법은 같은 폴더의 README.md 참고.
 //
-// 요청:  POST { "rows": [{ "id": "60101", "password": "…", "role": "user" | "admin" }] }
+// 요청:  POST { "rows": [{ "id": "60101", "password": "…", "role": "user" | "admin" }],
+//                "source"?: "single" | "bulk" }
 //        (Authorization: Bearer <호출자 access token> — supabase-js가 자동 첨부)
 // 응답:  200 { "results": [{ "index": 0, "id": "60101", "status": "created" | "exists" | "invalid" | "failed",
-//                            "message"?: "…", "warning"?: "…" }] }
+//                            "message"?: "…", "warning"?: "…" }],
+//              "warning"?: "감사 로그를 남기지 못했습니다 …" }
 //        401/403/400/405/413/500 { "error": "한국어 메시지" }
 //
 // 보안 메모
@@ -12,13 +14,16 @@
 // - **비밀번호는 응답·로그 어디에도 남기지 않는다.** console.error에도 아이디까지만 적는다.
 //   (createUser 실패 메시지는 GoTrue가 만든 문구라 비밀번호를 담지 않는다. 그래도 길이만 검사하고 값은 찍지 않는다.)
 // - 호출자가 관리자인지 함수 안에서 확인한다(화면 가드를 믿지 않는다).
-// - 새 SQL은 필요 없다. 계정 생성은 auth admin API, 역할·강제 변경 플래그는 service_role의
-//   profiles UPDATE로 처리한다(20260921000000의 revoke는 anon/authenticated 대상이라 service_role에는 영향이 없다).
+// - 계정 생성은 auth admin API, 역할·강제 변경 플래그는 service_role의 profiles UPDATE로 처리한다
+//   (20260921000000의 revoke는 anon/authenticated 대상이라 service_role에는 영향이 없다).
+// - 감사 로그(member_create_log)는 20260923030000_member_create_log.sql이 필요하다.
+//   **그 SQL을 실행하지 않아도 계정 생성은 그대로 동작한다** — 로그만 못 남기고 응답에 warning을 붙인다(review M1).
 //
 // 동작
 //   ① 호출자 확인(JWT) → ② 관리자 확인 → ③ 입력 검사(행별) →
 //   ④ 행마다 auth.admin.createUser({ email_confirm: true }) →
-//   ⑤ 트리거(handle_new_user)가 만든 profiles 행에 role + must_change_password = true 반영.
+//   ⑤ 트리거(handle_new_user)가 만든 profiles 행에 role + must_change_password = true 반영 →
+//   ⑥ 만들어진 계정 1개당 감사 로그 1행(admin_log_member_create RPC, 서비스 롤 전용).
 //   부분 실패를 허용한다: 성공한 행은 그대로 두고 실패 행만 사유와 함께 돌려준다.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -100,6 +105,20 @@ function validateRow(raw: unknown): { row: RowInput; email: string } | string {
   return { row: { id, password, role }, email: toEmail(id) };
 }
 
+/** 감사 로그용 SQL(20260923030000)이 아직 실행되지 않아 난 오류인지. */
+function isMissingLogSql(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  if (["PGRST202", "42883", "PGRST205", "42P01"].includes(code)) return true;
+  const m = (error.message ?? "").toLowerCase();
+  return m.includes("could not find the function") || m.includes("could not find the table") ||
+    /(function|relation) .* does not exist/.test(m);
+}
+
+const MISSING_LOG_SQL_WARNING =
+  "계정은 만들었지만 '누가 언제 만들었는지' 기록은 남지 않았습니다. " +
+  "Supabase SQL Editor에서 20260923030000_member_create_log.sql을 실행하면 다음부터 기록됩니다.";
+
 function isEmailExistsError(error: { code?: string; message?: string; status?: number } | null): boolean {
   if (!error) return false;
   if (error.code === "email_exists" || error.code === "user_already_exists") return true;
@@ -177,6 +196,8 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: "요청 형식이 올바르지 않습니다." }, 400, headers);
   }
+  const rawSource = (body as { source?: unknown } | null)?.source;
+  const source: "single" | "bulk" = rawSource === "single" || rawSource === "bulk" ? rawSource : "bulk";
   const rawRows = (body as { rows?: unknown } | null)?.rows;
   if (!Array.isArray(rawRows)) return json({ error: "만들 계정 목록(rows)이 없습니다." }, 400, headers);
   if (rawRows.length === 0) return json({ error: "만들 계정이 없습니다." }, 400, headers);
@@ -185,6 +206,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const results: RowResult[] = [];
+  // 감사 로그 상태: 한 번 "SQL 미실행"이 확인되면 나머지 행에서는 시도하지 않는다(요청 낭비 방지).
+  let logAvailable = true;
+  let logWarning: string | null = null;
   const prepared: { index: number; row: RowInput; email: string }[] = [];
   const seen = new Set<string>();
   rawRows.forEach((raw, index) => {
@@ -236,6 +260,28 @@ Deno.serve(async (req: Request) => {
       .update({ role: row.role, must_change_password: true })
       .eq("id", newId);
 
+    // ⑥ 감사 로그(만들어진 계정 1개당 1행). 실패해도 **계정 생성은 그대로 둔다**(review M1).
+    //    profiles UPDATE가 실패했다면 실제 역할은 기본값 'user'이므로 그대로 기록한다(있는 그대로 남긴다).
+    if (logAvailable) {
+      const loggedRole = profileUpdateErr ? "user" : row.role;
+      const { error: logErr } = await admin.rpc("admin_log_member_create", {
+        p_target: newId,
+        p_actor: callerId,
+        p_role: loggedRole,
+        p_source: source,
+      });
+      if (logErr) {
+        // 비밀번호는 로그에 남기지 않는다(아이디까지만).
+        console.error(`admin-create-member: 감사 로그 실패 [${row.id}]`, logErr.message);
+        if (isMissingLogSql(logErr)) {
+          logAvailable = false;
+          logWarning = MISSING_LOG_SQL_WARNING;
+        } else if (!logWarning) {
+          logWarning = `계정은 만들었지만 생성 기록(감사 로그)을 남기지 못했습니다. (${logErr.message})`;
+        }
+      }
+    }
+
     if (profileUpdateErr) {
       console.error(`admin-create-member: 프로필 설정 실패 [${row.id}]`, profileUpdateErr.message);
       results.push({
@@ -254,5 +300,5 @@ Deno.serve(async (req: Request) => {
   }
 
   results.sort((a, b) => a.index - b.index);
-  return json({ results }, 200, headers);
+  return json(logWarning ? { results, warning: logWarning } : { results }, 200, headers);
 });

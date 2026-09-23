@@ -147,9 +147,11 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         error: null,
         warning: null,
       };
-      const [outcome] = await createMembers([draft]);
+      const { outcomes, notices } = await createMembers([draft], { source: "single" });
+      const [outcome] = outcomes;
       if (outcome?.status === "created") {
         onCreated?.();
+        for (const notice of notices) toast.warning(notice, { duration: 12000 });
         if (outcome.warning) toast.warning(outcome.warning, { duration: 12000 });
         else toast.success(`${normalized} 계정을 만들었습니다. 첫 로그인 때 비밀번호를 바꾸게 됩니다.`);
         setPassword("");
@@ -266,6 +268,8 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<MemberDraft[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /** 행과 상관없는 서버 안내(예: 감사 로그용 SQL 미실행). */
+  const [serverNotices, setServerNotices] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<FilePhase>({ kind: "idle" });
   const working = useRef(false);
@@ -308,9 +312,13 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
     setError(null);
     setPhase({ kind: "working", done: 0, total: rows.length });
     try {
-      const outcomes = await createMembers(rows, (done, total) => setPhase({ kind: "working", done, total }));
+      const { outcomes, notices } = await createMembers(rows, {
+        source: "bulk",
+        onProgress: (done, total) => setPhase({ kind: "working", done, total }),
+      });
       const { created, failed } = summarize(outcomes);
       setPhase({ kind: "done", outcomes });
+      setServerNotices(notices);
       if (created > 0) onCreated?.();
       if (created > 0 && failed === 0) toast.success(`${created}명을 만들었습니다.`);
       else if (created > 0) toast.warning(`${created}명 성공, ${failed}명 실패했습니다.`);
@@ -324,8 +332,10 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   }
 
   function retryFailed(outcomes: CreateOutcome[]) {
-    const failedKeys = new Set(outcomes.filter((o) => o.status !== "created").map((o) => o.key));
-    run(drafts.filter((d) => failedKeys.has(d.key)));
+    // 다시 보낼 값이 있는 행만 보낸다(review L3).
+    // "이미 있음"은 다시 해도 같은 결과이고, "형식 오류"는 파일을 고쳐야 하므로 호출을 낭비하지 않는다.
+    const retryKeys = new Set(retryable(outcomes).map((o) => o.key));
+    run(drafts.filter((d) => retryKeys.has(d.key)));
   }
 
   const busy = phase.kind === "working" || phase.kind === "parsing";
@@ -395,7 +405,13 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
         </div>
       ) : null}
 
-      {phase.kind === "done" ? <ResultView outcomes={phase.outcomes} onRetry={() => retryFailed(phase.outcomes)} /> : null}
+      {phase.kind === "done" ? (
+        <ResultView
+          outcomes={phase.outcomes}
+          serverNotices={serverNotices}
+          onRetry={() => retryFailed(phase.outcomes)}
+        />
+      ) : null}
 
       <DialogFooter>
         <DialogClose render={<Button variant="outline" disabled={busy} />}>
@@ -410,6 +426,22 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
       </DialogFooter>
     </div>
   );
+}
+
+/** CSV 서식은 파일로 두지 않고 화면에서 만든다 — .gitignore가 `*.csv`를 막기 때문(계정 CSV에는 비밀번호가 들어간다). */
+const CSV_TEMPLATE = "아이디,비밀번호,역할\n60101,class1234,학생\n60102,class1234,학생\n";
+
+function downloadCsvTemplate() {
+  // 엑셀이 한글을 깨뜨리지 않도록 BOM을 붙인다.
+  const blob = new Blob([`﻿${CSV_TEMPLATE}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "회원추가-서식.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function SpecGuide() {
@@ -436,11 +468,7 @@ function SpecGuide() {
           <FileSpreadsheetIcon />
           서식 내려받기 (.xlsx)
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          render={<a href={withBasePath("/templates/members-template.csv")} download="회원추가-서식.csv" />}
-        >
+        <Button size="sm" variant="ghost" onClick={downloadCsvTemplate}>
           <DownloadIcon />
           CSV 서식
         </Button>
@@ -517,9 +545,23 @@ const STATUS_LABELS: Record<CreateOutcome["status"], string> = {
   failed: "실패",
 };
 
-function ResultView({ outcomes, onRetry }: { outcomes: CreateOutcome[]; onRetry: () => void }) {
+/** 다시 보내 볼 값이 있는 행(review L3). "이미 있음"·"형식 오류"는 다시 보내도 결과가 같다. */
+function retryable(outcomes: CreateOutcome[]): CreateOutcome[] {
+  return outcomes.filter((o) => o.status === "failed");
+}
+
+function ResultView({
+  outcomes,
+  serverNotices,
+  onRetry,
+}: {
+  outcomes: CreateOutcome[];
+  serverNotices: string[];
+  onRetry: () => void;
+}) {
   const { created, failed } = summarize(outcomes);
   const problems = outcomes.filter((o) => o.status !== "created");
+  const retryList = retryable(outcomes);
   const warnings = outcomes.filter((o) => o.status === "created" && o.warning);
   return (
     <div className="flex flex-col gap-3" aria-live="polite">
@@ -532,6 +574,17 @@ function ResultView({ outcomes, onRetry }: { outcomes: CreateOutcome[]; onRetry:
         ) : null}
         . 만들어진 계정은 첫 로그인 때 비밀번호를 새로 정합니다.
       </p>
+
+      {serverNotices.map((notice) => (
+        <p
+          key={notice}
+          className="flex gap-2 rounded-xl border border-foreground/10 bg-muted/50 p-3 text-sm"
+          role="note"
+        >
+          <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span>{notice}</span>
+        </p>
+      ))}
 
       {warnings.length > 0 ? (
         <ul className="flex flex-col gap-1 text-sm">
@@ -579,14 +632,16 @@ function ResultView({ outcomes, onRetry }: { outcomes: CreateOutcome[]; onRetry:
               </tbody>
             </table>
           </div>
-          <div>
-            <Button variant="outline" size="sm" onClick={onRetry}>
-              실패한 {problems.length}행만 다시 시도
-            </Button>
-          </div>
+          {retryList.length > 0 ? (
+            <div>
+              <Button variant="outline" size="sm" onClick={onRetry}>
+                다시 시도할 수 있는 {retryList.length}행만 다시 시도
+              </Button>
+            </div>
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            “이미 있음”은 다시 시도해도 같은 결과입니다. 그 학생의 비밀번호를 바꾸려면 목록에서 <strong>비밀번호
-            초기화</strong>를 쓰세요.
+            “이미 있음”과 “형식 오류”는 다시 시도해도 같은 결과라 다시 보내지 않습니다. 형식 오류는 파일을 고쳐 다시
+            올려 주세요. 이미 있는 학생의 비밀번호를 바꾸려면 목록에서 <strong>비밀번호 초기화</strong>를 쓰세요.
           </p>
         </>
       ) : null}

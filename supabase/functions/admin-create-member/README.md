@@ -8,13 +8,18 @@
 - 역할은 **학생 → `profiles.role = 'user'`**, **교사 → `'admin'`** 두 가지뿐입니다.
 - 화면은 한 번에 **20명씩 나눠** 보냅니다. 함수는 한 요청에 최대 **100행**까지 받습니다.
 
-## 새로 실행할 SQL은 없습니다
+## 먼저 할 일: SQL 1개 (감사 로그용)
 
-이 기능은 **마이그레이션이 필요 없습니다.** 계정 생성은 Auth Admin API로 하고,
-역할·`must_change_password`는 서비스 롤이 `profiles`를 직접 UPDATE합니다
-(`20260921000000_init_blog.sql`의 `revoke`는 `anon`/`authenticated`만 대상이라 서비스 롤에는 영향이 없습니다).
+**`supabase/migrations/20260923030000_member_create_log.sql`을 Supabase SQL Editor에서 먼저 실행**하세요.
+누가·언제·어떤 계정을 어떤 역할로 만들었는지 `member_create_log`에 남기기 위한 표와 서비스 롤 전용 함수입니다.
 
-이미 실행한 마이그레이션만 있으면 됩니다(`20260921020000_admin_learning.sql`의 `must_change_password` 컬럼까지).
+* 계정 생성·역할 지정 자체에는 이 SQL이 **필요 없습니다.** 실행하지 않아도 계정은 정상적으로 만들어지고,
+  대신 "기록이 남지 않았습니다. …SQL을 실행하세요"라는 안내가 화면에 함께 뜹니다.
+* **비밀번호는 로그에 어떤 형태로도 남기지 않습니다.** 실패한 행은 계정이 생기지 않았으므로 기록하지 않습니다.
+* 계정 생성은 Auth Admin API로 하고, 역할·`must_change_password`는 서비스 롤이 `profiles`를 직접 UPDATE합니다
+  (`20260921000000_init_blog.sql`의 `revoke`는 `anon`/`authenticated`만 대상이라 서비스 롤에는 영향이 없습니다).
+
+순서: **① SQL 실행 → ② 이 함수 배포 → ③ 사이트 push.**
 
 ## 환경·설정
 
@@ -66,7 +71,9 @@ npx supabase functions deploy admin-create-member
     { "index": 1, "id": "60102", "status": "exists",  "message": "이미 있는 아이디입니다." },
     { "index": 2, "id": "60103", "status": "invalid", "message": "비밀번호는 6자 이상이어야 합니다." },
     { "index": 3, "id": "60104", "status": "failed",  "message": "계정을 만들지 못했습니다. (…)" }
-  ]
+  ],
+  // 감사 로그를 남기지 못했을 때만 붙는다(계정 생성 자체는 성공한 상태).
+  "warning": "계정은 만들었지만 '누가 언제 만들었는지' 기록은 남지 않았습니다. …"
 }
 ```
 
@@ -81,3 +88,18 @@ npx supabase functions deploy admin-create-member
 | "이미 있는 아이디입니다" | 같은 아이디의 계정이 이미 있습니다(비밀번호는 바뀌지 않습니다). 비밀번호를 바꾸려면 **비밀번호 초기화**를 쓰세요. |
 | "비밀번호가 너무 쉬워 거부되었습니다" | Supabase의 비밀번호 정책(유출 비밀번호 차단 등)에 걸렸습니다. 다른 비밀번호로 바꾸세요. |
 | "요청이 너무 많습니다" | GoTrue 요청 제한입니다. 잠시 뒤 **실패한 행만 다시 시도**를 누르세요. |
+| "계정은 만들었지만 '누가 언제 만들었는지' 기록은 남지 않았습니다" | `20260923030000_member_create_log.sql`을 아직 실행하지 않았습니다. 실행하면 그다음부터 기록됩니다(이미 만든 계정은 그대로 유지됩니다). |
+
+## 감사 로그 확인
+
+SQL Editor에서:
+
+```sql
+select l.created_at, l.actor_name, l.target_email, l.target_role, l.source
+from public.member_create_log l
+order by l.created_at desc
+limit 50;
+```
+
+관리자 화면에는 아직 이 로그를 보여 주는 곳이 없습니다. 나중에 넣는다면 회원 상세
+(`/admin/members/?id=…`)의 "탈퇴 기록"이 있는 자리 옆에 "만든 사람·만든 날짜" 한 줄로 넣는 것이 가장 쌉니다.

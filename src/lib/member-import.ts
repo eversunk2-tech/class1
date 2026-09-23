@@ -9,6 +9,7 @@
 
 import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { AdminActionError } from "@/lib/admin";
+import { loginIdToEmail } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { colIndex, type SheetTable } from "@/lib/spreadsheet";
 
@@ -122,7 +123,7 @@ export type DraftBuildResult =
 
 /** 읽어 들인 표를 "만들 목록"으로 바꾼다. 제목 줄 이름은 흔들림을 허용한다. */
 export function buildDrafts(table: SheetTable): DraftBuildResult {
-  const { rows, numericRefs } = table;
+  const { rows, numericRefs, unsafeNumberRefs } = table;
   if (rows.length === 0) return { ok: false, message: "파일이 비어 있습니다." };
   if (rows.length < 2) return { ok: false, message: "제목 줄 아래에 만들 회원이 한 명도 없습니다." };
 
@@ -151,12 +152,16 @@ export function buildDrafts(table: SheetTable): DraftBuildResult {
   }
 
   // 숫자 서식으로 저장된 아이디·비밀번호 칸은 엑셀이 앞자리 0을 지웠을 수 있다.
-  const numericLines = new Set(
-    numericRefs
-      .filter((ref) => [idIdx, pwIdx].includes(colIndex(ref)))
-      .map((ref) => Number(ref.replace(/\D/g, "")))
-      .filter((line) => line >= 2),
-  );
+  const linesOf = (refs: string[]) =>
+    new Set(
+      refs
+        .filter((ref) => [idIdx, pwIdx].includes(colIndex(ref)))
+        .map((ref) => Number(ref.replace(/\D/g, "")))
+        .filter((line) => line >= 2),
+    );
+  const numericLines = linesOf(numericRefs);
+  // 2^53을 넘는 숫자는 "앞자리 0"이 아니라 **끝자리**가 바뀐다 — 다른 문구로 알린다(review L1).
+  const unsafeLines = linesOf(unsafeNumberRefs);
 
   const seen = new Map<string, number>();
   const drafts: MemberDraft[] = dataRows.map((cells, i) => {
@@ -169,18 +174,23 @@ export function buildDrafts(table: SheetTable): DraftBuildResult {
 
     let error = validateLoginId(rawId);
     if (!error) {
-      const firstLine = seen.get(id);
+      // 서버와 같은 기준(최종 이메일)으로 중복을 본다 — `60101`과 `60101@class1.local`은 같은 계정이다(review L2).
+      const key = loginIdToEmail(id);
+      const firstLine = seen.get(key);
       if (firstLine !== undefined) error = `${firstLine}줄과 아이디가 같습니다.`;
-      else seen.set(id, line);
+      else seen.set(key, line);
     }
     if (!error) error = validatePassword(password);
     if (!error && !rawRole) error = "역할이 비어 있습니다. 학생 또는 교사로 적어 주세요.";
     if (!error && !role) error = `역할 “${rawRole}”을(를) 알 수 없습니다. 학생 또는 교사로 적어 주세요.`;
 
-    const warning =
-      !error && numericLines.has(line)
-        ? "숫자 칸으로 저장되어 앞자리 0이 빠졌을 수 있습니다. 원본과 비교해 주세요."
-        : null;
+    const warning = error
+      ? null
+      : unsafeLines.has(line)
+        ? "숫자가 너무 커서 끝자리가 바뀌었을 수 있습니다. 원본과 비교해 주세요."
+        : numericLines.has(line)
+          ? "숫자 칸으로 저장되어 앞자리 0이 빠졌을 수 있습니다. 원본과 비교해 주세요."
+          : null;
 
     return { key: `${line}:${id || rawId}`, line, id, rawId: rawId.trim(), password, role, rawRole, error, warning };
   });
@@ -198,6 +208,9 @@ export function buildDrafts(table: SheetTable): DraftBuildResult {
 
 export type CreateStatus = "created" | "exists" | "invalid" | "failed";
 
+/** 감사 로그(member_create_log)에 남길 "한 명 만들기 / 엑셀 일괄" 구분. */
+export type CreateSource = "single" | "bulk";
+
 export type CreateOutcome = {
   key: string;
   line: number;
@@ -207,29 +220,54 @@ export type CreateOutcome = {
   warning?: string;
 };
 
+export type CreateRunResult = {
+  outcomes: CreateOutcome[];
+  /** 행과 상관없는 서버 안내(예: 감사 로그용 SQL 미실행). 같은 문구는 한 번만 담긴다. */
+  notices: string[];
+};
+
 const NOT_DEPLOYED_MESSAGE =
-  "회원 추가 기능이 아직 준비되지 않았습니다. Supabase에 Edge Function(admin-create-member)을 배포해 주세요.";
+  "회원 추가 기능이 아직 준비되지 않았습니다. Supabase에 Edge Function(admin-create-member)을 " +
+  "이름 그대로 배포했는지 확인해 주세요. (배포 방법: supabase/functions/admin-create-member/README.md)";
+const NOT_DEPLOYED_HINT = "계속 같은 오류가 나면 Edge Function(admin-create-member)이 배포되어 있는지 확인해 주세요.";
 const NOT_DEPLOYED_OR_NETWORK_MESSAGE =
   "회원 추가 기능에 연결하지 못했습니다. 인터넷 연결을 확인하고, Supabase에 Edge Function(admin-create-member)이 배포되어 있는지 확인해 주세요.";
 
-async function invokeCreate(rows: { id: string; password: string; role: DraftRole }[]): Promise<
-  { index: number; id: string; status: CreateStatus; message?: string; warning?: string }[]
-> {
-  const { data, error } = await supabase.functions.invoke("admin-create-member", { body: { rows } });
+type InvokeResult = {
+  results: { index: number; id: string; status: CreateStatus; message?: string; warning?: string }[];
+  /** 계정은 만들었지만 감사 로그를 남기지 못했을 때 서버가 붙여 보내는 안내(한 번만). */
+  warning?: string;
+};
+
+async function invokeCreate(
+  rows: { id: string; password: string; role: DraftRole }[],
+  source: CreateSource,
+): Promise<InvokeResult> {
+  const { data, error } = await supabase.functions.invoke("admin-create-member", { body: { rows, source } });
   if (error) {
     if (error instanceof FunctionsHttpError) {
       const res = error.context as Response | undefined;
+      const status = res?.status;
+
+      // ① 상태 코드가 원인을 분명히 알려 주는 경우에는 **본문보다 상태 코드를 먼저** 본다(review M2).
+      //    함수가 배포되지 않았을 때 Supabase 게이트웨이가 {"error": "..."} 모양의 영어 본문을 내려주면,
+      //    본문을 우선하던 이전 코드는 "함수를 배포하세요" 안내 대신 뜻 모를 영어 문구를 보여 줬다.
+      //    아래 네 가지는 우리 함수가 내는 문구와도 뜻이 같아서 잃는 정보가 없다.
+      if (status === 404) throw new AdminActionError(NOT_DEPLOYED_MESSAGE);
+      if (status === 401) throw new AdminActionError("로그인이 만료되었습니다. 다시 로그인해 주세요.");
+      if (status === 403) throw new AdminActionError("관리자만 사용할 수 있습니다. 관리자 계정으로 로그인해 주세요.");
+      if (status === 413) throw new AdminActionError("한 번에 보낸 내용이 너무 큽니다. 파일을 나눠서 만들어 주세요.");
+
+      // ② 그 밖의 상태(400·500 등)는 우리 함수가 담아 보낸 한국어 사유가 가장 정확하다.
       let message: string | null = null;
       try {
         const body = (await res?.clone().json()) as { error?: unknown } | undefined;
-        if (typeof body?.error === "string") message = body.error;
+        if (typeof body?.error === "string" && body.error.trim()) message = body.error;
       } catch {
         // 본문이 JSON이 아니면 아래 기본 문구를 쓴다.
       }
       if (message) throw new AdminActionError(message);
-      if (res?.status === 404) throw new AdminActionError(NOT_DEPLOYED_MESSAGE);
-      if (res?.status === 401) throw new AdminActionError("로그인이 만료되었습니다. 다시 로그인해 주세요.");
-      throw new AdminActionError(`회원을 만들지 못했습니다. (HTTP ${res?.status ?? "오류"})`);
+      throw new AdminActionError(`회원을 만들지 못했습니다. (HTTP ${status ?? "오류"}) ${NOT_DEPLOYED_HINT}`);
     }
     if (error instanceof FunctionsFetchError) throw new AdminActionError(NOT_DEPLOYED_OR_NETWORK_MESSAGE);
     if (error instanceof FunctionsRelayError) {
@@ -238,33 +276,40 @@ async function invokeCreate(rows: { id: string; password: string; role: DraftRol
     throw new AdminActionError("회원을 만들지 못했습니다.");
   }
 
-  const results = (data as { results?: unknown } | null)?.results;
-  if (!Array.isArray(results)) {
+  const body = data as { results?: unknown; warning?: unknown } | null;
+  if (!Array.isArray(body?.results)) {
     throw new AdminActionError("서버 응답이 올바르지 않습니다. Edge Function 코드가 최신인지 확인해 주세요.");
   }
-  return results as { index: number; id: string; status: CreateStatus; message?: string; warning?: string }[];
+  return {
+    results: body.results as InvokeResult["results"],
+    warning: typeof body.warning === "string" && body.warning.trim() ? body.warning : undefined,
+  };
 }
 
 /**
  * 만들 목록을 CHUNK_SIZE씩 나눠 Edge Function에 보낸다.
  * 부분 실패를 허용한다: 한 덩어리가 통째로 실패해도 나머지는 계속 시도하고, 실패 사유를 행마다 남긴다.
- * onProgress(done, total)로 진행 상황을 알린다.
+ * `onProgress(done, total)`로 진행 상황을 알리고, 서버가 보낸 안내(감사 로그 실패 등)는 `notices`로 모아 돌려준다.
  */
 export async function createMembers(
   drafts: MemberDraft[],
-  onProgress?: (done: number, total: number) => void,
-): Promise<CreateOutcome[]> {
+  options: { source: CreateSource; onProgress?: (done: number, total: number) => void },
+): Promise<CreateRunResult> {
+  const { source, onProgress } = options;
   const targets = drafts.filter((d) => !d.error && d.role);
   const outcomes: CreateOutcome[] = [];
+  const notices = new Set<string>();
   let done = 0;
   onProgress?.(0, targets.length);
 
   for (let i = 0; i < targets.length; i += CHUNK_SIZE) {
     const chunk = targets.slice(i, i + CHUNK_SIZE);
     try {
-      const results = await invokeCreate(
+      const { results, warning } = await invokeCreate(
         chunk.map((d) => ({ id: d.id, password: d.password, role: d.role as DraftRole })),
+        source,
       );
+      if (warning) notices.add(warning);
       const byIndex = new Map(results.map((r) => [r.index, r]));
       chunk.forEach((draft, n) => {
         const r = byIndex.get(n);
@@ -286,7 +331,7 @@ export async function createMembers(
     done += chunk.length;
     onProgress?.(done, targets.length);
   }
-  return outcomes;
+  return { outcomes, notices: [...notices] };
 }
 
 /** 요약 문구용 집계 */

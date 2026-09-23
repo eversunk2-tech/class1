@@ -15,6 +15,11 @@ export type SheetTable = {
   rows: string[][];
   /** 숫자 서식으로 저장된 셀 주소(예: "A2"). 앞자리 0이 사라졌을 수 있는 칸. */
   numericRefs: string[];
+  /**
+   * 숫자 서식이면서 값이 안전 정수 범위(2^53)를 넘는 셀 주소(review L1).
+   * 자바스크립트가 정확히 표현하지 못해 **끝자리가 바뀌어** 읽힌다. `numericRefs`에도 함께 들어간다.
+   */
+  unsafeNumberRefs: string[];
 };
 
 export class SpreadsheetError extends Error {}
@@ -186,6 +191,7 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<SheetTable> {
 
   const rows: string[][] = [];
   const numericRefs: string[] = [];
+  const unsafeNumberRefs: string[] = [];
   for (const rm of sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>|<row\b[^>]*\/>/g)) {
     const row: string[] = [];
     for (const cm of (rm[1] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
@@ -203,6 +209,8 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<SheetTable> {
         if (type === undefined || type === "n") {
           // 숫자 셀: 1.2E+7 같은 표기를 정수 문자열로 되돌린다.
           if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(value) && Number.isInteger(Number(value))) {
+            // 2^53을 넘으면 이 변환에서 끝자리가 바뀐다 — 숨기지 않고 따로 표시한다(review L1).
+            if (ref && Math.abs(Number(value)) > Number.MAX_SAFE_INTEGER) unsafeNumberRefs.push(ref);
             value = BigInt(Number(value)).toString();
           }
           if (ref) numericRefs.push(ref);
@@ -213,7 +221,7 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<SheetTable> {
     }
     rows.push(Array.from(row, (x) => x ?? ""));
   }
-  return { rows: rows.filter((r) => r.some((v) => String(v).trim() !== "")), numericRefs };
+  return { rows: rows.filter((r) => r.some((v) => String(v).trim() !== "")), numericRefs, unsafeNumberRefs };
 }
 
 /** 파일 하나를 표로 읽는다. 확장자로 .xlsx / 그 밖(CSV·TSV)을 가른다. */
@@ -224,5 +232,5 @@ export async function readSheetFile(file: File): Promise<SheetTable> {
   }
   const buffer = await file.arrayBuffer();
   if (name.endsWith(".xlsx")) return parseXlsx(buffer);
-  return { rows: parseCsv(decodeText(buffer)), numericRefs: [] };
+  return { rows: parseCsv(decodeText(buffer)), numericRefs: [], unsafeNumberRefs: [] };
 }
