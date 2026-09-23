@@ -92,10 +92,11 @@
       ta.value = state.script;
       var note = el("p", { class: "ss-help ss-len-note", id: scriptId + "-note", "aria-live": "polite" });
       ta.setAttribute("aria-describedby", scriptId + "-note");
+      /* 글자 수만 채운 것으로 "잘 적었어요"라고 하지 않는다(대본은 답 검사 대상이 아니다) — 중립 안내만 보여 준다. */
       function drawNote() {
         var n = state.script.trim().length;
-        note.textContent = n >= MIN ? "✔ 잘 적었어요." : MIN + "글자 이상 적어 주세요. (지금 " + n + "글자)";
-        note.classList.toggle("is-ok", n >= MIN);
+        note.textContent = n >= MIN ? "다 적었으면 다음 단계를 눌러요." : MIN + "글자 이상 적어 주세요. (지금 " + n + "글자)";
+        note.classList.remove("is-ok");
       }
       ta.addEventListener("input", function () {
         state.script = ta.value;

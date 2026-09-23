@@ -19,6 +19,9 @@
  *   - index.html에 answer-check.js를 불러온 앱에서만 동작한다. app.js는 바꿀 필요가 없다:
  *     이 화면이 들어 있는 <section data-stage="…">를 스스로 찾아 등록하고, lesson.js가 단계 이동 직전에 불러 준다.
  *   - 막히면 그 질문 칸 아래에 카드가 뜨고, 학생이 적은 글은 지우지 않는다.
+ *   - 글자 수 안내의 "✔ 잘 적었어요"는 **검사를 통과한 그 글일 때만** 나온다. 글자 수만 채운 상태에서는
+ *     "다 적었으면 다음 단계를 눌러요."(중립 안내)가 나오고, 글을 고치면 다시 중립 안내로 돌아간다.
+ *     answer-check.js를 불러오지 않은 앱은 예전처럼 글자 수만 채우면 "✔ 잘 적었어요"가 나온다.
  */
 (function () {
   "use strict";
@@ -37,7 +40,13 @@
       root.textContent = "";
       if (cfg.intro) root.appendChild(el("p", { class: "ss-lead", text: cfg.intro }));
 
-      var boxes = {}; /* 질문별 { ta, host } — 되짚기·차단 카드를 붙일 자리 */
+      var boxes = {}; /* 질문별 { ta, host, draw } — 되짚기·차단 카드를 붙일 자리 */
+
+      /* ── 답 되짚기·차단(answer-check.js가 있을 때만) ── */
+      var AC = SciSim.AnswerCheck || null;
+      function keyOf(q) {
+        return "predict:" + q.id;
+      }
 
       cfg.questions.forEach(function (q, i) {
         var id = "ss-predict-" + q.id;
@@ -51,14 +60,22 @@
         ta.value = values[q.id] || "";
         var note = minLength > 2 ? el("p", { class: "ss-help ss-len-note", id: id + "-note", "aria-live": "polite" }) : null;
         if (note) ta.setAttribute("aria-describedby", id + "-note");
+        /* 글자 수 안내.
+         * "✔ 잘 적었어요"는 **검사를 통과한 그 글**일 때만 보여 준다(answer-check.js가 있을 때).
+         * 글자 수만 채운 상태에서는 칭찬처럼 들리지 않는 중립 안내를 보여 준다 — 학생이 "통과했다"고 오해하지 않게.
+         * answer-check.js가 없는 앱에서는 예전 그대로 동작한다. */
         var drawNote = function () {
           if (!note) return;
-          var n = (values[q.id] || "").trim().length;
-          note.textContent =
-            n >= minLength
-              ? "✔ 잘 적었어요." + (cfg.lengthTip ? " " + cfg.lengthTip : "")
-              : minLength + "글자 이상 적어 주세요. (지금 " + n + "글자)" + (cfg.lengthTip ? " " + cfg.lengthTip : "");
-          note.classList.toggle("is-ok", n >= minLength);
+          var t = (values[q.id] || "").trim();
+          var tip = cfg.lengthTip ? " " + cfg.lengthTip : "";
+          if (t.length < minLength) {
+            note.textContent = minLength + "글자 이상 적어 주세요. (지금 " + t.length + "글자)" + tip;
+            note.classList.remove("is-ok");
+            return;
+          }
+          var passed = AC ? AC.passedFor(keyOf(q), t, q.text) : true;
+          note.textContent = (passed ? "✔ 잘 적었어요." : "다 적었으면 다음 단계를 눌러요.") + tip;
+          note.classList.toggle("is-ok", passed);
         };
         ta.addEventListener("input", function () {
           values[q.id] = ta.value;
@@ -68,7 +85,7 @@
         });
         drawNote();
         var host = el("div", { class: "ss-ac-host" });
-        boxes[q.id] = { ta: ta, host: host };
+        boxes[q.id] = { ta: ta, host: host, draw: drawNote };
         root.appendChild(
           el("div", { class: "ss-card ss-question" }, [
             el("label", { for: id, class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "질문 " + (i + 1) }), q.text]),
@@ -108,11 +125,6 @@
         root.appendChild(box);
       }
 
-      /* ── 답 되짚기·차단(answer-check.js가 있을 때만) ── */
-      var AC = SciSim.AnswerCheck || null;
-      function keyOf(q) {
-        return "predict:" + q.id;
-      }
       function checkPass() {
         if (!AC) return true;
         var list = cfg.questions.slice();
@@ -132,6 +144,7 @@
             mount: box.host,
             focus: box.ta,
           }).then(function (okv) {
+            if (box.draw) box.draw(); /* 통과했으면 이제 "잘 적었어요"로 바뀐다 */
             return okv === false ? false : step();
           });
         }

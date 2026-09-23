@@ -28,6 +28,7 @@
  *   SciSim.AnswerCheck.register(stageId, fn)         // predict.js가 호출. fn: () → true | Promise<bool>
  *   SciSim.AnswerCheck.checkStage(stageId)           // lesson.js가 단계 이동 직전에 호출 → true | Promise<bool>
  *   SciSim.AnswerCheck.verify({ key, stage, question, answer, model, hint, mount, focus })  → Promise<bool>
+ *   SciSim.AnswerCheck.passedFor(key, text, question) → 이 글이 검사를 통과한 그 글인지(화면의 "✔ 잘 적었어요"는 이때만 보여 준다)
  *   SciSim.AnswerCheck.qaFields(key)                 → {} | { nudged, blockCount, teacherOverride }
  */
 (function () {
@@ -294,14 +295,33 @@
     return p;
   }
 
+  /**
+   * 이 글이 "검사를 통과한 글"인지(= 화면에 칭찬 문구를 보여도 되는지).
+   * 통과한 그 글자 그대로일 때만 true. 글을 고치면 다시 false가 된다.
+   * 확실한 무의미(로컬 규칙)는 어떤 경우에도 칭찬하지 않는다.
+   */
+  function passedFor(key, text, question) {
+    var t = String(text || "").trim();
+    if (!t) return false;
+    var st = get(key);
+    if (!st.okFp || st.okFp !== fp(t)) return false;
+    return !Rules.block(t, question);
+  }
+
   /** 답 하나를 검사한다. → Promise<bool>(true면 넘어가도 된다) */
   function verify(o) {
     var key = o.key;
     var text = String(o.answer || "").trim();
     var st = get(key);
+    /* 통과한 글을 기억해 둔다 → 같은 글은 다시 묻지 않고, 화면의 "잘 적었어요"도 이 값으로만 켠다 */
+    function pass() {
+      st.okFp = fp(text);
+      put(key, st);
+      return true;
+    }
 
     /* 선생님이 확인해 준 질문은 늘 통과 */
-    if (st.teacherOverride) return Promise.resolve(true);
+    if (st.teacherOverride) return Promise.resolve(pass());
 
     /* ① 로컬 규칙 — 확실한 무의미(되짚기 1회 제한 없이 매번 검사한다) */
     var why = Rules.block(text, o.question);
@@ -317,25 +337,20 @@
       }).then(function (how) {
         if (how === "teacher") {
           st.teacherOverride = true;
-          put(key, st);
-          return true;
+          return pass();
         }
         return false;
       });
     }
 
     /* ② 이미 한 번 되짚어 준 질문은 늘 통과 */
-    if (st.nudged) return Promise.resolve(true);
+    if (st.nudged) return Promise.resolve(pass());
 
     /* ③ 방금 통과시킨 것과 같은 글이면 다시 묻지 않는다 */
     if (st.okFp && st.okFp === fp(text)) return Promise.resolve(true);
 
     /* ④ 정리하기 통과 지름길(모범 답안 낱말이 이미 들어 있음) */
-    if (o.stage === "conclude" && modelWordHit(text, o.model)) {
-      st.okFp = fp(text);
-      put(key, st);
-      return Promise.resolve(true);
-    }
+    if (o.stage === "conclude" && modelWordHit(text, o.model)) return Promise.resolve(pass());
 
     /* ⑤ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) */
     if (cfg.appId && !APP_ID_RE.test(cfg.appId)) return Promise.resolve(true);
@@ -345,11 +360,7 @@
       var verdict = r ? r.verdict : "rethink"; /* 응답 못 받음 → 되짚기 수준으로 낮춘다 */
       var message = r && r.message ? r.message : "적은 내용을 한 번 더 읽어 보고, 빠진 부분이 없는지 살펴볼까요?";
 
-      if (verdict === "ok") {
-        st.okFp = fp(text);
-        put(key, st);
-        return true;
-      }
+      if (verdict === "ok") return pass();
       if (verdict === "block") {
         st.blockCount += 1;
         put(key, st);
@@ -362,8 +373,7 @@
         }).then(function (how) {
           if (how === "teacher") {
             st.teacherOverride = true;
-            put(key, st);
-            return true;
+            return pass();
           }
           return false;
         });
@@ -378,7 +388,8 @@
         focus: o.focus,
         submitLabel: o.submitLabel,
       }).then(function (how) {
-        return how !== "again";
+        /* "그대로 제출"을 고른 글만 통과로 기록한다(고쳐 쓰기를 고르면 아직 통과가 아니다) */
+        return how === "again" ? false : pass();
       });
     });
   }
@@ -420,6 +431,7 @@
     },
     checkStage: checkStage,
     verify: verify,
+    passedFor: passedFor,
     /** detail.qa 항목에 덧붙일 값(값이 있을 때만). 기존 항목 모양은 바꾸지 않는다. */
     qaFields: function (key) {
       var st = get(key);
