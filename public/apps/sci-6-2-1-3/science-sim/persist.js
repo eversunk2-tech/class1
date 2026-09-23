@@ -13,7 +13,8 @@
  *   처음 만든 store의 접두사(= config의 storageKey, 반드시 "sci6…")가 이 앱의 "뿌리"다. 뿌리 + ":" 로 시작하는
  *   store(예: storageKey + ":fill")도 같은 앱 기록으로 함께 저장된다. 내부 표시 키: "<뿌리>:__meta"(앞 판 "__sync"는 옮김)
  *     { appId, title, owner: 기록 주인 user id, syncedAt: 마지막으로 맞춘 DB updated_at(서버 시각), dirty: DB에 아직 안 올린 변경이 있음,
- *       localAt: 마지막 변경 시각(이 기기 시계 — 화면 표시용, 비교에는 쓰지 않음), pendingClear: "처음부터 다시"의 DB 삭제가 아직 안 됨 }
+ *       localAt: 마지막 변경 시각(이 기기 시계 — 화면 표시용, 비교에는 쓰지 않음), pendingClear: "처음부터 다시"의 DB 삭제가 아직 안 됨,
+ *       sentFp: 마지막으로 서버에 보낸 내용의 지문(응답을 받으면 지운다 — 가짜 충돌 거르기용) }
  *     블로그 로그아웃(src/lib/science-progress.ts)과 앱의 로그아웃 버튼이 이 표시를 보고 못 올린 기록을 올린 뒤 지운다.
  *   ① createStore(뿌리) 때(동기, app.js가 기록을 읽기 전):
  *      - 로그인 세션 없음 → sci6… 로컬 키 모두 삭제, 로그인 안내 화면(가림막). 이후 쓰기는 메모리에만.
@@ -21,7 +22,9 @@
  *   ② Lesson.create → Sync.start(): 서버로 세션 확인 → app_progress 불러와 비교(충돌 규칙, 기기 시계를 쓰지 않는다)
  *      - DB 행 updated_at == syncedAt(서버 변경 없음): 로컬 우선. dirty면 바로 올림.
  *      - DB가 바뀜 + 로컬 변경 없음: DB로 복원 → 새로고침.
- *      - 둘 다 바뀜: 내용이 같으면 맞춘 것으로 보고, 다르면 학생에게 고르게 한다("이 기기의 기록" / "저장된 기록", 각 마지막 시각).
+ *      - 둘 다 바뀜: 내용이 같으면 맞춘 것으로 본다. 다르더라도 ⓐ 서버 내용이 이 기기가 마지막으로 보낸 것(sentFp)과 같거나
+ *        ⓑ 서버 내용이 로컬 안에 그대로 들어 있으면(로컬이 서버의 확장) 이 기기가 만든 차이이므로 조용히 로컬을 올린다(가짜 충돌).
+ *        그 밖에(다른 기기에서 다르게 진행) 학생에게 고르게 한다("이 기기의 기록" / "저장된 기록", 각 마지막 시각).
  *      - DB 행 없음: syncedAt이 있고 dirty가 아니면(다른 기기에서 처음부터 다시) 로컬도 비움, 아니면 로컬을 올림.
  *      - 테이블 없음(마이그레이션 전): 로컬 사본으로 계속, "저장 안 됨" 표시.
  *      - 네트워크 오류: 믿을 수 있는 로컬 사본(같은 주인, 이미 한 번 맞춤)이 있으면 그걸로 계속하며 다시 시도
@@ -140,7 +143,7 @@
       }
     }
     function freshMeta() {
-      return { appId: appId, owner: owner, syncedAt: null, dirty: false, localAt: 0, pendingClear: false };
+      return { appId: appId, owner: owner, syncedAt: null, dirty: false, localAt: 0, pendingClear: false, sentFp: null };
     }
     function clearAppLocal() {
       if (!root) return;
@@ -224,6 +227,26 @@
           "}"
         );
       return JSON.stringify(v === undefined ? null : v);
+    }
+    /* 내용 지문(짧은 문자열). 메타에 보관해 "이 기기가 마지막으로 보낸 내용"인지 알아본다. */
+    function fpOf(s) {
+      var h = 0x811c9dc5;
+      for (var i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+      }
+      return s.length + "-" + h.toString(16);
+    }
+    /* 서버 내용(base)이 로컬 내용(ext)에 그대로 들어 있는가(로컬이 서버의 확장인가) — 키 단위 canon 비교 */
+    function isExtensionOf(base, ext) {
+      if (!base || typeof base !== "object" || !ext || typeof ext !== "object") return false;
+      var ks = Object.keys(base);
+      for (var i = 0; i < ks.length; i++) {
+        var k = ks[i];
+        if (!Object.prototype.hasOwnProperty.call(ext, k)) return false;
+        if (canon(ext[k]) !== canon(base[k])) return false;
+      }
+      return Object.keys(ext).length > ks.length;
     }
     function fmtTime(t) {
       var d = typeof t === "number" ? new Date(t) : new Date(Date.parse(t));
@@ -785,16 +808,35 @@
       }
       // 서버가 바뀜(다른 기기에서 했거나 이 기기에서 처음 연다)
       if (!m.dirty || !hasLocalData()) return restore(row); // 이 기기에 안 올린 변경이 없음 → 서버 기록
-      if (canon(row.state.keys) === canon(snapshot().keys)) {
+      var rowCanon = canon(row.state.keys);
+      if (rowCanon === canon(snapshot().keys)) {
         // 내용이 같다(저장 응답만 못 받음) → 맞춘 것으로 본다
         m.syncedAt = row.updated_at;
         m.dirty = false;
+        m.sentFp = null;
         writeMeta(m);
         goReady();
         setStatus("good", "✅ 저장됨");
         return;
       }
+      // 가짜 충돌 거르기(다른 기기가 아니라 이 기기가 만든 차이) — 데이터는 지우지 않고 로컬을 올린다
+      //  ㄱ) 서버 내용 = 이 기기가 마지막으로 보낸 내용(떠날 때 keepalive 저장. 응답을 못 받아 dirty로 남았다)
+      //  ㄴ) 서버 내용이 로컬 안에 그대로 들어 있음(로컬이 서버의 확장 — 보낸 뒤에 이 기기가 더 썼다)
+      if (m.sentFp && m.sentFp === fpOf(rowCanon)) return keepLocalOver(row, m, "sent");
+      if (isExtensionOf(row.state.keys, snapshot().keys)) return keepLocalOver(row, m, "extends");
       askConflict(row, m); // 둘 다 바뀜 → 학생이 고른다
+    }
+    /* 서버 기록이 이 기기 기록에 이미 담겨 있다 → 충돌 창 없이 로컬을 올린다(잃는 내용 없음) */
+    function keepLocalOver(row, m, why) {
+      m.syncedAt = row.updated_at || null;
+      m.dirty = true;
+      m.localAt = m.localAt || Date.now();
+      m.sentFp = null;
+      writeMeta(m);
+      goReady();
+      setStatus("", "☁️ 저장 중…");
+      saveNow();
+      if (window.SCI_SYNC_DEBUG) console.info("[science-sim] 가짜 충돌 거름(" + why + ")");
     }
     function goReadyGateOnly() {
       // 가림막만 걷는다(화면을 떠나 있으면 "확인 중" 가림막으로 둔다)
@@ -859,6 +901,10 @@
       pendingSince = 0;
       var stamp = m.localAt;
       var snap = snapshot();
+      // 보내는 내용의 지문을 먼저 로컬에 적어 둔다(페이지가 곧 사라져 응답을 못 받아도 남는다).
+      // 다시 열었을 때 "서버 내용 = 내가 보낸 것"이면 가짜 충돌이므로 창을 띄우지 않는다.
+      m.sentFp = fpOf(canon(snap.keys));
+      writeMeta(m);
       var sopts = { expectedUserId: owner, keepalive: ka, force: !!(m.pendingClear || forceOverwrite) };
       if (!sopts.force) sopts.baseUpdatedAt = m.syncedAt || null;
       saving = true;
@@ -876,6 +922,7 @@
         if (m2.owner === owner) {
           if (res.updatedAt) m2.syncedAt = res.updatedAt;
           if (m2.localAt === stamp) m2.dirty = false;
+          m2.sentFp = null; // 응답을 받았으니 지문은 필요 없다
           m2.pendingClear = false; // 새 기록으로 덮어썼으니 지울 필요가 없다
           writeMeta(m2);
         }
@@ -1195,12 +1242,16 @@
   };
 
   /* 받침에 따라 조사 붙이기: SciSim.josa("식초", "을", "를") → "식초를"
-   * 한글이 아닌 글자(A, B 등)로 끝나면 받침 없는 쪽을 쓴다("실험 A를"). */
+   * 숫자로 끝나면 숫자를 읽는 말의 받침을 따른다(1 일·3 삼·6 육·7 칠·8 팔·0 영 → 받침 있음,
+   * 2 이·4 사·5 오·9 구 → 받침 없음). "실험 1을", "실험 2를"처럼 맞게 나온다.
+   * 한글·숫자가 아닌 글자(A, B 등)로 끝나면 받침 없는 쪽을 쓴다("실험 A를"). */
   SciSim.josa = function (word, a, b) {
     word = String(word);
+    var last = word.charAt(word.length - 1);
     var ch = word.charCodeAt(word.length - 1);
-    if (ch < 0xac00 || ch > 0xd7a3) return word + b;
-    return word + ((ch - 0xac00) % 28 ? a : b);
+    if (ch >= 0xac00 && ch <= 0xd7a3) return word + ((ch - 0xac00) % 28 ? a : b);
+    if (last >= "0" && last <= "9") return word + ("136780".indexOf(last) >= 0 ? a : b);
+    return word + b;
   };
 
   /* 입력이 멈춘 뒤 저장(너무 자주 쓰지 않게)

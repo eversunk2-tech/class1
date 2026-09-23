@@ -658,6 +658,7 @@
             });
             resetCheck();
             R.record.disabled = !!trial.check;
+            revealRecord();
           });
           box.appendChild(b);
         });
@@ -736,6 +737,19 @@
       R.checkNode.hidden = !res.node;
       if (res.node) R.checkNode.appendChild(res.node);
       R.retryBtn.hidden = res.ok || !(trial && trial.ob && trial.ob.retryLabel);
+      revealRecord();
+    }
+    /* 보기를 고르거나 '확인하기'를 누르면 카드가 길어져 '기록하기'가 아래 이동 막대에 가릴 수 있다.
+       가려져 있을 때만 막대 위로 보이게 스크롤한다(이미 보이면 그대로 둔다). */
+    function revealRecord() {
+      setTimeout(function () {
+        if (R.observe.hidden) return;
+        var f = document.querySelector(".ss-footer-nav");
+        var vh = window.innerHeight || document.documentElement.clientHeight;
+        var bottom = f ? f.getBoundingClientRect().height : 0;
+        var r = R.record.getBoundingClientRect();
+        if (r.bottom > vh - bottom + 1 || r.top < 0) scrollIntoViewSafe(R.record, { align: "nearest" });
+      }, 60);
     }
     function runCheck() {
       if (!trial || !trial.check) return;

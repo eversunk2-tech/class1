@@ -1,0 +1,76 @@
+/* sci-6-2-3-1 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.intro-body p { margin: 0 0 6px; }
+.safety-line { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--ss-warn-bg); font-size: 0.95rem; }
+.safety-line .safety-h { margin: 0 0 4px; font-weight: 700; }
+.safety-line ul { margin: 0; padding-left: 1.2em; }
+.safety-line li { margin: 2px 0; }
+.opt-icon { font-size: 1.25rem; line-height: 1; }
+#result-table2 { margin-top: 12px; }
+/* 결과 표는 열이 2개뿐이라 공통 틀의 min-width(620px)를 쓰지 않는다 — 좁은 화면에서도 가로 스크롤 없이 보이게 */
+#result-table1 .ss-matrix, #result-table2 .ss-matrix { min-width: 0; }
+#result-table1 .ss-matrix tbody th, #result-table2 .ss-matrix tbody th { white-space: normal; }
+
+/* 가로 화면: 3D 장면과 조작 패널이 한 화면에 들어오게 */
+@media (min-width: 901px) and (orientation: landscape) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: clamp(300px, calc(100vh - var(--ss-header-h) - 150px), 560px); min-height: 300px; }
+}
+/* 세로 태블릿: 3D 장면을 줄여 실행 버튼·관찰 카드가 가까이 오게 */
+@media (orientation: portrait) and (min-width: 641px) {
+  #experiment-root .ss-exp-view:not(.is-2d) { height: min(40vh, 460px); }
+}
+
+/* 3D 장면 위 안내(지금 하는 일) + 모형 배지 */
+.ov3d { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ov-badge {
+  position: absolute; top: 10px; right: 10px; padding: 3px 10px; border-radius: 999px;
+  background: #8a5a12; color: #fff; font-weight: 700; font-size: 0.8rem;
+}
+.ov-text {
+  position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); max-width: 90%;
+  padding: 6px 14px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff;
+  font-weight: 700; font-size: 1rem; text-align: center; white-space: nowrap;
+}
+@media (max-width: 640px) { .ov-text { font-size: 0.9rem; white-space: normal; } .ov-badge { top: 40px; } }
+
+/* 관찰 카드 */
+.ob-seen { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--ss-surface-2); font-weight: 600; }
+.ob-icon { font-size: 1.6rem; line-height: 1.1; }
+
+/* 궁금한 점(한 줄) */
+#curiosity-root .ss-textarea.one-line { min-height: 48px; resize: none; overflow-x: auto; white-space: nowrap; }
+
+/* ── 2D 대체 화면(SVG 회로도 모형) ── */
+.d2-wrap { position: relative; }
+.d2-badge {
+  position: absolute; top: -34px; right: 0; padding: 3px 10px; border-radius: 999px;
+  background: #8a5a12; color: #fff; font-weight: 700; font-size: 0.8rem;
+}
+.d2-svg { display: block; width: 100%; height: auto; max-height: 52vh; color: var(--ss-text); }
+@media (min-width: 901px) and (orientation: landscape) { .d2-svg { max-height: calc(100vh - var(--ss-header-h) - 240px); min-height: 220px; } }
+@media (orientation: portrait) and (min-width: 641px) { .d2-svg { max-height: 40vh; } }
+
+.d2-wire { fill: none; stroke: #33383f; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.d2-wire.d2-red { stroke: #d8434f; }
+.d2-wire.is-flow { stroke-dasharray: 12 8; animation: d2-flow 0.9s linear infinite; }
+@keyframes d2-flow { to { stroke-dashoffset: -20; } }
+@media (prefers-reduced-motion: reduce) { .d2-wire.is-flow { animation: none; } }
+.d2-rod.is-pending { opacity: 0.35; stroke-dasharray: 5 4; }
+.d2-part { fill: #3b4350; stroke: #232932; stroke-width: 2; }
+.d2-battery { fill: #2f6fd6; stroke: #1d4a95; stroke-width: 2; }
+.d2-term { fill: #c2ccd6; stroke: #6f7b89; stroke-width: 2; }
+.d2-lever { stroke: #c2ccd6; stroke-width: 7; stroke-linecap: round; }
+.d2-rod { stroke: #4a525c; stroke-width: 2; }
+.d2-bulb { fill: rgba(220, 235, 250, 0.5); stroke: #7a8ea3; stroke-width: 3; }
+.d2-bulb.is-lit { fill: #ffdd6a; stroke: #d8a417; }
+.d2-glow { fill: #ffd97a; opacity: 0; }
+.d2-glow.is-lit { opacity: 0.45; }
+.d2-name { font-size: 15px; font-weight: 800; fill: currentColor; }
+.d2-pole { font-size: 14px; font-weight: 800; fill: currentColor; }
+.d2-caption { margin: 8px 0 0; text-align: center; font-weight: 700; min-height: 1.5em; }
+@media (prefers-color-scheme: dark) {
+  .d2-wire { stroke: #9aa4b1; }
+  .d2-part { fill: #4a5563; stroke: #6b7686; }
+  .d2-bulb { fill: rgba(200, 225, 245, 0.16); stroke: #9fb3c8; }
+}

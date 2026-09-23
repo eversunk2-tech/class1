@@ -8,7 +8,7 @@
 
 | 파일 | 전역 이름 | 하는 일 |
 |---|---|---|
-| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce`(+`flush`, 떠날 때 자동 저장) | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사 |
+| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce`(+`flush`, 떠날 때 자동 저장) | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사(숫자로 끝나는 말도 숫자 읽기의 받침을 따른다 — "실험 1을", "실험 2를") |
 | `stage-nav.js` | `SciSim.StageNav` | 단계 진행바(앞 단계는 언제든, 뒤 단계는 조건 통과 시) |
 | `lesson.js` | `SciSim.Lesson` | 앱 뼈대: 알림, 학습 시간, 단계 이동 연결·새로고침 복원, 마치기·결과 저장(실패 까닭별 문구), 처음부터 다시 |
 | `predict.js` | `SciSim.Predict` | 예상하기(직접 타이핑 + 한 단계씩 열리는 힌트, 최소 글자 수 안내) |
@@ -325,6 +325,8 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 예상하기에서는 답을 알려 주지 않는다. 힌트도 생각거리만. 새 용어·개념 설명은 예상하기 **뒤**(실험하기 `intro` 또는 분석 단계)에 둔다.
 - 색만으로 구분하지 않는다: 색 칩 옆에 항상 글자, 그래프는 점 모양·선 무늬·범례.
 - 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI.
+- **화면 여백(2026-09-23)**: 아래쪽 이동 막대(`.ss-footer-nav`)와 머리말(`.ss-header`)은 고정이라 본문을 가린다. `lesson.js`가 두 높이를 `--ss-header-h`·`--ss-footer-h`에 넣고, `style-common.css`가 `.ss-main`의 아래 여백과 `scroll-margin-top/bottom`에 쓴다. 앱 `style.css`에서 `.ss-main`의 `padding-bottom`을 작은 고정값으로 덮어쓰지 않는다. `experiment.js`는 '확인하기' 뒤에 '기록하기' 버튼이 막대에 가리면 그만큼 스크롤한다.
+- **낮은 화면(2026-09-23)**: `@media (max-height: 480px)`(휴대폰 가로 812×375 등)에서 머리말·단계 진행바·이동 막대를 낮게 한다. 앱 `style.css`에서 머리말 요소 크기를 고정값으로 다시 키우지 않는다.
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
 - **질문-답 표준 목록 `detail.qa`**(2026-09-22, `docs/admin/responses-spec.md` §3.3): 관리자 대시보드 "학생 응답"이 질문과 답을 정리해 보여 준다. 모듈마다 `qa(stage)`가 있다(기존 `values()`/`result()`는 그대로 — 하위 호환). `buildDetail()`에 한 줄을 더한다:
   `qa: [].concat(predict.qa("predict"), quiz.qa("analyze"), conclude.qa("conclude"), curiosity.qa("curiosity"))` (+ 분류가 있으면 `sorter.qa("analyze")`).
@@ -343,3 +345,7 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 모든 DB 요청은 페이지의 기록 주인(`owner`)을 `expectedUserId`로 넘긴다. 실제 요청 토큰의 사용자가 다르면 요청하지 않고(`user_changed`) 앞 사람 로컬을 지운 뒤 새 사용자로 다시 연다. 화면을 떠날 때 "확인 중" 가림막을 씌우고 돌아올 때(`pageshow`·`visibilitychange`·`focus`) 세션을 다시 확인한다.
 - 머리말에 "○○ 계정으로 로그인 중 · 내가 아니면 [로그아웃]"이 나온다(`.ss-who`). 로그아웃은 블로그와 같은 절차: 못 올린 기록(`<storageKey>:__meta`의 `dirty`)을 올리고, 실패하면 확인을 받은 뒤 로그아웃·로컬 삭제.
 - 두 기기에서 모두 바뀌었으면(서버 `updated_at`이 마지막으로 맞춘 값과 다르고 로컬도 안 올린 변경이 있으면) 학생에게 "이 기기의 기록 / 저장된 기록"을 고르게 한다. 기기 시계는 비교에 쓰지 않는다.
+- **가짜 충돌은 묻지 않는다 (2026-09-23).** 탭을 숨기거나 새로고침할 때 보낸 저장(keepalive)은 응답을 못 받아 `dirty`로 남는데, 그 뒤 앱이 기록을 더 쓰면 로컬과 서버가 달라져 예전에는 충돌 창이 떴다. 이제 두 경우는 창 없이 로컬을 올린다(잃는 내용 없음).
+  - 서버 내용이 이 기기가 **마지막으로 보낸 내용**과 같을 때(`<storageKey>:__meta`의 `sentFp` 지문으로 확인).
+  - 서버 내용이 **로컬 안에 그대로 들어 있을 때**(키 단위 `canon` 비교로 로컬이 서버의 확장일 때).
+  - 다른 기기에서 다르게 진행한 진짜 충돌은 지금처럼 학생이 고른다.

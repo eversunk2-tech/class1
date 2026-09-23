@@ -1,0 +1,129 @@
+/* sci-6-2-3-3 전용 스타일(실험 화면 틀·조작 패널 공통 스타일: science-sim/style-common.css) */
+.ss-warn { background: var(--ss-warn-bg); }
+.sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
+.intro-body p { margin: 0 0 6px; }
+.safety summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.safety ul { margin: 8px 0 0; padding-left: 1.2em; }
+.wide { width: 100%; }
+
+/* 실험 아이콘(색이 아니라 모양으로도 구분: 스위치 / 전지 / 나침반) */
+.exp-icon { flex: none; width: 30px; height: 30px; }
+.ei-base { fill: #8c6b45; }
+.ei-lever { stroke: #8a929c; stroke-width: 3; stroke-linecap: round; }
+.ei-dot { fill: #c9ced6; stroke: #6f7883; stroke-width: 1; }
+.ei-cell { fill: #d8b23a; stroke: #8a6f1e; stroke-width: 1.2; }
+.ei-nub { fill: #c9ced6; }
+.ei-dial { fill: #f6f7f9; stroke: #8a929c; stroke-width: 1.6; }
+.ei-needle-n { fill: #d8434f; }
+.ei-needle-s { fill: #3b6fd1; }
+
+/* ── 실험 화면 상태 표시(3D·2D 공통) ── */
+.hud {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 12px; border-radius: 12px;
+  background: rgba(20, 30, 45, 0.86); color: #fff; font-weight: 700; font-size: 0.92rem; pointer-events: none;
+}
+.hud-sw { color: #ffd166; }
+.hud-sw.is-on { color: #7ee3a2; }
+.ss-view3d .hud { position: absolute; top: 10px; right: 10px; z-index: 3; max-width: calc(100% - 90px); justify-content: flex-end; }
+
+/* ── 관찰 카드 ── */
+.obs-body > * + * { margin-top: 10px; }
+.obs-photo { margin: 0; }
+.obs-photo .photo-img, .obs-photo .photo-svg { display: block; width: 100%; max-height: 230px; object-fit: contain; border-radius: 12px; background: var(--ss-surface-2); }
+.obs-photo figcaption { margin-top: 4px; }
+.shot-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.shot-row .obs-photo { flex: 1 1 210px; min-width: 0; }
+.shot-row .obs-photo .photo-img, .shot-row .obs-photo .photo-svg { max-height: 260px; }
+
+/* 값 패널(붙은 둥근 철 고리 개수) */
+.val-panel {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px;
+  padding: 12px 14px; border-radius: 14px; background: var(--ss-surface-2); border: 2px solid var(--ss-primary);
+}
+.val-cond { font-weight: 700; }
+.val-main { display: inline-flex; align-items: baseline; gap: 6px; }
+.val-label { color: var(--ss-muted); font-size: 0.9rem; }
+.val-num { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.val-unit { font-weight: 700; }
+.ring-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ring-chip { width: 26px; height: 26px; border-radius: 50%; border: 5px solid #9aa3ad; background: transparent; }
+
+/* 나침반 확대 그림 */
+.comp-fig { margin: 0; }
+.comp-svg { display: block; width: 100%; max-width: 420px; margin: 0 auto; height: auto; background: var(--ss-surface-2); border-radius: 12px; }
+.comp-dial { fill: #f6f7f9; stroke: #8a929c; stroke-width: 3; }
+.comp-bar { fill: #b9c0c8; stroke: #6f7883; stroke-width: 2; }
+.comp-pin { fill: #555b63; }
+.comp-needle-n { fill: #d8434f; }
+.comp-needle-s { fill: #3b6fd1; }
+.comp-n { font: 700 15px system-ui, sans-serif; fill: #444c56; }
+.comp-lbl { font: 700 14px system-ui, sans-serif; fill: var(--ss-text); }
+.comp-tip { font: 700 12px system-ui, sans-serif; fill: #d8434f; }
+.comp-tag-s { font: 700 12px system-ui, sans-serif; fill: #3b6fd1; }
+
+/* ── 2D 대체 화면: 옆에서 본 모습 ── */
+.s2-wrap { position: relative; }
+.s2-head { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; min-height: 34px; margin-bottom: 6px; }
+.side-svg { display: block; width: 100%; height: auto; max-height: 52vh; background: var(--ss-surface-2); border-radius: 14px; }
+.s2-caption { margin: 6px 2px 0; font-size: 0.85rem; color: var(--ss-muted); }
+.s2-table { fill: #e3d4b4; }
+.s2-stand { fill: #b59b74; stroke: #8c7a5c; stroke-width: 1.5; }
+.s2-bolt { fill: #a8b0ba; stroke: #6f7883; stroke-width: 1.5; }
+.s2-boltHead { fill: #99a2ac; stroke: #6f7883; stroke-width: 1.5; }
+.s2-paper { fill: #f3f0e6; stroke: #cfc8b4; stroke-width: 1.2; }
+.s2-coil { fill: none; stroke: #b5712f; stroke-width: 3.4; }
+.s2-dish { fill: #c9ced6; stroke: #8a929c; stroke-width: 1.5; }
+.s2-ring { fill: none; stroke: #9aa3ad; stroke-width: 5; }
+.s2-ring.is-on { stroke: #7a838d; }
+.s2-holder { fill: #2f3742; }
+.s2-battery { fill: #d8b23a; stroke: #8a6f1e; stroke-width: 1.5; }
+.s2-nub { fill: #c9ced6; }
+.s2-sign { font: 800 13px system-ui, sans-serif; fill: #4a3c10; }
+.s2-swbase { fill: #8c6b45; }
+.s2-swdot { fill: #c9ced6; stroke: #6f7883; stroke-width: 1.2; }
+.s2-lever { stroke: #8a929c; stroke-width: 6; stroke-linecap: round; }
+.s2-lever.is-on { stroke: #4b9e6a; }
+.s2-wire { fill: none; stroke: #2b2f36; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.s2-wire.is-red { stroke: #c0392b; }
+.s2-comp { fill: #f6f7f9; stroke: #8a929c; stroke-width: 3; }
+.s2-comp.is-on { stroke: var(--ss-primary); stroke-width: 5; }
+.s2-lbl { font: 700 15px system-ui, sans-serif; fill: var(--ss-text); }
+.s2-lbl-s { font: 700 13px system-ui, sans-serif; fill: var(--ss-text); }
+.s2-lbl-xs { font: 600 12px system-ui, sans-serif; fill: var(--ss-muted); }
+/* 나침반판 안쪽 글자: 판이 흰색이라 다크 모드에서도 진한 고정 색을 쓴다 */
+.s2-dial-t { font: 700 12px system-ui, sans-serif; fill: #444c56; }
+.s2-tag-n { font: 800 12px system-ui, sans-serif; fill: #c02c38; }
+.s2-tag-s { font: 800 12px system-ui, sans-serif; fill: #2c55a8; }
+@media (prefers-color-scheme: dark) {
+  .s2-table { fill: #4d4436; }
+}
+
+/* 진행 막대 이름("🔒 전지 개수 실험")이 줄바꿈되지 않게 */
+.ss-prow { grid-template-columns: 8.4em 1fr 3.2em; }
+
+/* ── 분석 ── */
+.know-card { border-left: 6px solid var(--ss-primary); line-height: 1.6; }
+#result-battery, #result-pole { margin-bottom: 12px; }
+#result-battery .ss-matrix, #result-pole .ss-matrix { min-width: 0; }
+
+/* ── 마치기 ── */
+.finish-card { text-align: center; }
+.done-card h3 { margin: 0 0 8px; }
+.done-card { border: 2px solid var(--ss-good); }
+.restart-line { text-align: center; }
+#login-hint a { font-weight: 700; }
+
+/* 궁금한 점은 선택 입력 한 줄 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .hud { font-size: 0.78rem; padding: 4px 8px; }
+  .ss-view3d .hud { max-width: calc(100% - 70px); }
+  .side-svg { max-height: none; }
+  .shot-row .obs-photo { flex: 1 1 100%; }
+  .val-num { font-size: 1.7rem; }
+  #result-battery .ss-matrix, #result-pole .ss-matrix { font-size: 0.85rem; }
+  #result-battery .ss-matrix th, #result-battery .ss-matrix td,
+  #result-pole .ss-matrix th, #result-pole .ss-matrix td { padding: 6px 4px; }
+}

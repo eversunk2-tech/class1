@@ -53,6 +53,15 @@
         setH();
         if ("ResizeObserver" in window) new ResizeObserver(setH).observe(header);
       }
+      /* 아래쪽 이동 막대 높이 → CSS 변수(--ss-footer-h). 본문 아래 여백·scroll-margin에 쓴다(버튼이 막대에 가리지 않게). */
+      var footerNav = document.querySelector(".ss-footer-nav");
+      if (footerNav) {
+        var setF = function () {
+          document.documentElement.style.setProperty("--ss-footer-h", Math.round(footerNav.getBoundingClientRect().height) + "px");
+        };
+        setF();
+        if ("ResizeObserver" in window) new ResizeObserver(setF).observe(footerNav);
+      }
 
       /* 학습 시간(화면을 보고 있는 동안만 셈) */
       var meta = store.get("meta", null);

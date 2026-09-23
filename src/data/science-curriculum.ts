@@ -130,9 +130,9 @@ export const scienceTerms: Term[] = [
         number: 3,
         title: "전기의 이용",
         lessons: [
-          { id: "2", inquiry: 1, period: "2", title: "전구에 불을 켜려면 어떻게 해야 할까?", science: "60~61", workbook: "36~37" },
-          { id: "3", inquiry: 2, period: "3", title: "전기 회로에 전지 한 개를 더 연결하면 어떻게 될까?", science: "62~63", workbook: "38~39" },
-          { id: "4", inquiry: 3, period: "4~5", title: "전자석의 성질이 궁금해!", science: "64~67", workbook: "40~43" },
+          { id: "2", inquiry: 1, period: "2", title: "전구에 불을 켜려면 어떻게 해야 할까?", science: "60~61", workbook: "36~37", app: { id: "sci-6-2-3-1", kind: "sim" } },
+          { id: "3", inquiry: 2, period: "3", title: "전기 회로에 전지 한 개를 더 연결하면 어떻게 될까?", science: "62~63", workbook: "38~39", app: { id: "sci-6-2-3-2", kind: "sim" } },
+          { id: "4", inquiry: 3, period: "4~5", title: "전자석의 성질이 궁금해!", science: "64~67", workbook: "40~43", app: { id: "sci-6-2-3-3", kind: "sim" } },
           { id: "6", inquiry: 4, period: "6", title: "전자석을 사용하는 예를 알아볼까?", science: "68~69", workbook: "44~45" },
           { id: "7", inquiry: 5, period: "7~8", title: "전기, 어떻게 사용해야 할까?", science: "70~73", workbook: "46~47" },
         ],
