@@ -7,9 +7,11 @@ import { CommunitySetupNotice } from "@/components/community/community-setup-not
 import { EmptyBoxIllustration } from "@/components/illustrations/empty-box-illustration";
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
 import { PostCardSkeleton } from "@/components/post-card";
+import { LoginNeededNotice } from "@/components/login-gate";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
 import {
   authorName,
@@ -35,6 +37,8 @@ type Status = "loading" | "ready" | "error" | "setup";
  */
 export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?: number }) {
   const { loading: sessionLoading, user } = useSession();
+  // "로그인해야만 이용"이 켜져 있으면 RLS가 글을 돌려주지 않는다 → 빈 목록 대신 까닭을 알려 준다.
+  const locked = useLoginLocked();
   const userId = user?.id ?? null;
   const pageSize = limit ?? PAGE_SIZE;
   const meta = KIND_META[kind];
@@ -83,6 +87,8 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
       setLoadingMore(false);
     }
   }
+
+  if (locked) return <LoginNeededNotice what={meta.label} className="py-8" />;
 
   if (status === "loading") {
     return (

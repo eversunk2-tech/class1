@@ -441,3 +441,22 @@ a { color: var(--ss-primary); }
 }
 /* 카드가 떠 있는 동안에는 글자 수 안내("✔ 잘 적었어요")를 감춘다(안내가 서로 엇갈리지 않게) */
 .ss-ac-open .ss-len-note { display: none; }
+
+/* ── "제출" 안내(lesson.js) — '학습 마치기' 버튼 바로 위. 색만이 아니라 앞머리 글자로도 구분된다 ── */
+.ss-submit-note {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 12px 14px; border-radius: 14px;
+  border: 2px solid var(--ss-primary); background: var(--ss-surface-2);
+  color: var(--ss-text); font-weight: 700; line-height: 1.5;
+}
+.ss-submit-note-tag {
+  flex: none; padding: 3px 12px; border-radius: 999px;
+  background: var(--ss-primary); color: var(--ss-on-primary); font-size: 0.82rem; letter-spacing: 0.02em;
+}
+.ss-submit-note-text { min-width: 0; }
+.ss-submit-note.is-done { border-color: var(--ss-good); background: var(--ss-good-bg); }
+.ss-submit-note.is-done .ss-submit-note-tag { background: var(--ss-good); color: var(--ss-on-primary); }
+.ss-submit-note.is-warn { border-color: var(--ss-bad); background: var(--ss-bad-bg); }
+.ss-submit-note.is-warn .ss-submit-note-tag { background: var(--ss-bad); color: var(--ss-on-primary); }
+/* '더 탐구하고 싶은 점'이 필수라는 안내(lesson.js) */
+.ss-req-note { font-weight: 600; color: var(--ss-text); }

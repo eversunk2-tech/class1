@@ -17,6 +17,11 @@
  *   lesson.finish({
  *     button, msgEl, loginHintEl, doneEl,       // index.html의 요소
  *     canFinish: function () { return true | "먼저 할 일"; },
+ *     // '학습 마치기'를 누르면 canFinish 뒤에 답을 한 번 더 본다(answer-check.js가 있을 때):
+ *     //   ① 정리하기 답이 block이면 마치지 못한다(정리하기 화면에서 카드로 까닭을 알려 준다).
+ *     //   ② '더 탐구하고 싶은 점'(#ss-curiosity)은 **비워 두면 마치지 못한다**. 내용은 느슨하게만 본다
+ *     //      (무의미·완전히 딴 이야기만 막고, 아쉽다는 이유로는 되짚지 않는다).
+ *     // 버튼 위에는 "'학습 마치기'를 눌러야 선생님에게 제출돼요" 안내가 늘 보이고, 마친 뒤에는 제출 상태로 바뀐다.
  *     detail: function () { return {...}; },    // class1-record.js로 저장할 detail
  *     summary: function () { return ["기록한 실험: 24칸", …]; },
  *   });
@@ -179,7 +184,103 @@
         },
         finish: function (f) {
           var saving = false;
+          var gating = false; /* 마치기 전 답 검사 중 */
           var loginChecked = false;
+
+          /* ── "제출" 안내: 버튼 바로 위에 늘 보인다(색만이 아니라 글자로도 구분된다) ── */
+          var noteTag = el("span", { class: "ss-submit-note-tag" });
+          var noteText = el("span", { class: "ss-submit-note-text" });
+          var submitNote = el("p", { class: "ss-submit-note", role: "note" }, [noteTag, noteText]);
+          if (f.button.parentNode) f.button.parentNode.insertBefore(submitNote, f.button);
+          /** kind: "todo"(아직 안 냄) | "done"(제출함) | "warn"(마쳤지만 저장되지 않음) */
+          function setNote(kind) {
+            submitNote.classList.toggle("is-done", kind === "done");
+            submitNote.classList.toggle("is-warn", kind === "warn");
+            if (kind === "done") {
+              noteTag.textContent = "제출 완료";
+              noteText.textContent = "✅ 선생님에게 제출했어요. 고친 내용이 있으면 다시 눌러 주세요.";
+            } else if (kind === "warn") {
+              noteTag.textContent = "제출 안 됨";
+              noteText.textContent = "⚠️ 아직 선생님에게 제출되지 않았어요. 아래 안내를 읽고 다시 눌러 주세요.";
+            } else {
+              noteTag.textContent = "제출";
+              noteText.textContent = "'🎉 학습 마치기'를 눌러야 선생님에게 제출돼요.";
+            }
+          }
+          setNote("todo");
+
+          /* ── '더 탐구하고 싶은 점'(#ss-curiosity)은 이제 필수 ──
+           * 앱 파일을 고치지 않고 화면 문구만 다듬는다(저장 구조·질문 내용은 그대로). */
+          var OPTIONAL_RE = /\s*[(（]\s*(?:선택|비워\s*두어도[^)）]*|비워도[^)）]*|안\s*적어도[^)）]*)\s*[)）]\s*/g;
+          var curEl = document.getElementById("ss-curiosity");
+          var curHost = null;
+          function curiosityLabel() {
+            try {
+              return document.querySelector('label[for="ss-curiosity"]');
+            } catch (e) {
+              return null;
+            }
+          }
+          function curiosityQuestion() {
+            var label = curiosityLabel();
+            var q = "";
+            if (label) {
+              var clone = label.cloneNode(true);
+              var tag = clone.querySelector(".ss-q-num");
+              if (tag && tag.parentNode) tag.parentNode.removeChild(tag);
+              q = (clone.textContent || "").replace(/\s+/g, " ").trim();
+            }
+            return q || "더 탐구하고 싶은 점(또는 궁금한 점)을 적어 보세요.";
+          }
+          if (curEl) {
+            curHost = el("div", { class: "ss-ac-host" });
+            if (curEl.parentNode) curEl.parentNode.insertBefore(curHost, curEl.nextSibling);
+            var curLabel = curiosityLabel();
+            if (curLabel) {
+              var curTag = curLabel.querySelector(".ss-q-num");
+              if (curTag && /선택/.test(curTag.textContent || "")) curTag.textContent = "궁금한 점";
+              for (var ci = 0; ci < curLabel.childNodes.length; ci++) {
+                var cn = curLabel.childNodes[ci];
+                if (cn.nodeType !== 3) continue;
+                var tidy = cn.nodeValue.replace(OPTIONAL_RE, " ").replace(/\s+/g, " ").trim();
+                if (tidy !== cn.nodeValue) cn.nodeValue = tidy;
+              }
+            }
+            if (curEl.parentNode) curEl.parentNode.insertBefore(el("p", { class: "ss-help ss-req-note", text: "한 줄이라도 적어야 '학습 마치기'를 할 수 있어요." }), curHost);
+          }
+
+          function goStage(id) {
+            if (navApi && id && navApi.current() !== id) navApi.go(id, { silent: true });
+          }
+          /** 궁금한 점: 비어 있으면 막고, 내용은 느슨하게만 본다(무의미·완전히 딴 이야기만). → Promise<bool> */
+          function checkCuriosity() {
+            if (!curEl) return Promise.resolve(true);
+            var t = (curEl.value || "").trim();
+            if (!t) {
+              f.msgEl.textContent = "'더 탐구하고 싶은 점'을 한 줄이라도 적어야 마칠 수 있어요.";
+              try {
+                curEl.focus();
+                curEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              } catch (e) {
+                /* 무시 */
+              }
+              return Promise.resolve(false);
+            }
+            var AC = SciSim.AnswerCheck;
+            if (!AC || !AC.verify) return Promise.resolve(true);
+            var q = curiosityQuestion();
+            if (AC.settled && AC.settled("curiosity", t, q, { stage: "curiosity" })) return Promise.resolve(true);
+            return AC.verify({ key: "curiosity", stage: "curiosity", question: q, answer: t, mount: curHost, focus: curEl });
+          }
+          /** 정리하기 답 → 궁금한 점 차례로 본다. → Promise<bool> */
+          function checkAnswers() {
+            var AC = SciSim.AnswerCheck;
+            var first = AC && AC.checkFinish ? AC.checkFinish({ goTo: goStage }) : true;
+            return Promise.resolve(first).then(function (okv) {
+              return okv === false ? false : checkCuriosity();
+            });
+          }
+
           function drawDone(saveText) {
             var card = f.doneEl;
             card.textContent = "";
@@ -209,18 +310,49 @@
             return "인터넷 연결 문제 등으로 결과를 저장하지 못했어요. 잠시 뒤 다시 '학습 마치기'를 눌러 주세요.";
           }
           f.button.addEventListener("click", function () {
-            if (saving) return;
+            if (saving || gating) return;
             var ok = f.canFinish ? f.canFinish() : true;
             if (ok !== true) {
               f.msgEl.textContent = typeof ok === "string" ? ok : "앞의 활동을 먼저 마쳐 주세요.";
               return;
             }
+            /* 답을 한 번 더 보고 나서 마친다. 막히면 카드가 뜬 단계에 그대로 둔다(학생이 고쳐 쓰고 다시 누를 수 있다). */
+            var back = navApi ? navApi.current() : null;
+            gating = true;
+            f.button.disabled = true;
+            f.msgEl.textContent = "";
+            var after = function (okv) {
+              gating = false;
+              f.button.disabled = false;
+              if (okv === false) return;
+              if (back) goStage(back);
+              doFinish();
+            };
+            try {
+              checkAnswers().then(after, function () {
+                after(true); /* 검사 자체가 실패하면 막지 않는다 */
+              });
+            } catch (e) {
+              after(true);
+            }
+          });
+
+          function doFinish() {
             meta.finishedAt = Date.now();
             store.set("meta", meta);
             refresh();
             if (!recordReady) {
               f.msgEl.textContent = "";
+              setNote("warn");
               drawDone("결과 저장 기능을 불러오지 못해 저장하지 않았어요. 학습은 모두 마쳤어요.");
+              return;
+            }
+            // 체험 모드(비로그인 + 사이트 잠금 꺼짐): 서버에 아무것도 보내지 않는다(persist.js 맨 위 주석 ⑦).
+            if (SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial()) {
+              f.msgEl.textContent = "";
+              setNote("warn");
+              if (f.loginHintEl) window.Class1Record.renderLoginHint(f.loginHintEl, "로그인한 뒤 다시 '학습 마치기'를 누르면 결과가 저장돼요.");
+              drawDone("체험 모드라서 결과는 저장되지 않았어요. 로그인하면 기록이 남아요.");
               return;
             }
             saving = true;
@@ -240,11 +372,13 @@
                   store.set("meta", meta);
                   text = "✅ 결과를 저장했어요! '내 학습 활동'에서 볼 수 있어요.";
                 } else text = failText(res);
+                setNote(res.ok ? "done" : "warn");
                 f.msgEl.textContent = "";
                 drawDone(text);
               })
               .catch(function () {
                 f.msgEl.textContent = "";
+                setNote("warn");
                 drawDone("인터넷 연결 문제 등으로 결과를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.");
               })
               .then(function () {
@@ -252,14 +386,20 @@
                 f.button.disabled = false;
                 f.button.textContent = "🎉 학습 마치기 (다시 저장)";
               });
-          });
+          }
           api.onStage(function (id) {
             if (id !== (f.stage || "curiosity")) return;
+            if (meta.finishedAt) setNote(meta.savedAt ? "done" : "warn");
             if (meta.finishedAt && f.doneEl.hidden) drawDone(meta.savedAt ? "✅ 결과를 저장했어요." : "");
             if (!loginChecked && recordReady && f.loginHintEl) {
               loginChecked = true;
+              var trial = SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial();
               window.Class1Record.getUser().then(function (u) {
-                if (!u) window.Class1Record.renderLoginHint(f.loginHintEl, "로그인이 풀렸어요. 다시 로그인하면 이어서 하고 결과도 저장돼요.");
+                if (u) return;
+                window.Class1Record.renderLoginHint(
+                  f.loginHintEl,
+                  trial ? "지금은 체험 모드예요. 로그인하면 결과가 저장돼요." : "로그인이 풀렸어요. 다시 로그인하면 이어서 하고 결과도 저장돼요."
+                );
               });
             }
           });

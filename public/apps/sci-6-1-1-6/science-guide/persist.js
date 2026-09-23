@@ -16,7 +16,8 @@
  *       localAt: 마지막 변경 시각(이 기기 시계 — 화면 표시용, 비교에는 쓰지 않음), pendingClear: "처음부터 다시"의 DB 삭제가 아직 안 됨 }
  *     블로그 로그아웃(src/lib/science-progress.ts)과 앱의 로그아웃 버튼이 이 표시를 보고 못 올린 기록을 올린 뒤 지운다.
  *   ① createStore(뿌리) 때(동기, app.js가 기록을 읽기 전):
- *      - 로그인 세션 없음 → sci6… 로컬 키 모두 삭제, 로그인 안내 화면(가림막). 이후 쓰기는 메모리에만.
+ *      - 로그인 세션 없음 → 주인이 "체험"이 아닌 sci6… 로컬 기록(앞 학생 것)을 모두 삭제하고 "확인 중" 가림막.
+ *        이어서 site_settings.login_required 를 읽어(공개 읽기, 실패하면 꺼짐으로 봄) 갈 길을 정한다 — 아래 ⑦.
  *      - 기록 주인 표시가 없거나 다른 사람 → 이 앱 로컬 키 모두 삭제 후 주인 = 지금 사용자. "불러오는 중" 가림막.
  *   ② Lesson.create → Sync.start(): 서버로 세션 확인 → app_progress 불러와 비교(충돌 규칙, 기기 시계를 쓰지 않는다)
  *      - DB 행 updated_at == syncedAt(서버 변경 없음): 로컬 우선. dirty면 바로 올림.
@@ -37,6 +38,13 @@
  *      머리말에 "○○ 계정으로 로그인 중 · 내가 아니면 [로그아웃]" — 버튼은 블로그 로그아웃과 같은 절차(못 올린 기록 올리기 →
  *      실패하면 "저장되지 않은 활동이 있어요 — 그래도 로그아웃할까요?" → 로그아웃 → 로컬 삭제).
  *   ⑥ SciSim.Sync.reset(store) — "처음부터 다시 하기": 로컬 삭제 + clearProgress() (실패하면 다음에/로그아웃 때 다시 시도).
+ *   ⑦ 비로그인일 때(2026-09-23 사용자 결정 — docs/admin/admin-tools/scope-fix-instructions.md §2)
+ *      - 잠금 켜짐(login_required = true) → 지금까지처럼 로그인 안내 가림막. sci6… 로컬 키를 모두 지운다.
+ *      - 잠금 꺼짐(기본) → **체험 모드**(phase "trial"): 모든 단계를 그대로 쓸 수 있고, 입력은 이 기기(localStorage)에만
+ *        남는다. app_progress·app_results 를 한 번도 부르지 않는다. 머리말에 "로그인하면 기록이 저장돼요" 한 줄 + 로그인 링크.
+ *        체험 기록의 주인 표시는 "__guest__"다. 로그인한 학생이 열면 주인이 달라 그 즉시 지워진다
+ *        (체험 기록은 누가 썼는지 확인할 수 없으므로 학생 기록으로 이어받지 않는다 — 주인 확인 규칙 ④를 깨지 않기 위해).
+ *        체험 중 다른 탭에서 로그인하면 화면을 새로 불러와 평소(로그인) 흐름으로 들어간다.
  *   스냅샷 형식(app_progress.state): { v: 1, prefix: 뿌리, keys: { "<접두사 뒤 키>": 값, … }, savedAt: ISO 시각 }
  */
 (function () {
@@ -77,9 +85,10 @@
   /* ═════════ 로그인 필수 · 진행 상황 동기화(SciSim.Sync) — 설계는 맨 위 주석 ═════════ */
   var Sync = (function () {
     var SCI_PREFIX = "sci6"; // 과학 앱 로컬 키 공통 머리(블로그 로그아웃 때도 이 머리로 지운다)
+    var GUEST = "__guest__"; // 체험 모드 기록의 주인 표시(실제 사용자 id와 절대 겹치지 않는 값)
     var root = null; // 이 앱의 뿌리 접두사
     var available = false; // localStorage 사용 가능
-    // idle | login | loading | ready | offline | local-only | conflict | confirm-id | error | stopped
+    // idle | checking | trial | login | loading | ready | offline | local-only | conflict | confirm-id | error | stopped
     var phase = "idle";
     var owner = null; // 기록 주인(user id) — 이 페이지는 이 사람의 기록만 읽고 쓴다
     var ownerLabel = "";
@@ -88,6 +97,7 @@
     var gateEl = null;
     var statusEl = null;
     var whoEl = null;
+    var trialEl = null; // 체험 모드 안내 줄
     var timer = null;
     var pendingSince = 0;
     var saving = false;
@@ -265,7 +275,10 @@
         "color:var(--ss-text,#1b1f2a);font-weight:700;cursor:pointer;touch-action:manipulation}" +
         ".ss-who-out:disabled{opacity:0.5}" +
         ".ss-who-float{position:fixed;right:10px;bottom:10px;z-index:1500;margin:0;padding:4px 4px 4px 12px;border-radius:999px;" +
-        "background:var(--ss-surface,#fff);border:1px solid var(--ss-border,#d8dce6)}";
+        "background:var(--ss-surface,#fff);border:1px solid var(--ss-border,#d8dce6)}" +
+        ".ss-trial-link{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:999px;" +
+        "border:1px solid var(--ss-border,#d8dce6);background:var(--ss-surface,#fff);color:var(--ss-text,#1b1f2a);" +
+        "font-weight:700;text-decoration:none;touch-action:manipulation}";
       (document.head || document.documentElement).appendChild(st);
     }
     function setInert(on) {
@@ -330,11 +343,14 @@
         a.href = R() && R().loginUrl ? R().loginUrl() : "../../login/";
         a.target = "_top"; // 블로그 화면(iframe) 안에서도 로그인은 전체 창에서
         actions.appendChild(a);
-      } else if (kind === "loading" || kind === "cover") {
+      } else if (kind === "loading" || kind === "cover" || kind === "checking") {
         card.appendChild(mk("div", "ss-gate-spin")).setAttribute("aria-hidden", "true");
-        card.appendChild(mk("h2", null, kind === "cover" ? "로그인을 확인하고 있어요…" : "내 기록을 불러오고 있어요…")).id = "ss-gate-title";
+        var title = "내 기록을 불러오고 있어요…";
+        if (kind === "cover") title = "로그인을 확인하고 있어요…";
+        else if (kind === "checking") title = "활동을 여는 중이에요…";
+        card.appendChild(mk("h2", null, title)).id = "ss-gate-title";
         card.appendChild(mk("p", null, message || "잠깐만 기다려 주세요."));
-        withBack = kind === "loading";
+        withBack = kind !== "cover";
       } else if (kind === "conflict") {
         card.appendChild(mk("h2", null, "⚠️ 기록이 두 가지예요")).id = "ss-gate-title";
         card.appendChild(
@@ -421,18 +437,34 @@
         logout(b);
       });
       whoEl.appendChild(b);
-      var header = document.querySelector(".ss-header");
-      var top = header ? header.querySelector(".ss-topline") : null;
-      if (top && top.parentNode) top.parentNode.insertBefore(whoEl, top.nextSibling);
-      else if (header) header.insertBefore(whoEl, header.firstChild);
-      else {
-        whoEl.className += " ss-who-float";
-        document.body.appendChild(whoEl);
-      }
+      mountLine(whoEl);
     }
     function removeWho() {
       if (whoEl && whoEl.parentNode) whoEl.parentNode.removeChild(whoEl);
       whoEl = null;
+    }
+    /* 머리말(또는 화면 구석)에 붙이는 한 줄. renderWho와 renderTrialNote가 같은 자리를 쓴다. */
+    function mountLine(node) {
+      var header = document.querySelector(".ss-header");
+      var top = header ? header.querySelector(".ss-topline") : null;
+      if (top && top.parentNode) top.parentNode.insertBefore(node, top.nextSibling);
+      else if (header) header.insertBefore(node, header.firstChild);
+      else {
+        node.className += " ss-who-float";
+        document.body.appendChild(node);
+      }
+    }
+    /* 체험 모드 안내: "적은 내용은 이 기기에만 남아요 · 로그인하면 기록이 저장돼요" */
+    function renderTrialNote() {
+      if (!document.body || trialEl) return;
+      injectStyle();
+      trialEl = mk("div", "ss-who ss-trial");
+      trialEl.appendChild(mk("span", null, "💡 체험 모드예요 — 적은 내용은 이 기기에만 남아요."));
+      var a = mk("a", "ss-trial-link", "로그인하면 기록이 저장돼요");
+      a.href = R() && R().loginUrl ? R().loginUrl() : "../../login/";
+      a.target = "_top"; // 블로그 화면(iframe) 안에서도 로그인은 전체 창에서
+      trialEl.appendChild(a);
+      mountLine(trialEl);
     }
 
     /* 새로고침 무한 반복 방지(앞 새로고침에서 5초 안에 또 새로고침하는 일이 3번 넘게 이어지면 멈춘다) */
@@ -474,6 +506,46 @@
       timer = retryTimer = null;
     }
 
+    /* ───── 비로그인: 잠금 설정을 보고 "로그인 안내"인지 "체험 모드"인지 정한다(맨 위 주석 ⑦) ───── */
+    function checkLock() {
+      var rec = R();
+      var p = rec && rec.fetchLoginRequired ? rec.fetchLoginRequired() : Promise.resolve(false);
+      Promise.resolve(p).then(decide, function () {
+        decide(false); // 읽지 못하면 잠그지 않는다
+      });
+    }
+    function decide(locked) {
+      if (phase !== "checking") return;
+      if (peek()) {
+        // 확인하는 사이에 로그인했다 → 평소(로그인) 흐름으로 다시 연다
+        phase = "stopped";
+        safeReload();
+        return;
+      }
+      if (locked) {
+        phase = "login";
+        if (available) clearAllSciLocal();
+        showGate("login");
+        return;
+      }
+      startTrial();
+    }
+    /* 체험 모드: 모든 단계를 쓸 수 있고, 입력은 이 기기에만 남는다(DB 호출 없음) */
+    function startTrial() {
+      phase = "trial";
+      if (available) {
+        var m = readMeta();
+        if (!m || m.owner !== GUEST) {
+          var g = freshMeta();
+          g.owner = GUEST;
+          writeMeta(g);
+        }
+      }
+      hideGate();
+      renderTrialNote();
+      setStatus("warn", "체험 모드 · 기록이 저장되지 않아요");
+    }
+
     /* ───── 로그아웃됨 / 다른 사람으로 바뀜 ───── */
     function toLogin(message) {
       var wasActive = phase !== "idle" && phase !== "login";
@@ -509,7 +581,8 @@
     function recheckOwner() {
       if (!root || !R() || phase === "idle" || phase === "stopped") return phase !== "stopped";
       var p = peek();
-      if (phase === "login") {
+      if (phase === "login" || phase === "trial" || phase === "checking") {
+        // 로그인하면(다른 탭 포함) 평소 흐름으로 다시 연다. 체험 기록은 주인이 달라 그때 지워진다.
         if (p) {
           phase = "stopped";
           safeReload();
@@ -687,6 +760,7 @@
     async function reconcile() {
       if (reconciling || suspended || loggingOut) return;
       if (phase === "login" || phase === "stopped" || phase === "conflict" || phase === "confirm-id") return;
+      if (phase === "trial" || phase === "checking") return; // 체험 모드는 DB를 부르지 않는다
       reconciling = true;
       try {
         await reconcileInner();
@@ -940,8 +1014,6 @@
         }
         var p = peek();
         if (!p) {
-          phase = "login";
-          if (ok) clearAllSciLocal();
           var msg = null;
           try {
             msg = window.sessionStorage.getItem("sciSync:loginMsg");
@@ -949,7 +1021,19 @@
           } catch (e) {
             msg = null;
           }
-          showGate("login", msg);
+          if (msg) {
+            // 방금 로그아웃했거나 세션이 끊겨 돌아온 경우 → 곧바로 로그인 안내(체험 모드로 흘려보내지 않는다)
+            phase = "login";
+            if (ok) clearAllSciLocal();
+            showGate("login", msg);
+            return true;
+          }
+          // 주인이 "체험"이 아닌 과학 앱 로컬 기록(앞 학생 것)은 먼저 지운다.
+          // 체험 기록(owner = "__guest__")만 남겨 새로고침해도 이어서 할 수 있게 한다.
+          if (ok) clearForeignSciLocal(GUEST);
+          phase = "checking";
+          showGate("checking");
+          checkLock(); // 잠금 켜짐 → 로그인 안내 / 꺼짐 → 체험 모드
           return true;
         }
         owner = p.userId;
@@ -996,6 +1080,7 @@
           if (m0 && m0.owner === owner) writeMeta(m0); // appId·제목 기록(블로그 로그아웃 때 올릴 수 있게)
         }
         rec.onAuthChange(function (kind) {
+          if (phase === "trial" || phase === "checking") return; // 체험 모드에는 끊길 세션이 없다
           if (kind === "user_changed") onUserChanged();
           else toLogin();
         });
@@ -1030,7 +1115,8 @@
         } catch (e) {
           /* 무시 */
         }
-        if (phase === "login") return;
+        // 로그인 안내 중이거나 체험 모드면 DB와 맞출 것이 없다(app_progress·app_results를 부르지 않는다).
+        if (phase === "login" || phase === "checking" || phase === "trial") return;
         renderWho();
         if (!available) {
           // 이 브라우저는 로컬 사본을 못 씀 → DB와 맞출 수 없음(빈 기록으로 덮어쓰지 않게 동기화하지 않는다)
@@ -1073,6 +1159,10 @@
       },
       owner: function () {
         return owner;
+      },
+      /* 체험 모드(비로그인 + 잠금 꺼짐)인가 — 결과 저장·Edge Function 호출을 건너뛸 때 쓴다 */
+      isTrial: function () {
+        return phase === "trial";
       },
       logout: function () {
         return logout(null);

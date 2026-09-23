@@ -110,9 +110,18 @@ Edge Function `admin-reset-password` 배포 완료(Verify JWT 켬).
 * Edge Function `supabase/functions/check-answer` — **아직 배포 전**. 사용자가 키 발급 → `supabase secrets set GEMINI_API_KEY=...` → `supabase functions deploy check-answer`(Verify JWT 켠 채) 하면 Gemini 판단이 켜진다.
 * 저장 키·저장 구조 불변(`app_progress.state`, `detail.qa`). 새 필드는 값이 있을 때만 덧붙음. SQL 없음.
 
+## 관리자 기능 (2026-09-23)
+* **회원 완전 탈퇴**: 회원 관리 ⋮ 메뉴 → 이름 입력 확인 → `auth.users` 삭제(복구 없음), 학습 기록은 남고 "탈퇴한 학생"으로 표시. Edge Function `admin-delete-member`(배포 완료), 마이그레이션 `20260923000000_member_withdrawal.sql`(실행 완료).
+* **로그인 잠금 스위치**: 관리자 화면 토글(`site_settings.login_required`, 기본 꺼짐). 마이그레이션 `20260923010000_login_required.sql`(실행 완료), 범위 조정 `20260923020000_login_required_scope.sql`(**실행 대기**).
+  * 잠금 **꺼짐**: 홈·블로그·게시판·게임 모두 공개, 과학 앱은 **비로그인도 체험 가능**(기록 저장 없음).
+  * 잠금 **켜짐**: 홈·메뉴는 그대로, 블로그 글·자유게시판·학습게임 글·과학 앱은 로그인 필요.
+* 설계 `docs/admin/admin-tools/spec.md`, 검증 `review.md`·`scope-fix-review.md`.
+
 ## 남은 작업·메모
 * **공통 틀 수정 완료(2026-09-23, `docs/science/template-fix-1-report.md`)**: 가짜 충돌 창·기록하기 가림·휴대폰 가로 머리말·숫자 조사 4건 + 알림(`.ss-toast`) `pointer-events:none`. 저장 키·저장 구조 그대로라 학생 기록은 유지. 사본 동기화 완료(`science-sim` 20개, `science-guide` 3개, `class1-record.js`).
 * 조사 도우미 틀(`science-guide`)은 토스트만 함께 고쳤고 나머지 4건은 적용하지 않음(해당 앱 3개는 수업에 쓰지 않음).
-* Gemini 키 등록·`check-answer` 배포는 사용자 작업 대기(그 전까지는 앱 안 규칙만 동작).
+* Gemini 키 등록·`check-answer` 배포는 사용자 작업 대기(그 전까지는 앱 안 규칙만 동작). 2026-09-23 궁금한 점용 느슨 기준을 추가했으므로 배포 시 최신본으로.
+* `20260923020000_login_required_scope.sql` 실행 대기 — 실행 전까지는 잠금을 켜면 사이트 전체가 가려진다(꺼져 있으면 영향 없음).
+* 마치기 조건: 정리하기 답이 무의미·주제 무관이면 '학습 마치기' 거부, '더 탐구하고 싶은 점' 필수(느슨 판정).
 * 게임 업로드 안내 문구가 "index.html"로 적혀 있음 — 실제로는 `.html`이면 이름 무관. 문구 변경 제안했으나 미결정.
 * `src/data/apps.ts`의 `webApps`는 비어 있음(과학 앱 목록 원천은 `science-curriculum.ts`).

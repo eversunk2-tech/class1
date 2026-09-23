@@ -1,42 +1,35 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LockIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useSession } from "@/hooks/use-session";
-import { fetchLoginRequired } from "@/lib/admin";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { useLoginLocked } from "@/hooks/use-login-lock";
 import { loginHref } from "@/lib/community";
-
-/** 잠겨 있어도 들어갈 수 있는 경로(basePath 제외, trailingSlash 기준) — 로그인 자체가 막히면 안 된다. */
-const ALWAYS_OPEN = ["/login/", "/reset-password/"];
+import { cn } from "@/lib/utils";
 
 /**
- * "로그인해야만 이용" 토글이 켜져 있으면 비로그인 방문자에게 본문 대신 로그인 안내를 보여 준다
- * (docs/admin/admin-tools/spec.md §2.4).
+ * 잠금이 걸리는 경로(basePath 제외, trailingSlash 기준의 접두사).
+ * 2026-09-23 사용자 결정: 잠가야 하는 것은 **블로그 글 · 자유게시판 · 학습게임**뿐이다.
+ * 홈("/"), 과학수업("/science/"), 로그인·비밀번호 재설정, 관리자 화면은 여기에 넣지 않는다.
+ *  · 홈·과학수업은 화면 자체는 그대로 열리고, 데이터를 읽는 칸만 "로그인하면 볼 수 있어요" 안내로 바뀐다.
+ *  · /me/learning/ 과 /admin/ 은 원래부터 로그인·관리자 전용이라 이 잠금과 무관하다.
+ */
+const LOCKED_PREFIXES = ["/post/", "/board/", "/games/", "/search/"];
+
+/**
+ * "로그인해야만 이용" 토글이 켜져 있으면, 잠금 대상 경로에서 비로그인 방문자에게 본문 대신 로그인 안내를 보여 준다
+ * (docs/admin/admin-tools/spec.md §2.4 + scope-fix-instructions.md §3).
  *
  * 실제 차단은 이 컴포넌트가 아니라 RLS(can_browse())가 한다 — 여기서는 "왜 비었는지" 설명할 뿐이다.
- * 설정을 아직 모르거나 읽지 못했으면 아무것도 막지 않는다(잘못 잠그는 쪽보다 안전).
  */
 export function LoginGate({ children }: { children: ReactNode }) {
-  const { loading, user } = useSession();
+  const locked = useLoginLocked();
   const pathname = usePathname();
-  const [required, setRequired] = useState<boolean | null>(null);
-
-  // 로그인 상태가 바뀌면 다시 확인한다(로그아웃 직후 바로 안내가 뜨도록).
-  useEffect(() => {
-    let active = true;
-    fetchLoginRequired().then((v) => {
-      if (active) setRequired(v);
-    });
-    return () => {
-      active = false;
-    };
-  }, [user?.id]);
 
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
-  const blocked = required === true && !loading && !user && !ALWAYS_OPEN.includes(path);
+  const blocked = locked && LOCKED_PREFIXES.some((p) => path.startsWith(p));
   if (!blocked) return <>{children}</>;
 
   return (
@@ -51,6 +44,29 @@ export function LoginGate({ children }: { children: ReactNode }) {
       <Button render={<Link href={loginHref(path)} />} nativeButton={false}>
         로그인하기
       </Button>
+    </div>
+  );
+}
+
+/**
+ * 홈·과학수업처럼 화면은 열어 두고 한 칸만 막을 때 쓰는 안내 카드.
+ * 오류가 아니라 "지금은 로그인해야 볼 수 있다"는 설명이므로 EmptyState와 같은 점선 테두리를 쓴다.
+ */
+export function LoginNeededNotice({ what, className }: { what: string; className?: string }) {
+  const pathname = usePathname();
+  const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  return (
+    <div
+      className={cn("flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center", className)}
+    >
+      <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground" aria-hidden>
+        <LockIcon className="size-5" />
+      </span>
+      <p className="font-medium">로그인하면 볼 수 있어요</p>
+      <p className="text-sm text-muted-foreground">지금은 로그인한 우리 반 친구들만 {what}을 볼 수 있어요.</p>
+      <Link href={loginHref(path)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}>
+        로그인하기
+      </Link>
     </div>
   );
 }

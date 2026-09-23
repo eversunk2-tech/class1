@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FlaskConicalIcon, Gamepad2Icon, MessageSquareIcon, NewspaperIcon, RotateCwIcon, type LucideIcon } from "lucide-react";
+import { FlaskConicalIcon, Gamepad2Icon, LockIcon, MessageSquareIcon, NewspaperIcon, RotateCwIcon, type LucideIcon } from "lucide-react";
 import { scienceAppCount } from "@/components/dashboard/science-app-status";
 import type { MenuColor } from "@/data/menu";
+import { useLoginLocked } from "@/hooks/use-login-lock";
 import { formatCount } from "@/lib/format";
 import { countCommunityPosts, isSetupMissing, type CommunityKind } from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-type Status = "loading" | "ready" | "error" | "setup";
+// "locked" = "로그인해야만 이용"이 켜져 있고 로그인하지 않음 → 0이 아니라 잠김 표시를 보여 준다.
+type Status = "loading" | "ready" | "error" | "setup" | "locked";
 
 /** 통계 타일 1개(표시 전용). 숫자는 제목 글꼴로 크게, 라벨은 본문 색으로 보여 준다. */
 export function StatTile({
@@ -43,6 +45,11 @@ export function StatTile({
         ) : status === "setup" ? (
           <span className="text-sm text-muted-foreground" title="SQL 실행 후 열려요">
             준비 중
+          </span>
+        ) : status === "locked" ? (
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <LockIcon className="size-3.5" aria-hidden />
+            로그인 필요
           </span>
         ) : status === "error" ? (
           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -101,6 +108,8 @@ function PostCountTile({
   const [count, setCount] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [attempt, setAttempt] = useState(0);
+  // 잠금 중 비로그인이면 RLS가 0을 돌려준다 → "0개"가 아니라 "로그인 필요"로 보여 준다.
+  const locked = useLoginLocked();
 
   useEffect(() => {
     let active = true;
@@ -123,7 +132,16 @@ function PostCountTile({
     setAttempt((n) => n + 1);
   }
 
-  return <StatTile label={label} value={count} icon={icon} color={color} status={status} onRetry={retry} />;
+  return (
+    <StatTile
+      label={label}
+      value={count}
+      icon={icon}
+      color={color}
+      status={locked ? "locked" : status}
+      onRetry={retry}
+    />
+  );
 }
 
 /**

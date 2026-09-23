@@ -14,6 +14,8 @@
  * 답 되짚기·차단(answer-check.js, docs/science/answer-check/spec.md)
  *   index.html에 answer-check.js를 불러온 앱에서만 동작한다(app.js 무변경). '제출하고 모범 답안 보기'를 누르면
  *   글자 수를 확인한 뒤 답을 한 번 살펴보고, 막히면 모범 답안을 아직 보여 주지 않는다. 적은 글은 지우지 않는다.
+ *   '학습 마치기'를 누를 때도 한 번 더 본다(AnswerCheck.registerFinish) — 제출한 뒤 답을 무의미한 글로 고쳐 두면
+ *   마칠 수 없다. 이때 카드는 정리하기 화면에서 보여 준다(lesson.js가 그 단계를 열어 준다).
  */
 (function () {
   "use strict";
@@ -136,7 +138,7 @@
 
         drawCompare();
         root.appendChild(card);
-        blocks.push({ card: card, idx: idx });
+        blocks.push({ card: card, idx: idx, item: it, ta: ta, host: acHost, msg: msg });
       });
 
       function update() {
@@ -148,6 +150,51 @@
         });
       }
       update();
+
+      /* ── '학습 마치기' 검사 ──
+       * 저장될 글(지금 칸에 있는 글)을 한 번 더 본다. block이면 마칠 수 없다.
+       * 통과할 글이면 화면을 움직이지도, 서버를 부르지도 않는다(AC.settled).
+       * rethink는 지금까지와 같다(질문당 한 번 권하고, 그대로 두면 마칠 수 있다). */
+      if (AC && AC.registerFinish) {
+        AC.registerFinish(root, function (reveal) {
+          var list = blocks.slice();
+          var i = 0;
+          function step() {
+            if (i >= list.length) return Promise.resolve(true);
+            var b = list[i++];
+            var it = b.item;
+            var st = state[it.id] || {};
+            if (!st.submitted) return step(); /* 아직 제출하지 않은 문항은 canFinish가 본다 */
+            var text = (b.ta.value || "").trim();
+            if (text.length < MIN) {
+              if (reveal) reveal();
+              b.msg.textContent = "결론을 " + MIN + "글자 이상 적고 '고친 내용 다시 제출하기'를 눌러 주세요.";
+              try {
+                b.ta.focus();
+              } catch (e) {
+                /* 무시 */
+              }
+              return Promise.resolve(false);
+            }
+            if (AC.settled && AC.settled(keyOf(it), text, it.prompt, { stage: "conclude", model: it.model })) return step();
+            if (reveal) reveal();
+            return AC.verify({
+              key: keyOf(it),
+              stage: "conclude",
+              question: it.prompt,
+              answer: text,
+              model: it.model,
+              hint: it.checkHint || it.compareTip,
+              mount: b.host,
+              focus: b.ta,
+              submitLabel: "그대로 제출할게요",
+            }).then(function (okv) {
+              return okv === false ? false : step();
+            });
+          }
+          return step();
+        });
+      }
 
       return {
         isDone: function () {

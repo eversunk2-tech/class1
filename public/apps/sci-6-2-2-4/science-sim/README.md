@@ -368,3 +368,13 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 대기 한도: 클라이언트 3.5초, 함수 안 Gemini 호출 3초. 기다리는 동안 "🔎 답을 다시 확인하고 있어요…" 표시.
 - `StageNav`에 `beforeLeave(targetId, currentId)` 옵션이 생겼다(Promise를 돌려주면 기다렸다가 이동). `go(id, { silent: true })`는 이 확인을 건너뛴다(새로고침 복원).
 - 문항별로 오개념 힌트를 주고 싶으면(선택) `predict.questions[i].checkHint` 또는 `conclude` 항목의 `checkHint`를 넣는다(없으면 `compareTip`을 쓴다).
+
+### 마치기 조건 (2026-09-23 추가, `docs/science/answer-check/finish-gate-report.md`)
+
+- **'학습 마치기'를 누르면 답을 한 번 더 본다.** `canFinish()`를 통과한 뒤 ① 정리하기 답(`conclude.js`가 `AnswerCheck.registerFinish`로 등록) → ② '더 탐구하고 싶은 점'(`lesson.js`가 `#ss-curiosity`를 직접 본다) 차례로 확인한다. **앱 코드는 그대로다.**
+  - 정리하기 답이 **block**이면 마치지 못한다(카드가 정리하기 화면에서 뜨도록 `lesson.js`가 그 단계를 열어 주고, 통과하면 원래 단계로 되돌아온다). rethink는 지금까지와 같다.
+  - 통과할 답이면 화면이 움직이지 않고 서버도 부르지 않는다(`AnswerCheck.settled`).
+- **'더 탐구하고 싶은 점'은 필수**다. 비워 두면 마치지 못하고, 내용은 **느슨하게만**(stage `"curiosity"`) 본다 — 무의미·완전히 딴 이야기만 막고 되짚기(rethink)는 없다. 서버(`check-answer`)도 같은 기준을 쓴다(**함수를 다시 배포해야 한다**).
+  화면 문구("(비워 두어도 마칠 수 있어요)" 등)는 `lesson.js`가 보여 줄 때만 다듬는다 — `lesson-config.js`와 `detail.qa`는 그대로다.
+- **체험 모드**(비로그인·사이트 잠금 꺼짐)에서는 서버를 부르지 않고, 로컬 규칙만으로 판단해 **그대로 통과**시킨다(전에는 좋은 답에도 되짚기 카드가 한 번 떴다 — scope-fix review M1).
+- `'🎉 학습 마치기'를 눌러야 선생님에게 제출돼요` 안내가 버튼 바로 위에 늘 보이고(`.ss-submit-note`), 마친 뒤에는 `제출 완료`/`제출 안 됨`으로 바뀐다.

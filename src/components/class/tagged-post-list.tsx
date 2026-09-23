@@ -7,9 +7,11 @@ import { EmptyBoxIllustration } from "@/components/illustrations/empty-box-illus
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
 import { PostCard, PostCardSkeleton } from "@/components/post-card";
 import { fetchViewCounts } from "@/components/post-list";
+import { LoginNeededNotice } from "@/components/login-gate";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { MenuColor } from "@/data/menu";
+import { useLoginLocked } from "@/hooks/use-login-lock";
 import { supabase } from "@/lib/supabase";
 import { POST_SUMMARY_COLUMNS, type PostSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -51,6 +53,8 @@ export function TaggedPostList({
   emptyDescription?: string;
 }) {
   const pageSize = limit ?? PAGE_SIZE;
+  // "로그인해야만 이용"이 켜져 있으면 RLS가 글을 돌려주지 않는다 → 빈 목록 대신 까닭을 알려 준다.
+  const locked = useLoginLocked();
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [views, setViews] = useState<Record<string, number>>({});
   const [status, setStatus] = useState<Status>("loading");
@@ -110,6 +114,8 @@ export function TaggedPostList({
   }
 
   const name = tag ? `${tag} 수업 글` : "글";
+
+  if (locked) return <LoginNeededNotice what={name} className="py-8" />;
 
   if (status === "loading") {
     return (

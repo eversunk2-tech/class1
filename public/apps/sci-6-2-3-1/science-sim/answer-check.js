@@ -8,6 +8,14 @@
  *     rethink … "다시 한번 생각해서 써 볼까요?" 카드. **그대로 제출도 할 수 있다.** 질문당 평생 1번만 뜬다.
  *     block   … "아직 이 질문과 어울리는 답이 아니에요" 카드. 다시 쓰기 전에는 못 넘어간다.
  *
+ * ▶ 느슨한 단계(stage: "curiosity") — '더 탐구하고 싶은 점'
+ *   정답이 없는 질문이라 **무의미한 글·완전히 딴 이야기만** 막는다(ok / block만 쓴다).
+ *   내용이 아쉽다는 이유로는 절대 되짚지 않는다(rethink 없음). Edge Function도 이 단계는 같은 기준으로 본다.
+ *
+ * ▶ 체험 모드(비로그인 · 사이트 잠금 꺼짐)
+ *   서버(check-answer)를 부르지 않는다. 로컬 규칙의 확실한 무의미만 막고 **나머지는 바로 통과**시킨다
+ *   (전에는 "응답을 못 받았다"로 보고 좋은 답에도 되짚기 카드를 한 번 띄웠다 — scope-fix review M1).
+ *
  * ▶ 차단은 좁게(중요)
  *   - 로컬 규칙(Rules.block)은 **누가 봐도 확실한 무의미**만 막는다(자모만·같은 글자 반복·숫자만·질문 그대로 복사·자판 뭉개기).
  *   - "질문과 관련이 없다(off-topic)"는 판단은 **오직 Gemini(check-answer Edge Function)만** 내린다.
@@ -29,6 +37,9 @@
  *   SciSim.AnswerCheck.checkStage(stageId)           // lesson.js가 단계 이동 직전에 호출 → true | Promise<bool>
  *   SciSim.AnswerCheck.verify({ key, stage, question, answer, model, hint, mount, focus })  → Promise<bool>
  *   SciSim.AnswerCheck.passedFor(key, text, question) → 이 글이 검사를 통과한 그 글인지(화면의 "✔ 잘 적었어요"는 이때만 보여 준다)
+ *   SciSim.AnswerCheck.settled(key, text, question, o) → verify()가 아무것도 보여 주지 않고 통과시킬 글인지(마치기 검사에서 헛걸음하지 않으려고)
+ *   SciSim.AnswerCheck.registerFinish(mount, fn)     // conclude.js가 호출. fn(reveal): '학습 마치기'를 누를 때 한 번 더 본다
+ *   SciSim.AnswerCheck.checkFinish({ goTo })         // lesson.js가 '학습 마치기'에서 호출 → Promise<bool>
  *   SciSim.AnswerCheck.qaFields(key)                 → {} | { nudged, blockCount, teacherOverride }
  */
 (function () {
@@ -43,8 +54,20 @@
   var MAX_ANSWER = 500;
   var APP_ID_RE = /^sci-[0-9]{1,2}-[0-9]-[0-9]{1,2}-[0-9]{1,2}$/;
 
+  var LENIENT_STAGE = "curiosity"; /* 정답이 없는 질문 — ok / block만 쓴다(rethink 없음) */
+
   var cfg = { appId: null, store: null };
   var stageChecks = {}; /* { "<data-stage>": [fn, …] } */
+  var finishChecks = []; /* [{ mount, fn }] — '학습 마치기'를 누를 때 한 번 더 보는 검사 */
+
+  /** 체험 모드(비로그인 · 사이트 잠금 꺼짐)인지. 이때는 서버를 부르지 않는다. */
+  function isTrial() {
+    try {
+      return !!(SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial());
+    } catch (e) {
+      return false;
+    }
+  }
 
   /* ───────── 저장 ───────── */
 
@@ -158,6 +181,8 @@
   function ask(payload) {
     try {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(null);
+      // 체험 모드(비로그인)에서는 서버를 부르지 않는다. verify()가 이미 앞에서 통과시키므로 여기까지 오지 않는다(보호용).
+      if (isTrial()) return Promise.resolve(null);
       var rec = window.Class1Record;
       if (!rec || typeof rec.callFunction !== "function") return Promise.resolve(null);
       var call = rec
@@ -284,7 +309,7 @@
   function payloadFor(o, priorBlocks) {
     var p = {
       appId: cfg.appId,
-      stage: o.stage === "conclude" ? "conclude" : "predict",
+      stage: o.stage === "conclude" || o.stage === LENIENT_STAGE ? o.stage : "predict",
       question: String(o.question || "").slice(0, MAX_QUESTION),
       answer: String(o.answer || "").slice(0, MAX_ANSWER),
       priorBlocks: Math.max(0, Math.min(2, priorBlocks || 0)),
@@ -308,10 +333,29 @@
     return !Rules.block(t, question);
   }
 
+  /**
+   * verify()가 카드도 스피너도 보여 주지 않고 그대로 통과시킬 글인지.
+   * '학습 마치기' 검사에서 헛되이 단계를 옮기거나 서버를 부르지 않으려고 미리 본다.
+   * (true면 "이미 정리된 글" — 다시 묻지 않는다. false면 verify()를 불러 봐야 안다.)
+   */
+  function settled(key, text, question, o) {
+    var t = String(text || "").trim();
+    if (!t) return true; /* 빈 글은 글자 수 조건이 따로 본다 */
+    var st = get(key);
+    if (st.teacherOverride) return true;
+    if (Rules.block(t, question)) return false; /* 확실한 무의미는 언제든 다시 막는다 */
+    if (st.nudged) return true;
+    if (st.okFp && st.okFp === fp(t)) return true;
+    if (o && o.stage === "conclude" && modelWordHit(t, o.model)) return true;
+    if (isTrial()) return true; /* 서버를 부르지 않으므로 로컬 규칙만으로 끝난다 */
+    return false;
+  }
+
   /** 답 하나를 검사한다. → Promise<bool>(true면 넘어가도 된다) */
   function verify(o) {
     var key = o.key;
     var text = String(o.answer || "").trim();
+    var lenient = o.stage === LENIENT_STAGE; /* 정답이 없는 질문 — 되짚지 않고 ok/block만 쓴다 */
     var st = get(key);
     /* 통과한 글을 기억해 둔다 → 같은 글은 다시 묻지 않고, 화면의 "잘 적었어요"도 이 값으로만 켠다 */
     function pass() {
@@ -352,12 +396,18 @@
     /* ④ 정리하기 통과 지름길(모범 답안 낱말이 이미 들어 있음) */
     if (o.stage === "conclude" && modelWordHit(text, o.model)) return Promise.resolve(pass());
 
-    /* ⑤ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) */
+    /* ⑤ 체험 모드 — 서버를 부르지 않으므로 ①의 로컬 규칙만으로 판단하고 그대로 통과시킨다(scope-fix review M1).
+     *    (전에는 여기서 "응답 못 받음"으로 보고 좋은 답에도 되짚기 카드를 한 번 띄웠다.) */
+    if (isTrial()) return Promise.resolve(pass());
+
+    /* ⑥ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) */
     if (cfg.appId && !APP_ID_RE.test(cfg.appId)) return Promise.resolve(true);
     showWait(o.mount);
     return ask(payloadFor(o, st.blockCount)).then(function (r) {
       clearCard(o.mount);
-      var verdict = r ? r.verdict : "rethink"; /* 응답 못 받음 → 되짚기 수준으로 낮춘다 */
+      /* 응답 못 받음 → 되짚기 수준으로 낮춘다. 느슨한 단계는 되짚지 않으므로 그냥 통과. */
+      var verdict = r ? r.verdict : lenient ? "ok" : "rethink";
+      if (lenient && verdict === "rethink") verdict = "ok"; /* 느슨한 단계는 ok/block만 쓴다 */
       var message = r && r.message ? r.message : "적은 내용을 한 번 더 읽어 보고, 빠진 부분이 없는지 살펴볼까요?";
 
       if (verdict === "ok") return pass();
@@ -420,6 +470,60 @@
     return step();
   }
 
+  /* ───────── 마치기 훅(conclude.js가 등록, lesson.js가 '학습 마치기'에서 호출) ───────── */
+
+  /** 이 화면이 들어 있는 단계 id(카드를 보이지 않는 곳에 띄우지 않으려고 쓴다). */
+  function stageOf(node) {
+    var n = node;
+    while (n && typeof n.getAttribute === "function") {
+      var id = n.getAttribute("data-stage");
+      if (id) return id;
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  /**
+   * '학습 마치기'를 누를 때 한 번 더 보는 검사를 등록한다.
+   * mount: 카드가 뜨는 자리(그 단계를 찾는 데 쓴다) · fn(reveal): → bool | Promise<bool>
+   * fn은 **카드를 띄우기 직전에만** reveal()을 불러 그 단계를 열어 준다(통과할 답이면 화면이 움직이지 않게).
+   */
+  function registerFinish(mount, fn) {
+    if (typeof fn !== "function") return;
+    finishChecks.push({ mount: mount || null, fn: fn });
+  }
+
+  /** 등록된 마치기 검사를 차례로 본다. o.goTo(stageId): 그 단계를 열어 주는 함수(선택). → Promise<bool> */
+  function checkFinish(o) {
+    var list = finishChecks.slice();
+    var goTo = o && typeof o.goTo === "function" ? o.goTo : null;
+    var i = 0;
+    function step() {
+      if (i >= list.length) return Promise.resolve(true);
+      var item = list[i++];
+      var reveal = function () {
+        if (!goTo) return;
+        var sid = stageOf(item.mount);
+        if (sid) goTo(sid);
+      };
+      var r;
+      try {
+        r = item.fn(reveal);
+      } catch (e) {
+        return step(); /* 검사 자체가 실패하면 막지 않는다 */
+      }
+      return Promise.resolve(r).then(
+        function (okv) {
+          return okv === false ? false : step();
+        },
+        function () {
+          return step();
+        }
+      );
+    }
+    return step();
+  }
+
   SciSim.AnswerCheck = {
     configure: function (o) {
       cfg.appId = o && o.appId ? String(o.appId) : null;
@@ -430,8 +534,12 @@
       (stageChecks[stageId] = stageChecks[stageId] || []).push(fn);
     },
     checkStage: checkStage,
+    registerFinish: registerFinish,
+    checkFinish: checkFinish,
     verify: verify,
     passedFor: passedFor,
+    settled: settled,
+    isTrial: isTrial,
     /** detail.qa 항목에 덧붙일 값(값이 있을 때만). 기존 항목 모양은 바꾸지 않는다. */
     qaFields: function (key) {
       var st = get(key);
@@ -445,5 +553,6 @@
     _rules: Rules,
     _timeoutMs: TIMEOUT_MS,
     _teacherAt: TEACHER_AT,
+    _lenientStage: LENIENT_STAGE,
   };
 })();

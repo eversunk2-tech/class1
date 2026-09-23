@@ -81,6 +81,9 @@
  *   과학 차시 앱은 공통 틀(science-sim|science-guide/persist.js의 SciSim.Sync)이 아래 함수를 대신 부른다.
  *   오류는 던지지 않고 결과 객체로 돌려준다.
  *   Class1Record.peekSession()        → { userId, accessToken, expiresAt, label } | null  (localStorage만 동기로 읽음, 검증 전 값)
+ *   Class1Record.fetchLoginRequired() → Promise<boolean>  사이트 설정의 "로그인해야만 이용"(site_settings.login_required).
+ *        비로그인도 읽을 수 있고(RLS에서 늘 공개), 읽지 못하면 반드시 false(잠금 꺼짐)를 돌려준다 — 설정을 못 읽어도 갇히지 않게.
+ *        init() 전에도 부를 수 있다(config.js의 URL·anon key만 있으면 된다).
  *   Class1Record.requireUser()        → Promise<{ ok: true, user } | { ok: false, reason: "not_initialized" | "not_logged_in" | "offline" }>
  *        "offline": 토큰 갱신을 네트워크 문제로 못 함(로그아웃된 것이 아님 — 로컬 사본을 지우면 안 된다)
  *   ※ 아래 세 함수는 opts.expectedUserId(페이지의 기록 주인)를 받는다. 요청에 실제로 쓰는 토큰의 사용자(JWT sub)가 이 값과
@@ -115,6 +118,7 @@
   var PROGRESS_MAX_BYTES = 262144; // app_progress_state_size 제약과 같게
   var KEEPALIVE_MAX_BYTES = 60000; // fetch keepalive 본문 한도(64KB)보다 작게
   var DETAIL_MAX_CHARS = 16000;
+  var SETTINGS_TIMEOUT_MS = 6000; // site_settings 읽기 대기 한도(넘으면 "잠금 꺼짐"으로 본다)
   var SHRINK_MARK = "…(길어서 줄임)";
 
   /** detail 사본에서 가장 긴 문자열을 반씩 줄여 JSON 길이를 한도 아래로 맞춘다. */
@@ -249,6 +253,47 @@
       return "sb-" + new URL(url).hostname.split(".")[0] + "-auth-token";
     } catch {
       return null;
+    }
+  }
+
+  /** init() 전에도 쓸 수 있는 REST 접속 정보(config.js 값으로 대신한다). 없으면 null */
+  function restConfig() {
+    var cfg = window.CLASS1_CONFIG || {};
+    var url = state.url || cfg.SUPABASE_URL;
+    var key = state.anonKey || cfg.SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return { url: String(url).replace(/\/$/, ""), key: key };
+  }
+
+  /**
+   * 사이트 설정의 "로그인해야만 이용"(site_settings.login_required)을 읽는다.
+   * site_settings 의 SELECT 는 RLS에서 언제나 공개라 로그인하지 않아도 읽을 수 있다.
+   * ⚠ 읽지 못하면 반드시 false(= 잠금 꺼짐)를 돌려준다 — 설정을 못 읽었다고 학생을 가둬서는 안 된다.
+   * init() 전에도 부를 수 있다(config.js 값만 있으면 된다).
+   */
+  async function fetchLoginRequired() {
+    var c = restConfig();
+    if (!c) return false;
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctrl
+      ? setTimeout(function () {
+          ctrl.abort();
+        }, SETTINGS_TIMEOUT_MS)
+      : null;
+    try {
+      var r = await fetch(c.url + "/rest/v1/site_settings?select=login_required&limit=1", {
+        headers: { apikey: c.key, Authorization: "Bearer " + c.key, Accept: "application/json" },
+        cache: "no-store",
+        signal: ctrl ? ctrl.signal : undefined,
+      });
+      if (!r.ok) return false; // 표가 아직 없거나(404) 권한 문제 → 잠그지 않는다
+      var rows = await r.json();
+      var row = Array.isArray(rows) ? rows[0] : rows;
+      return !!(row && row.login_required === true);
+    } catch {
+      return false; // 네트워크 오류 → 잠그지 않는다
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -820,6 +865,7 @@
     renderLoginHint: renderLoginHint,
     peekSession: peekSession,
     requireUser: requireUser,
+    fetchLoginRequired: fetchLoginRequired,
     callFunction: callFunction,
     loadProgress: loadProgress,
     saveProgress: saveProgress,

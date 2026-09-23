@@ -25,6 +25,9 @@
 | `lesson.js` | 조금 다름 | `texts` 옵션 추가(마침 카드 제목·안내, 처음부터 다시 확인 문구, 너무 긴 글 문구). **기본 문구가 "조사"** |
 | `quiz.js` | 조금 다름 | 마지막 인자 `{ numLabel, key }` 추가(문항 앞 말 기본 "문제", 저장 키 기본 "analysis") |
 
+> **2026-09-23 마치기 조건**: `lesson.js`가 '학습 마치기' 직전에 정리하기 답과 '더 탐구하고 싶은 점'(필수)을 한 번 더 본다.
+> 자세한 내용은 `scripts/templates/science-sim/README.md`의 "마치기 조건"과 `docs/science/answer-check/finish-gate-report.md`를 본다(동작은 실험 앱과 같다).
+
 "같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity}.js scripts/templates/science-sim/style-common.css scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다).
 `stage-nav.js`·`conclude.js`는 2026-09 수정 1차에서 위 동작을 더해 달라졌으니 **덮어쓰지 말고** 차이를 옮긴다.
 "조금 다름" 파일은 덧붙인 옵션이 모두 선택(기본값 있음)이라 나중에 science-sim 쪽으로 합쳐도 실험 앱이 깨지지 않는다.
