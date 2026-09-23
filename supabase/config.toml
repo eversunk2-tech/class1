@@ -1,0 +1,16 @@
+# Supabase CLI 설정 — 이 저장소에서는 **Edge Function의 JWT 검증 설정만** 남겨 둔다.
+# (review L4: 배포 명령이나 대시보드에서 실수로 Verify JWT가 꺼지는 것을 막으려고 저장소에 적어 둔다.)
+#
+# - `npx supabase functions deploy <이름>`이 이 값을 읽어 JWT 검증을 켠 채로 배포한다.
+#   `--no-verify-jwt`를 붙이지 않는다.
+# - 로컬 Supabase(`supabase start`)는 쓰지 않는다. DB 스키마는 `supabase/migrations/`의 SQL을
+#   사용자가 SQL Editor에서 직접 실행한다(CLAUDE.md "SQL 적용 절차").
+# - project_id는 로컬에서 프로젝트를 구분하는 이름일 뿐, 배포 대상은 `supabase link --project-ref`로 정한다.
+
+project_id = "class1"
+
+[functions.check-answer]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true

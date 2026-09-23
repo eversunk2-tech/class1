@@ -10,8 +10,13 @@
  *     isDone: function (id) { return false; },               // 체크 표시용(선택)
  *     onChange: function (id) { ... },                       // 단계가 바뀐 뒤 호출
  *     onBlocked: function (message) { alert(message); },     // 막혔을 때(선택)
+ *     // canEnter를 통과한 뒤, 실제로 넘어가기 직전에 한 번 더 확인한다(답 되짚기·차단 — answer-check.js).
+ *     // true면 바로 이동, Promise면 기다린 뒤 결과가 false가 아닐 때만 이동한다. 기다리는 동안 다른 이동은 무시한다.
+ *     beforeLeave: function (targetId, currentId) { return true | Promise<bool>; },   // 선택
+ *     waitingMessage: "…",                                   // 선택: 확인을 기다리는 동안 다시 눌렀을 때 보여 줄 말
  *   });
- *   nav.go("experiment");  // 앞 단계는 언제든, 뒤 단계는 canEnter 통과 시
+ *   nav.go("experiment");              // 앞 단계는 언제든, 뒤 단계는 canEnter 통과 시
+ *   nav.go("experiment", { silent: true });  // beforeLeave를 건너뛴다(새로고침 복원처럼 학생이 누르지 않은 이동)
  *   nav.next(); nav.prev(); nav.refresh(); nav.current();
  *
  * 각 단계의 화면은 <section data-stage="{id}">로 두고, 현재 단계만 보이게 한다(hidden 속성).
@@ -72,31 +77,50 @@
       });
     }
 
+    var waiting = false; /* beforeLeave 응답을 기다리는 중(두 번 눌러도 한 번만) */
+
     var api = {
       current: function () {
         return cur;
       },
-      go: function (id) {
+      go: function (id, goOpts) {
         if (indexOf(id) < 0) return false;
+        if (waiting) {
+          // 답을 확인하는 중이거나 안내 카드가 떠 있다 → 버튼이 고장 난 것처럼 보이지 않게 까닭을 알려 준다
+          if (opts.onBlocked) opts.onBlocked(opts.waitingMessage || "지금 적은 답을 확인하고 있어요. 화면의 안내를 먼저 살펴봐 주세요.");
+          return false;
+        }
         if (indexOf(id) > indexOf(cur)) {
           var c = check(id);
           if (!c.ok) {
             if (opts.onBlocked) opts.onBlocked(c.message);
             return false;
           }
-        }
-        var changed = id !== cur;
-        cur = id;
-        render();
-        if (changed) {
-          try {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          } catch (e) {
-            window.scrollTo(0, 0);
+          if (opts.beforeLeave && !(goOpts && goOpts.silent)) {
+            var r;
+            try {
+              r = opts.beforeLeave(id, cur);
+            } catch (e) {
+              r = true; /* 확인 자체가 실패하면 막지 않는다 */
+            }
+            if (r && typeof r.then === "function") {
+              waiting = true;
+              r.then(
+                function (okv) {
+                  waiting = false;
+                  if (okv !== false) move(id);
+                },
+                function () {
+                  waiting = false;
+                  move(id); /* 확인하지 못했으면 막지 않는다 */
+                }
+              );
+              return false;
+            }
+            if (r === false) return false;
           }
         }
-        if (opts.onChange) opts.onChange(cur);
-        return true;
+        return move(id);
       },
       next: function () {
         var i = indexOf(cur);
@@ -108,6 +132,21 @@
       },
       refresh: render,
     };
+
+    function move(id) {
+      var changed = id !== cur;
+      cur = id;
+      render();
+      if (changed) {
+        try {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (e) {
+          window.scrollTo(0, 0);
+        }
+      }
+      if (opts.onChange) opts.onChange(cur);
+      return true;
+    }
     render();
     return api;
   };

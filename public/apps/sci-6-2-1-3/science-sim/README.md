@@ -20,6 +20,7 @@
 | `quiz.js` | `SciSim.Quiz` | 보기 고르기 분석(정확 일치 또는 `grade` 함수, 고른 오답 보기별 피드백 `wrongBy`, 빠뜨린 정답 보기별 피드백 `missBy`) |
 | `conclude.js` | `SciSim.Conclude` | 결론·발전 질문: 적고 제출해야 모범 답안이 나오고 나란히 비교 |
 | `curiosity.js` | `SciSim.Curiosity` | 더 탐구하고 싶은 점 |
+| `answer-check.js` | `SciSim.AnswerCheck` | **답 되짚기·차단**(예상하기·정리하기). 로컬 규칙으로 확실한 무의미만 막고, 나머지는 `check-answer` Edge Function(Gemini)이 ok/rethink/block을 정한다. 설계: `docs/science/answer-check/spec.md` |
 | `style-common.css` | — | 공통 스타일(태블릿 우선, 44px 이상 터치 영역, 다크모드, 실험 화면 틀·분류·그래프 스타일) |
 
 각 파일 맨 위 주석에 자세한 사용법이 있다.
@@ -44,7 +45,8 @@
    <nav class="ss-footer-nav"><button id="btn-prev">…</button><button id="btn-next">…</button></nav>
    <div class="ss-toast" id="toast" role="status" hidden></div>
    ```
-   스크립트 순서: importmap(three, SRI) → supabase-js(SRI) → `config.js` → `class1-record.js` → `science-sim/persist.js, stage-nav.js, lesson.js, predict.js, record-store.js, table-chart.js, sorter.js, quiz.js, conclude.js, curiosity.js, sim3d.js, experiment.js` → `data/lesson-config.js` → `app.js`.
+   스크립트 순서: importmap(three, SRI) → supabase-js(SRI) → `config.js` → `class1-record.js` → `science-sim/persist.js, answer-check.js, stage-nav.js, lesson.js, predict.js, record-store.js, table-chart.js, sorter.js, quiz.js, conclude.js, curiosity.js, sim3d.js, experiment.js` → `data/lesson-config.js` → `app.js`.
+   (`answer-check.js`는 `persist.js` 바로 뒤, 반드시 `lesson.js`·`predict.js`·`conclude.js`보다 먼저 불러온다. 빼면 되짚기·차단만 꺼지고 나머지는 그대로 동작한다.)
    3D를 쓰지 않는 차시는 importmap과 `sim3d.js`를 빼도 된다(2D만 씀).
 4. `data/lesson-config.js`: 아래 3절 예시 중 알맞은 형(색 관찰형 / 수치 측정형)을 골라 채운다.
 5. `app.js`: 아래 순서로 연결한다(시범 앱 `app.js`가 실제 예).
@@ -349,3 +351,20 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
   - 서버 내용이 이 기기가 **마지막으로 보낸 내용**과 같을 때(`<storageKey>:__meta`의 `sentFp` 지문으로 확인).
   - 서버 내용이 **로컬 안에 그대로 들어 있을 때**(키 단위 `canon` 비교로 로컬이 서버의 확장일 때).
   - 다른 기기에서 다르게 진행한 진짜 충돌은 지금처럼 학생이 고른다.
+
+## 답 되짚기·차단 (2026-09-23, `answer-check.js`)
+
+설계: `docs/science/answer-check/spec.md`. 서버: `supabase/functions/check-answer/`(시크릿 `GEMINI_API_KEY` 하나).
+
+- **앱 코드(app.js·lesson-config.js)는 바꾸지 않는다.** `index.html`에 `<script src="./science-sim/answer-check.js"></script>` 한 줄만 있으면 켜진다.
+  `predict.js`가 자기 화면의 `<section data-stage="…">`를 찾아 스스로 등록하고, `lesson.js`가 그 단계를 떠나기 직전에 불러 준다.
+  `conclude.js`는 '제출하고 모범 답안 보기'를 누를 때 스스로 확인한다. 이 파일을 빼면 예전과 똑같이 동작한다.
+- 판정 3단계: **ok**(아무것도 안 보임) · **rethink**(노란 카드, "그대로 제출할게요"로 언제나 넘어갈 수 있음, 질문당 평생 1번) ·
+  **block**(빨간 카드, 다시 써야 넘어감. 같은 질문에서 3번째부터 "🙋 선생님과 확인했어요 · 계속하기").
+- **차단은 좁게**: 로컬 규칙(`SciSim.AnswerCheck._rules.block`)은 자모만·같은 글자 반복·숫자만·질문 그대로 복사(90% 이상)·자판 뭉개기만 막는다.
+  "질문과 관련 없음(off-topic)"은 오직 Gemini가 정하고, **Gemini가 응답하지 못하면(오프라인·시간 초과·오류·429) 절대 막지 않는다**(rethink로 강등).
+- 저장: store의 새 키 `answerCheck` = `{ "predict:q1": { nudged, blockCount, teacherOverride, okFp } }`.
+  **저장 키 버전(`:vN`)과 기존 저장 구조는 그대로**다. `predict.qa()`·`conclude.qa()`가 값이 있을 때만 `nudged`·`blockCount`·`teacherOverride`를 항목에 덧붙인다(관리자 화면은 모르는 필드를 무시한다).
+- 대기 한도: 클라이언트 3.5초, 함수 안 Gemini 호출 3초. 기다리는 동안 "🔎 답을 다시 확인하고 있어요…" 표시.
+- `StageNav`에 `beforeLeave(targetId, currentId)` 옵션이 생겼다(Promise를 돌려주면 기다렸다가 이동). `go(id, { silent: true })`는 이 확인을 건너뛴다(새로고침 복원).
+- 문항별로 오개념 힌트를 주고 싶으면(선택) `predict.questions[i].checkHint` 또는 `conclude` 항목의 `checkHint`를 넣는다(없으면 `compareTip`을 쓴다).

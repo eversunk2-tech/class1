@@ -12,7 +12,13 @@
  *   predict.values()   → { q1: "…", q2: "…" }
  *   predict.isDone()   → 모든 질문을 적었는지
  *   predict.qa(stage)  → [{ stage, id, label, question, kind: "text", answer }] (detail.qa용 질문-답 목록, stage 기본 "predict")
+ *   predict.checkPass() → true | Promise<bool> (답 되짚기·차단 — answer-check.js가 있을 때만, 없으면 늘 true)
  *   저장 키: "predict"(답), "hints"(열린 힌트 수)
+ *
+ * 답 되짚기·차단(answer-check.js, docs/science/answer-check/spec.md)
+ *   - index.html에 answer-check.js를 불러온 앱에서만 동작한다. app.js는 바꿀 필요가 없다:
+ *     이 화면이 들어 있는 <section data-stage="…">를 스스로 찾아 등록하고, lesson.js가 단계 이동 직전에 불러 준다.
+ *   - 막히면 그 질문 칸 아래에 카드가 뜨고, 학생이 적은 글은 지우지 않는다.
  */
 (function () {
   "use strict";
@@ -30,6 +36,8 @@
 
       root.textContent = "";
       if (cfg.intro) root.appendChild(el("p", { class: "ss-lead", text: cfg.intro }));
+
+      var boxes = {}; /* 질문별 { ta, host } — 되짚기·차단 카드를 붙일 자리 */
 
       cfg.questions.forEach(function (q, i) {
         var id = "ss-predict-" + q.id;
@@ -59,11 +67,14 @@
           if (onChange) onChange();
         });
         drawNote();
+        var host = el("div", { class: "ss-ac-host" });
+        boxes[q.id] = { ta: ta, host: host };
         root.appendChild(
           el("div", { class: "ss-card ss-question" }, [
             el("label", { for: id, class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "질문 " + (i + 1) }), q.text]),
             ta,
             note,
+            host,
           ])
         );
       });
@@ -97,7 +108,48 @@
         root.appendChild(box);
       }
 
+      /* ── 답 되짚기·차단(answer-check.js가 있을 때만) ── */
+      var AC = SciSim.AnswerCheck || null;
+      function keyOf(q) {
+        return "predict:" + q.id;
+      }
+      function checkPass() {
+        if (!AC) return true;
+        var list = cfg.questions.slice();
+        var i = 0;
+        function step() {
+          if (i >= list.length) return Promise.resolve(true);
+          var q = list[i++];
+          var box = boxes[q.id];
+          var text = (values[q.id] || "").trim();
+          if (!box || text.length < minLength) return step(); /* 글자 수는 기존 gate가 본다 */
+          return AC.verify({
+            key: keyOf(q),
+            stage: "predict",
+            question: q.text,
+            answer: text,
+            hint: q.checkHint || cfg.checkHint,
+            mount: box.host,
+            focus: box.ta,
+          }).then(function (okv) {
+            return okv === false ? false : step();
+          });
+        }
+        return step();
+      }
+      /* 이 화면이 들어 있는 단계를 찾아 등록해 둔다 → lesson.js가 그 단계를 떠나기 직전에 불러 준다(app.js 무변경). */
+      if (AC) {
+        var section = null;
+        try {
+          section = root.closest ? root.closest("[data-stage]") : null;
+        } catch (e) {
+          section = null;
+        }
+        if (section) AC.register(section.getAttribute("data-stage"), checkPass);
+      }
+
       return {
+        checkPass: checkPass,
         values: function () {
           var out = {};
           cfg.questions.forEach(function (q) {
@@ -117,7 +169,7 @@
         /* 질문-답 표준 목록(detail.qa, docs/admin/responses-spec.md §3.3). stage: 이 화면의 단계 id(기본 "predict") */
         qa: function (stage) {
           return cfg.questions.map(function (q, i) {
-            return {
+            var item = {
               stage: stage || "predict",
               id: q.id,
               label: cfg.questions.length > 1 ? "질문 " + (i + 1) : "예상",
@@ -125,6 +177,14 @@
               kind: "text",
               answer: (values[q.id] || "").trim(),
             };
+            /* 되짚기·차단 기록(값이 있을 때만 덧붙인다 — 기존 항목 모양은 그대로) */
+            if (AC) {
+              var extra = AC.qaFields(keyOf(q));
+              Object.keys(extra).forEach(function (k) {
+                item[k] = extra[k];
+              });
+            }
+            return item;
           });
         },
       };

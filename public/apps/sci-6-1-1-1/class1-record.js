@@ -99,6 +99,13 @@
  *   Class1Record.signOut()            → 로그아웃(오프라인이어도 이 기기의 세션은 지운다)
  *   Class1Record.save(result)의 result.expectedUserId → 지금 사용자와 다르면 저장하지 않고 "user_changed"
  *
+ * ▶ Edge Function 호출
+ *   Class1Record.callFunction(name, body, { timeoutMs, expectedUserId })
+ *        → Promise<{ ok: true, status, data } | { ok: false, reason, message }>
+ *        reason: "not_initialized" | "invalid" | "not_logged_in" | "offline" | "user_changed" | "timeout" | "rate_limited" | "error"
+ *        로그인 토큰을 붙여 POST한다(Verify JWT를 켠 함수용). 본문은 JSON, 응답도 JSON으로 읽는다.
+ *        지금은 답 되짚기·차단(science-sim/answer-check.js → check-answer)이 쓴다.
+ *
  * 외부 라이브러리는 supabase-js(CDN) 하나만 쓴다.
  */
 (function () {
@@ -352,6 +359,52 @@
       return fail("user_changed", "다른 사람으로 로그인되어 있어요.");
     if (!peek.accessToken || !sub || sub !== peek.userId || (peek.expiresAt && peek.expiresAt * 1000 < Date.now() + 5000)) return null;
     return { ok: true, token: peek.accessToken, userId: sub };
+  }
+
+  /**
+   * Edge Function 호출(로그인 토큰 첨부). 실패는 던지지 않고 결과 객체로 돌려준다.
+   * 개인정보는 body에 넣지 않는다(호출하는 쪽 책임).
+   */
+  async function callFunction(name, body, opts) {
+    if (!state.client) return fail("not_initialized", "Class1Record.init()을 먼저 호출하세요.");
+    if (typeof name !== "string" || !/^[a-z0-9][a-z0-9-]{0,59}$/.test(name)) return fail("invalid", "함수 이름이 올바르지 않습니다.");
+    var o = opts || {};
+    var auth = await authFor(o.expectedUserId);
+    if (!auth.ok) return auth;
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = o.timeoutMs && ctrl ? setTimeout(function () { ctrl.abort(); }, o.timeoutMs) : null;
+    try {
+      var r = await fetch(state.url + "/functions/v1/" + name, {
+        method: "POST",
+        headers: {
+          apikey: state.anonKey,
+          Authorization: "Bearer " + auth.token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body == null ? {} : body),
+        cache: "no-store",
+        signal: ctrl ? ctrl.signal : undefined,
+      });
+      var text = await r.text();
+      var data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+      if (!r.ok) {
+        if (r.status === 429) return fail("rate_limited", "잠시 뒤에 다시 시도해 주세요.");
+        if (r.status === 401 || r.status === 403) return fail("not_logged_in", "로그인이 만료됐어요. 다시 로그인해 주세요.");
+        return fail("error", (data && data.error) || "요청이 실패했어요(" + r.status + ").");
+      }
+      return { ok: true, status: r.status, data: data };
+    } catch (e) {
+      if (e && e.name === "AbortError") return fail("timeout", "응답이 늦어요.");
+      return fail("offline", (e && e.message) || "인터넷에 연결할 수 없어요.");
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /** PostgREST/네트워크 오류 → reason */
@@ -767,6 +820,7 @@
     renderLoginHint: renderLoginHint,
     peekSession: peekSession,
     requireUser: requireUser,
+    callFunction: callFunction,
     loadProgress: loadProgress,
     saveProgress: saveProgress,
     clearProgress: clearProgress,

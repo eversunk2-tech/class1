@@ -65,6 +65,9 @@
         if ("ResizeObserver" in window) new ResizeObserver(setH).observe(header);
       }
 
+      /* 답 되짚기·차단(answer-check.js를 불러온 앱에서만). 앱 코드는 바꿀 필요가 없다. */
+      if (SciSim.AnswerCheck) SciSim.AnswerCheck.configure({ appId: o.appId, store: store });
+
       /* 학습 시간(화면을 보고 있는 동안만 셈) */
       var meta = store.get("meta", null);
       if (!meta || typeof meta !== "object") meta = { startedAt: Date.now(), activeSec: 0, finishedAt: null, savedAt: null };
@@ -136,6 +139,10 @@
             onBlocked: function (m) {
               toast(m, 3400);
             },
+            /* 다음 단계로 넘어가기 직전에 지금 화면의 답을 한 번 살펴본다(answer-check.js가 없으면 늘 통과). */
+            beforeLeave: function (targetId, fromId) {
+              return SciSim.AnswerCheck ? SciSim.AnswerCheck.checkStage(fromId) : true;
+            },
             onChange: function (id) {
               store.set("step", id);
               if (onEnter[id]) onEnter[id]();
@@ -155,7 +162,7 @@
             if (canEnter(ids[i]) !== true) break;
             target = ids[i];
           }
-          navApi.go(target);
+          navApi.go(target, { silent: true }); // 복원 이동은 학생이 누른 것이 아니므로 답 확인을 건너뛴다
           if (n.prevBtn)
             n.prevBtn.addEventListener("click", function () {
               navApi.prev();

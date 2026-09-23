@@ -103,9 +103,16 @@ Edge Function `admin-reset-password` 배포 완료(Verify JWT 켬).
 * 실제 학생 소요 시간(7분 기준) — 지금 시간표는 글자 수 기반 추정
 * 두 학생 계정으로 진행 상황 저장·로그아웃 삭제·이어서 하기 흐름
 
+## 학생 답 되짚기·차단 (2026-09-23)
+* 설계 `docs/science/answer-check/spec.md`(끝 "개정 1"), 구현 `docs/science/answer-check/build-report.md`, 검증 `review.md`.
+* 과학 앱 **23개 전부** 적용. 앱 안 규칙(확실한 무의미 5종)은 키 없이도 동작 — 지금도 "ㅇㅇㄹㅎㄷㄴ"류는 막힌다.
+* 판정 3단계: 통과 / 다시 생각(질문당 1회, 통과 허용) / 통과 불가(무의미·주제 무관). 틀렸지만 주제에 맞는 답은 막지 않는다. Gemini 실패(오프라인·한도·오류·시간 초과)면 **차단 없음**. 같은 질문 3번째 차단부터 "🙋 선생님과 확인했어요" 버튼.
+* Edge Function `supabase/functions/check-answer` — **아직 배포 전**. 사용자가 키 발급 → `supabase secrets set GEMINI_API_KEY=...` → `supabase functions deploy check-answer`(Verify JWT 켠 채) 하면 Gemini 판단이 켜진다.
+* 저장 키·저장 구조 불변(`app_progress.state`, `detail.qa`). 새 필드는 값이 있을 때만 덧붙음. SQL 없음.
+
 ## 남은 작업·메모
 * **공통 틀 수정 완료(2026-09-23, `docs/science/template-fix-1-report.md`)**: 가짜 충돌 창·기록하기 가림·휴대폰 가로 머리말·숫자 조사 4건 + 알림(`.ss-toast`) `pointer-events:none`. 저장 키·저장 구조 그대로라 학생 기록은 유지. 사본 동기화 완료(`science-sim` 20개, `science-guide` 3개, `class1-record.js`).
 * 조사 도우미 틀(`science-guide`)은 토스트만 함께 고쳤고 나머지 4건은 적용하지 않음(해당 앱 3개는 수업에 쓰지 않음).
-* 2학기 시뮬레이션 앱 11개(위 표) 착수는 사용자 승인을 기다림.
+* Gemini 키 등록·`check-answer` 배포는 사용자 작업 대기(그 전까지는 앱 안 규칙만 동작).
 * 게임 업로드 안내 문구가 "index.html"로 적혀 있음 — 실제로는 `.html`이면 이름 무관. 문구 변경 제안했으나 미결정.
 * `src/data/apps.ts`의 `webApps`는 비어 있음(과학 앱 목록 원천은 `science-curriculum.ts`).
