@@ -3,7 +3,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t">
       <div className="w-full px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-8">
-        © {new Date().getFullYear()} 우리 반 배움터
+        © {new Date().getFullYear()} PSC. All rights reserved.
       </div>
     </footer>
   );

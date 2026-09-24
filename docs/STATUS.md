@@ -70,7 +70,8 @@
 ## 사이트 디자인 (2026-09-24 개편, 모두 배포됨)
 * 참고: "똑똑! 수학탐험대"의 **느낌만**(그림·로고·문구·캐릭터는 가져오지 않음). 설계 `docs/design/redesign/spec.md`(끝 "개정 1"·"개정 2"), 보고 `build-1~5-report.md`, 검증 `review-12.md`·`review-34.md`·`review-5.md`.
 * 보라 주색 + 연보라 배경 그라데이션, 메뉴별 파스텔 그라데이션 카드, 본문 Pretendard(OFL, npm 자체 호스팅, 가변 글꼴), **제목 G마켓 산스 Bold + 부드러운 그림자**(5단계, 2026-09-24 사용자 선택 — 주아체 대신, 공식 OTF 원본 `public/fonts/gmarket-sans/`, 관리자 화면은 그림자 없음), 왼쪽 사이드바 유지, 다크모드 유지. 관리자 화면만 보라 채도 약 25% 낮춤(`src/app/admin/admin-theme.css`), 위험 버튼은 진한 빨강(`src/lib/danger-button.ts`).
-* 마스코트 "부엉이 과학자"(Canva AI 생성, 사용자 선택): `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`(홈·과학수업·빈 화면·완료), 원본·배경 제거 스크립트 `docs/design/redesign/mascot-src/`.
+* 마스코트 "부엉이 과학자"(Canva AI 생성, 사용자 선택): `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`(홈·과학수업·빈 화면·완료), 원본·배경 제거 스크립트 `docs/design/redesign/mascot-src/`. 09-25 사용자 지적("흰 배경이 매끄럽지 못하게 남음")으로 배경 제거를 v2로 다시 함(가장자리 색에서 흰 배경을 걷어 냄 — 흰 테두리·돌기·발밑 그림자 없음, 원본 JPEG에서 4장 모두 `cutout.cjs` 자동 설정). 표시할 때 쓰던 "가장자리 1px 깎기" SVG 필터는 뺐다.
+* 사이트 맨 아래 문구: "© {연도} PSC. All rights reserved."(09-25 사용자 요청, `src/components/site-footer.tsx`).
 * 3D 아이콘 15개: Microsoft Fluent Emoji 3D(MIT) `public/illustrations/3d/`(고지 `LICENSE-fluent-emoji.txt`).
 
 ## Supabase (모두 사용자가 실행·배포 완료)
