@@ -366,3 +366,19 @@ Jua·Pretendard 모두 SIL OFL 1.1 — 재배포·서브셋·자체 호스팅 �
 * **Q1 홈 CTA**: 문구 **"오늘의 과학 탐구 시작하기"**, 목적지 **과학수업(`/science/`)**.
 * **Q3**: 과학 앱 23개 **전부** 공통 틀 CSS 리스킨에 포함(동작·저장 무변경).
 * Q4·Q5·Q7은 추천안 그대로. Q6: 부엉이는 홈 히어로(인사)와 과학수업 히어로(태블릿) 모두에 쓴다.
+
+---
+
+## 개정 2 (2026-09-24, 사용자 결정) — 제목 글꼴·제목 그림자. **이 절이 §2.1과 개정 1의 "제목 Jua"보다 우선한다.**
+* 계기: 사용자가 "주아체보다 똑똑수학탐험대 배너처럼 명시적으로 눈에 띄는 글꼴로 모두", "메뉴 타이틀 글자에 그림자 느낌의 입체감"을 요청(배너 캡처 제공 — 그림 속 글자라 글꼴 이름은 알 수 없음, 참고 사이트의 웹 글자는 Pretendard·Jua). Claude가 OFL 후보 4개(G마켓 산스 Bold·나눔스퀘어라운드 EB·Pretendard Black·검은고딕)와 그림자 3안(A 부드러운·B 스티커·C 블록)을 우리 사이트 문구로 비교 이미지를 만들어 보여 주고 **사용자가 G마켓 산스 Bold + A 부드러운 그림자**를 골랐다. 참고 사이트의 파일·그림·문구는 가져오지 않았다.
+* **제목 글꼴: G마켓 산스 Bold**(Gmarket Sans, SIL OFL 1.1, © 2019 eBay Korea, Reserved Font Name "Gmarket Sans Font", 한글 11,172자).
+  * 파일(Claude가 사용자 허락 받고 받아 둠): `public/fonts/gmarket-sans/GmarketSansBold.otf` — 공식 배포 원본을 **수정 없이**(약 869KB, 한 번 받으면 캐시). WOFF2 변환·서브셋은 OFL "수정본"이라 원래 이름을 쓸 수 없어 하지 않는다. 고지 `LICENSE-gmarket-sans-OFL.txt`, 불러오기 CSS `gmarket-sans.css`(@font-face 1개, `font-display: swap`, weight 700). Build는 글꼴 파일을 새로 받거나 바꾸지 않는다.
+  * 사이트: `layout.tsx`의 `next/font` Jua를 빼고 head에 `withBasePath("/fonts/gmarket-sans/gmarket-sans.css")` 스타일시트를 붙인다(같은 출처의 작은 CSS). 제목 글꼴 변수는 `"Gmarket Sans"` → 대체 글꼴(Pretendard 굵게) 순서.
+  * 과학 앱: `persist.js`(science-sim·science-guide)가 Jua `<link>` 대신 `../../fonts/gmarket-sans/gmarket-sans.css`(같은 사이트, 상대경로)를 **비차단**으로 붙인다 — 사이트와 같은 파일·같은 캐시. `--ss-font-heading`을 G마켓 산스로. Google Fonts 연결(preconnect 포함)은 더 쓰지 않으면 뺀다.
+  * 굵기: 파일은 Bold 하나뿐이다. 제목의 굵기를 700으로 맞춰 글꼴을 못 받았을 때도 대체 글꼴이 굵게 보이게 하고, 가짜 굵게(`font-synthesis`)는 계속 막는다. 주아보다 글자 폭이 넓으므로 좁은 화면에서 제목이 넘치거나 어색하게 줄바꿈되는 곳만 크기·자간을 조금 조정한다. 알약·칩처럼 세로 가운데가 중요한 곳에서 글자가 위아래로 치우쳐 보이는지 확인한다.
+* **제목 그림자: A 부드러운 그림자**(비교 이미지의 A).
+  * 밝음: 글자 바로 아래 흰 윤곽(`0 0.05em 0` 흰색 90%) + 보라 부드러운 그림자(`0 0.16em 0.4em` 보라 약 28%). 어두움: 검은 그림자(`0 0.08em 0.3em` 70%) + 보라 은은한 빛(`0 0 0.5em` 약 25%). **em 단위**라 제목 크기에 비례한다. 값은 CSS 변수 하나로 두어 한 곳에서 조절한다.
+  * 적용: 사이트에서 제목 글꼴을 쓰는 제목(홈 히어로, 각 메뉴 페이지 제목, 섹션 제목, 카드 제목 등). 작은 글자(약 18px 이하)는 흐림을 줄인다. **관리자 화면은 그림자 없음**(업무 화면은 담백하게 — 개정 1 Q7과 같은 이유, 글꼴은 바꿈). 과학 앱은 제목 글꼴을 쓰는 곳에 같은 그림자.
+  * 그라데이션 글자(`text-grad-primary` 등 글자색 투명)는 text-shadow가 글자 안으로 비쳐 탁해지므로 `text-shadow: none` + `filter: drop-shadow(...)`로 대신한다.
+  * 접근성: 대비는 그림자 없이 글자색↔바탕으로 AA 유지, 고대비 모드(`forced-colors: active`)에서는 그림자 없음.
+* 과학 앱의 3D 장면·그래프·SVG 속 글자, 측정값·표·입력칸 글꼴은 바꾸지 않는다(계속 Pretendard/기존 값).

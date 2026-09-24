@@ -63,7 +63,7 @@
 }
 .p2-row { display: flex; align-items: center; gap: 6px; text-align: left; }
 .p2-row.is-unused { cursor: default; background: transparent; color: #6b7684; font-weight: 600; font-size: 0.72rem; }
-.p2-col.is-sel, .p2-row.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.p2-col.is-sel, .p2-row.is-sel { border-color: #6c4dd6; background: #f5f3fc; }
 .p2-well {
   position: relative; aspect-ratio: 1; min-height: 44px; border-radius: 50%; border: 3px solid #c3ceda;
   background: #dde5ee; cursor: pointer; padding: 0; overflow: visible;

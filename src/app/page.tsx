@@ -12,7 +12,7 @@ import { menuItems, type MenuColor } from "@/data/menu";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { cn } from "@/lib/utils";
 
-/** 홈 섹션 제목: 앞에 작은 3D 반짝이 + 조금 큰 Jua 글자(개정 2) */
+/** 홈 섹션 제목: 앞에 작은 3D 반짝이 + 조금 큰 제목 글꼴(G마켓 산스) 글자(개정 2) */
 function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
   return (
     <h2 id={id} className="flex items-center gap-2 font-heading text-2xl font-normal sm:text-[1.75rem]">
@@ -23,7 +23,7 @@ function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
 }
 
 /**
- * 대시보드 정보 카드: 흰 둥근 카드 + 메뉴색 부드러운 그림자 + 큰 3D 아이콘 칩 + 제목(Jua) + 메뉴색 "더 보기" 알약.
+ * 대시보드 정보 카드: 흰 둥근 카드 + 메뉴색 부드러운 그림자 + 큰 3D 아이콘 칩 + 제목(G마켓 산스) + 메뉴색 "더 보기" 알약.
  * 목록 글자가 페이지 배경(연보라)이 아니라 흰 카드 위에 놓여 대비가 안정적이다(redesign spec §4.3, 개정 2).
  */
 function DashboardSection({

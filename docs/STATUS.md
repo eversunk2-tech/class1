@@ -54,8 +54,8 @@
 * 로그인 학생: 진행 상황 `app_progress` 자동 저장·이어서 하기, 로그아웃 시 `sci6…` 로컬 삭제, 완료 시 `app_results`(+`detail.qa`).
 * **학생 답 되짚기·차단**(`answer-check.js` + Edge Function `check-answer`): 통과 / 다시 생각(질문당 1회, 그대로 제출 가능) / 통과 불가(무의미·주제 무관). 로컬 규칙은 확실한 무의미 5종만, 주제 무관은 Gemini만. Gemini 실패·체험 모드면 차단 없음(로컬 규칙만). 같은 질문 3번째 차단부터 "🙋 선생님과 확인했어요". "✔ 잘 적었어요"는 검사 통과 뒤에만. 안내 문구(외부 검사 사실)는 넣지 않음(사용자 결정) — 학생에게 개인정보를 적지 않도록 교실에서 안내.
 * **마치기 조건**: 정리하기 답이 통과 불가면 '학습 마치기' 거부, '더 탐구하고 싶은 점'은 **필수**(느슨 판정: 무의미·주제 무관만 거부). 버튼 위에 "'학습 마치기'를 눌러야 선생님에게 제출돼요" 상시 표시.
-* 디자인: 사이트와 같은 보라·알약 버튼·Pretendard/Jua(`persist.js`가 CDN `<link>`를 비차단으로 붙임, CDN이 막혀도 첫 화면 즉시). 3D 장면·그래프 색은 그대로.
-* 공통 틀 개선 이력: `docs/science/template-fix-1-report.md`(가짜 충돌 창·기록하기 가림·휴대폰 가로 머리말·숫자 조사·알림 클릭 통과), `docs/science/answer-check/`(되짚기·마치기 조건·체험 모드 연동), `docs/design/redesign/build-3-report.md`(겉모양·글꼴).
+* 디자인: 사이트와 같은 보라·알약 버튼·본문 Pretendard(jsDelivr)·제목 G마켓 산스 Bold + 부드러운 그림자(사이트의 `public/fonts/gmarket-sans/`를 상대경로로). `persist.js`가 글꼴 `<link>`를 비차단으로 붙여 글꼴이 막혀도 첫 화면 즉시. 3D 장면·그래프 색은 그대로.
+* 공통 틀 개선 이력: `docs/science/template-fix-1-report.md`(가짜 충돌 창·기록하기 가림·휴대폰 가로 머리말·숫자 조사·알림 클릭 통과), `docs/science/answer-check/`(되짚기·마치기 조건·체험 모드 연동), `docs/design/redesign/build-3-report.md`(겉모양·글꼴), `docs/design/redesign/build-5-report.md`(제목 글꼴·그림자), `docs/science/small-fix-2-report.md`(움직임 줄이기 스피너, 예전 파랑 7곳, `sci-6-2-1-4` 기록하기 버튼).
 
 ## 블로그·관리자 기능 (모두 배포됨)
 * 블로그 글(관리자 작성), 댓글·좋아요·조회수, 검색/태그, 로그인(아이디/비밀번호 + GitHub/Google OAuth)
@@ -68,8 +68,8 @@
 * 설계·검증 문서: `docs/admin/`(spec, responses-spec, admin-tools/, create-members/)
 
 ## 사이트 디자인 (2026-09-24 개편, 모두 배포됨)
-* 참고: "똑똑! 수학탐험대"의 **느낌만**(그림·로고·문구·캐릭터는 가져오지 않음). 설계 `docs/design/redesign/spec.md`(끝 "개정 1"), 보고 `build-1~4-report.md`, 검증 `review-12.md`·`review-34.md`.
-* 보라 주색 + 연보라 배경 그라데이션, 메뉴별 파스텔 그라데이션 카드, 본문 Pretendard(OFL, npm 자체 호스팅, 가변 글꼴), 제목 Jua, 왼쪽 사이드바 유지, 다크모드 유지. 관리자 화면만 보라 채도 약 25% 낮춤(`src/app/admin/admin-theme.css`), 위험 버튼은 진한 빨강(`src/lib/danger-button.ts`).
+* 참고: "똑똑! 수학탐험대"의 **느낌만**(그림·로고·문구·캐릭터는 가져오지 않음). 설계 `docs/design/redesign/spec.md`(끝 "개정 1"·"개정 2"), 보고 `build-1~5-report.md`, 검증 `review-12.md`·`review-34.md`·`review-5.md`.
+* 보라 주색 + 연보라 배경 그라데이션, 메뉴별 파스텔 그라데이션 카드, 본문 Pretendard(OFL, npm 자체 호스팅, 가변 글꼴), **제목 G마켓 산스 Bold + 부드러운 그림자**(5단계, 2026-09-24 사용자 선택 — 주아체 대신, 공식 OTF 원본 `public/fonts/gmarket-sans/`, 관리자 화면은 그림자 없음), 왼쪽 사이드바 유지, 다크모드 유지. 관리자 화면만 보라 채도 약 25% 낮춤(`src/app/admin/admin-theme.css`), 위험 버튼은 진한 빨강(`src/lib/danger-button.ts`).
 * 마스코트 "부엉이 과학자"(Canva AI 생성, 사용자 선택): `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`(홈·과학수업·빈 화면·완료), 원본·배경 제거 스크립트 `docs/design/redesign/mascot-src/`.
 * 3D 아이콘 15개: Microsoft Fluent Emoji 3D(MIT) `public/illustrations/3d/`(고지 `LICENSE-fluent-emoji.txt`).
 
@@ -100,16 +100,17 @@
 ## 사용자가 실제로 확인한 것
 * (09-23) Gemini 피드백 품질·말투 괜찮음, 로그인 잠금 스위치 동작, 회원 추가(단건·엑셀)·감사 로그, 완전 탈퇴(계정 삭제 뒤 학습 기록 유지), 무의미 입력 차단
 * (09-24) 디자인 개편 1단계 방향 승인("더 화려하게" 반영 후 "좋아")
+* (09-24) 제목 글꼴·그림자 비교 이미지(글꼴 4개 × 그림자 3안)를 보고 G마켓 산스 Bold + A 부드러운 그림자 선택, 글꼴 파일 받기 허락
 
 ## 확인하지 못한 것 (사용자 확인 필요)
 * 실제 iPad/태블릿: 3D 드래그, 시간 바·각도 슬라이더, 세로 화면 스크롤, 게임 무한 루프 시 정지 버튼, 버저 소리 크기(3단원 탐구 2)
 * 실제 학생 소요 시간(7분 기준) — 지금 시간표는 글자 수 추정
-* 개편된 디자인을 실제 로그인 상태·실제 태블릿으로 본 것(모두 가짜 세션·headless 브라우저로 확인)
+* 개편된 디자인을 실제 로그인 상태·실제 태블릿으로 본 것(모두 가짜 세션·headless 브라우저로 확인). 새 제목 글꼴(G마켓 산스, 약 0.9MB 한 번 받음)이 학교 망·iPad Safari에서 뜨는 속도와 모양도 포함
 
 ## 남은 작업·메모
 * 진행 중 작업 없음. 새 요청을 기다림.
 * 참고(09-24 해결): 게임 업로드 안내 문구의 "index.html"을 실제 규칙("이름은 무엇이든, `.html`/`.htm`으로 끝나면 됨")에 맞게 고침(`game-upload-field.tsx`, `community-post-form.tsx`, `games/page.tsx`, `lib/community.ts` 오류 문구).
-* **낮은 지적(기존부터, 쓰는 데 문제 없음)**: `sci-6-2-1-4` 태블릿 가로에서 실험하기 진입 직후 기록하기 버튼이 아래 막대에 약간 걸침(스크롤하면 정상), 움직임 줄이기 설정에서 검사 중 스피너가 멈춰 보임, 일부 앱 선택 표시에 예전 파란색이 남음(앱 고유 CSS).
+* 참고(09-24 해결): 낮은 지적 3개 — `sci-6-2-1-4` 기록하기 버튼 가림(태블릿 가로, 카드 여백 조정), 움직임 줄이기에서 멈춰 보이던 스피너(2.4초로 천천히 돎), 앱 선택 표시에 남은 예전 파랑 7곳(보라로) — 모두 고침(`docs/science/small-fix-2-report.md`).
 * 참고(해결됨): 학생 계정 202603·202622가 "로그인 기록 없음"으로 보였던 것은 DB 오류가 아니라 **그 계정으로 로그인한 적이 없음**(세션·토큰·활동 0) — 태블릿이 다른 계정이었거나 체험 모드였을 가능성. 필요하면 태블릿에서 계정 확인.
 * `src/data/apps.ts`의 `webApps`는 비어 있음(과학 앱 목록 원천은 `science-curriculum.ts`, `appTitle()`이 그쪽도 찾음).
 * 서브에이전트가 테스트 중 실제 Supabase로 요청을 보냈을 가능성이 있던 적이 한 번 있음(09-24, 가짜 토큰이라 쓰기는 거부됨). 이후 규칙: 테스트 시 실제 Supabase 주소를 첫 로드부터 막는다(CLAUDE.md).

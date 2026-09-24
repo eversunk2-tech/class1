@@ -41,7 +41,7 @@
   font-weight: 700; font-size: 0.78rem; line-height: 1.2; cursor: pointer; padding: 4px;
 }
 .p2-row { display: flex; align-items: center; gap: 6px; text-align: left; }
-.p2-col.is-sel, .p2-row.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.p2-col.is-sel, .p2-row.is-sel { border-color: #6c4dd6; background: #f5f3fc; }
 .p2-well {
   position: relative; aspect-ratio: 1; min-height: 52px; border-radius: 50%; border: 3px solid #c3ceda;
   background: #dde5ee; cursor: pointer; padding: 0; overflow: visible;

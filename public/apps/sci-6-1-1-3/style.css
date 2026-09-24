@@ -41,14 +41,14 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 4px; font-weight: 700; font-size: 0.8rem; line-height: 1.2;
 }
 .p3-dish-plate { width: 48px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid #d7dee8; display: grid; place-items: center; }
-.p3-dish.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.p3-dish.is-sel { border-color: #6c4dd6; background: #f5f3fc; }
 .p3-plates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .p3-plate { padding: 8px; border-radius: 14px; background: #fbfaf4; border: 2px solid #d8d2bf; }
 .p3-plate-head {
   width: 100%; min-height: 48px; border: 2px solid transparent; border-radius: 10px; background: #e4ebf2; color: #1f2733; cursor: pointer;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 4px 6px; font-weight: 700; font-size: 0.86rem; line-height: 1.2;
 }
-.p3-plate-head.is-sel { border-color: #2f6fd6; background: #d6e4fb; }
+.p3-plate-head.is-sel { border-color: #6c4dd6; background: #f5f3fc; }
 .tw-tag { font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; }
 .tw-hcl { background: #b8571f; }
 .tw-naoh { background: #2b7a51; }

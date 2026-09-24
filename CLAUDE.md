@@ -8,7 +8,7 @@
 * 웹앱: HTML, CSS, JavaScript로 만든 독립 정적 앱 (`/public/apps/{앱이름}/`)
 * Supabase 기반 백엔드 데이터 서버 (글, 댓글, 좋아요, 조회수, 로그인, 웹앱 데이터)
 * 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`)
-* 언어/디자인: 한국어 UI, 다크모드 지원. 디자인 체계는 `docs/design/redesign/spec.md`(2026-09-24 개편: 보라 주색, 본문 Pretendard·제목 Jua, Fluent 3D 아이콘, 부엉이 과학자 마스코트) — 아래 "디자인 규칙"
+* 언어/디자인: 한국어 UI, 다크모드 지원. 디자인 체계는 `docs/design/redesign/spec.md`(2026-09-24 개편: 보라 주색, 본문 Pretendard·제목 G마켓 산스 Bold + 부드러운 그림자, Fluent 3D 아이콘, 부엉이 과학자 마스코트) — 아래 "디자인 규칙"
 * 메뉴: 홈 · 학습게임활동 · 과학수업 · 자유게시판 (수학수업은 삭제됨, `/math/` 없음)
 * 진행 현황·확정 결정은 `docs/STATUS.md`에 기록한다(위에서 함께 불러옴).
 
@@ -136,7 +136,7 @@
 * 여러 차시 앱이 같은 틀을 쓰므로, 공통 코드는 정본(`scripts/templates/science-sim/` 실험용, `scripts/templates/science-guide/` 조사용, `scripts/templates/class1-record.js` 저장)을 두고 앱 폴더로 복사해 쓴다(앱은 자체 완결 유지).
 * 정본을 고치면 **하위 호환**을 지키고, 모든 앱 사본에 다시 복사한 뒤 `diff -r`로 일치를 확인하고 앱을 실험 단계까지 열어 점검한다.
 * 학생 화면에 "지도서"라는 말을 쓰지 않는다(교사용 자료, "지도서 N차시"도 "N차시"로). 출처는 "교과서·실험관찰"로 적는다.
-* 과학 앱 글꼴(Pretendard·Jua)은 `persist.js`가 CDN `<link>`를 **비차단**으로 붙인다. CSS `@import`로 불러오지 않는다(학교 망이 느리면 첫 화면이 멈춘다).
+* 과학 앱 글꼴은 `persist.js`가 `<link>`를 **비차단**으로 붙인다: 본문 Pretendard는 jsDelivr CDN(버전 고정+SRI), 제목 G마켓 산스는 사이트의 `public/fonts/gmarket-sans/gmarket-sans.css`를 상대경로 `../../fonts/…`로(사이트와 같은 파일·같은 캐시 — 앱 폴더 밖을 참조하는 유일한 예외, 못 받으면 기기 글꼴). CSS `@import`로 불러오지 않는다(학교 망이 느리면 첫 화면이 멈춘다).
 * 과학 앱에서 새 기능을 넣을 때도 3D 장면·그래프 계열 색은 과학적 의미가 있으므로 디자인 개편 대상에서 뺀다.
 * 측정값은 학생에게 반올림을 시키지 않고 처음부터 소수 첫째 자리로 제시한다(세는 값은 자연수, 교과서가 "○시간 ○분"처럼 쓰는 값은 그 표기를 따른다). 값은 학생이 타이핑하지 않고 화면에 보이며 **기록하기**로 저장한다.
 * **측정 규칙(2026-09-22 개정)**: **같은 조건을 여러 번 반복 측정**하는 실험(예: 같은 거리를 여러 번 재어 평균)은 조건마다 **1번만** 측정한다. 반복이 아니라 **조건이 여러 가지**인 실험(시각별·월별·각도별·위치별 등)은 **실험관찰에 제시된 조건을 모두** 측정한다(임의로 줄이지 않음).
@@ -144,7 +144,9 @@
 
 ## 디자인 규칙 (2026-09-24 개편)
 
-* 기준 문서: `docs/design/redesign/spec.md`(끝 "개정 1"). 참고 사이트("똑똑! 수학탐험대")는 **느낌만** 참고하고 그림·로고·문구·캐릭터는 절대 가져오지 않는다.
+* 기준 문서: `docs/design/redesign/spec.md`(끝 "개정 1"·"개정 2", 뒤의 개정이 우선). 참고 사이트("똑똑! 수학탐험대")는 **느낌만** 참고하고 그림·로고·문구·캐릭터는 절대 가져오지 않는다.
+* 글꼴: 본문 Pretendard(npm 자체 호스팅), **제목 G마켓 산스 Bold**(2026-09-24 사용자 선택, SIL OFL 1.1). 제목 글꼴 파일은 공식 배포 OTF 원본을 **수정 없이** `public/fonts/gmarket-sans/`에 두고(고지 `LICENSE-gmarket-sans-OFL.txt`) 사이트(`layout.tsx`)와 과학 앱이 같이 쓴다. WOFF2 변환·서브셋·이름 변경은 하지 않는다(OFL "수정본"은 원래 이름 금지 조건). 파일이 Bold 하나라 제목은 굵기 700 + `font-synthesis: none`.
+* 제목 그림자: **A 부드러운 그림자**(사용자 선택) — `globals.css`의 `--heading-shadow`(작은 제목 `-sm`, 그라데이션 글자는 `drop-shadow`), 과학 앱은 `--ss-heading-shadow`. 관리자 영역은 그림자 없음. 고대비 모드에서는 없음. 그림자는 대비 계산에 넣지 않는다(글자색↔바탕으로 AA).
 * 그림: 3D 아이콘은 Microsoft Fluent Emoji 3D(MIT)만 `public/illustrations/3d/`에(192px WebP, 고지 `LICENSE-fluent-emoji.txt`), 마스코트는 부엉이 과학자 `public/illustrations/mascot/`. 새 아이콘·이미지·글꼴을 **내려받거나 만들 때는 사용자 허락**(파일명·출처·크기 명시) 후 Claude가 하고, 서브에이전트는 받지 않는다. 변환은 `node_modules`의 `sharp`를 쓴다(`package.json`에 추가하지 않음).
 * 이미지는 `withBasePath()`로 경로, `width`/`height`·`alt`(장식이면 `alt=""`+`aria-hidden`), 첫 화면 마스코트만 eager, 떠 있는 소품은 lazy(preload 경고 방지).
 * 접근성: 글자 대비 WCAG AA(밝음·어두움), 색만으로 정보 전달 금지, 키보드 초점 표시, `prefers-reduced-motion`이면 움직임 없음, 터치 영역 44px 이상.

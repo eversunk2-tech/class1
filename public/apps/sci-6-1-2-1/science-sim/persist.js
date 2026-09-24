@@ -50,13 +50,16 @@
  *        체험 중 다른 탭에서 로그인하면 화면을 새로 불러와 평소(로그인) 흐름으로 들어간다.
  *   스냅샷 형식(app_progress.state): { v: 1, prefix: 뿌리, keys: { "<접두사 뒤 키>": 값, … }, savedAt: ISO 시각 }
  */
-/* ───── 글꼴(디자인 개편 3단계 개정 1, 2026-09-24): 본문 Pretendard · 제목 Jua ─────
+/* ───── 글꼴(디자인 개편 5단계, 2026-09-24): 본문 Pretendard · 제목 G마켓 산스 Bold ─────
  * style-common.css의 @import는 글꼴 CDN이 응답 없이 걸려 있으면 첫 화면을 그만큼 늦췄다(6초 걸림 → 6초 빈 화면).
  * 스크립트가 붙인 <link rel="stylesheet">는 화면 그리기를 막지 않는다 → 먼저 기기 글꼴로 그리고, 글꼴이 오면 바뀐다
  * (두 CSS 모두 font-display: swap). 글꼴 이름 목록(--ss-font, --ss-font-heading)은 style-common.css에 있다.
  * 한 번만 붙이고(같은 id가 있으면 건너뜀) 어떤 오류도 밖으로 던지지 않는다. 저장·동작과는 관계없다.
  *   - Pretendard 1.3.9(jsDelivr, 사이트가 쓰는 npm 패키지와 같은 파일) — 버전 고정 + SRI
- *   - Jua(Google Fonts, display=swap) — 응답이 브라우저마다 달라 SRI를 붙일 수 없다
+ *   - G마켓 산스 Bold: Jua(Google Fonts)를 대신해 사이트와 같은 파일(public/fonts/gmarket-sans/gmarket-sans.css)을
+ *     상대경로(../../fonts/gmarket-sans/gmarket-sans.css, 같은 출처)로 붙인다 — 앱은 public/apps/{앱}/index.html에서
+ *     열리므로 두 단계 위가 public/다. 사이트와 파일이 같아 한 번 받으면 브라우저 캐시를 함께 쓴다. SRI 없음(로컬 파일이라
+ *     불필요), gstatic preconnect도 더 안 쓰므로 뺐다.
  */
 (function () {
   "use strict";
@@ -69,7 +72,6 @@
       for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) l.setAttribute(k, attrs[k]);
       head.appendChild(l);
     };
-    add({ rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "anonymous" });
     add({
       id: "ss-font-pretendard",
       rel: "stylesheet",
@@ -77,7 +79,7 @@
       integrity: "sha384-uR1wgObmx89ZQ4VVXHdzjbDJZ1PvBK01K+E3GebmaBKdZ87qRJvBWPoPbzWeEd5T",
       crossorigin: "anonymous",
     });
-    add({ id: "ss-font-jua", rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Jua&display=swap" });
+    add({ id: "ss-font-heading", rel: "stylesheet", href: "../../fonts/gmarket-sans/gmarket-sans.css" });
   } catch (e) {
     /* 글꼴을 못 붙여도 기기 글꼴로 그대로 동작한다 */
   }

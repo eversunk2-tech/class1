@@ -9,8 +9,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  /* 제목 전용 글꼴(Jua). layout.tsx의 --font-heading-kr 변수를 가리킨다. */
-  --font-heading: var(--font-heading-kr), var(--font-sans), var(--font-body-kr), "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  /* 제목 전용 글꼴(G마켓 산스 Bold, docs/design/redesign/spec.md 개정 2). layout.tsx head의 <link>가
+     public/fonts/gmarket-sans/gmarket-sans.css를 붙인다. 못 받으면 본문 글꼴(Pretendard) → 기기 한글 글꼴 순. */
+  --font-heading: "Gmarket Sans", var(--font-body-kr), "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   /* 메뉴별 accent 색. soft = 배경 틴트, strong = 아이콘·테두리·포인트 */
   --color-home-soft: var(--home-soft);
   --color-home-strong: var(--home-strong);
@@ -116,6 +117,11 @@
   --shadow-md: 0 6px 16px -4px oklch(0 0 0 / 0.08);
   --shadow-lg: 0 16px 32px -8px oklch(0 0 0 / 0.12);
   --shadow-brand: 0 10px 24px -6px color-mix(in oklch, var(--primary) 45%, transparent);
+  /* 제목 그림자(spec 개정 2 "A 부드러운"): 흰 윤곽 한 겹 + 보라 부드러운 빛 한 겹, em 단위(제목 크기에 비례).
+     -sm은 18px 이하 작은 제목용(흐림이 덜 번지게 더 약하게). -grad는 text-grad-primary(투명 글자) 전용 drop-shadow. */
+  --heading-shadow: 0 0.05em 0 oklch(1 0 0 / 90%), 0 0.16em 0.4em color-mix(in oklch, var(--primary) 28%, transparent);
+  --heading-shadow-sm: 0 0.04em 0 oklch(1 0 0 / 85%), 0 0.08em 0.18em color-mix(in oklch, var(--primary) 18%, transparent);
+  --heading-grad-shadow: drop-shadow(0 0.05em 0 oklch(1 0 0 / 90%)) drop-shadow(0 0.14em 0.3em color-mix(in oklch, var(--primary) 32%, transparent));
   /* ── 개정 2(더 화려하게) ── */
   /* 보라 그라데이션(주 버튼·강조 글자) 끝색. 흰 글자 대비 5.6~6.0:1 */
   --primary-grad-to: oklch(0.52 0.21 312);
@@ -174,6 +180,10 @@
   --bg-grad-top: oklch(0.2 0.035 288);
   --bg-blob: color-mix(in oklch, var(--primary) 10%, transparent);
   --shadow-brand: 0 10px 24px -6px color-mix(in oklch, var(--primary) 25%, transparent);
+  /* 다크: 검은 그림자 한 겹 + 보라 은은한 빛 한 겹(spec 개정 2) */
+  --heading-shadow: 0 0.08em 0.3em oklch(0 0 0 / 70%), 0 0 0.5em color-mix(in oklch, var(--primary) 25%, transparent);
+  --heading-shadow-sm: 0 0.05em 0.18em oklch(0 0 0 / 55%), 0 0 0.3em color-mix(in oklch, var(--primary) 16%, transparent);
+  --heading-grad-shadow: drop-shadow(0 0.06em 0.2em oklch(0 0 0 / 55%)) drop-shadow(0 0 0.4em color-mix(in oklch, var(--primary) 30%, transparent));
   --primary-grad-to: oklch(0.77 0.14 315);
   --home-glow: color-mix(in oklch, var(--home-strong) 22%, transparent);
   --games-glow: color-mix(in oklch, var(--games-strong) 22%, transparent);
@@ -270,14 +280,19 @@ html {
 @utility bg-grad-primary {
   background-image: linear-gradient(120deg, var(--primary) 0%, var(--primary-grad-to) 100%);
 }
-/* 보라 그라데이션 글자(큰 제목의 핵심 낱말 전용). 고대비 모드에서는 일반 글자색으로 */
+/* 보라 그라데이션 글자(큰 제목의 핵심 낱말 전용). 고대비 모드에서는 일반 글자색으로.
+   text-shadow는 투명 글자 안으로 그대로 비쳐 탁해 보이므로 끄고, 같은 느낌을 drop-shadow filter로 대신한다
+   (부모 제목의 .font-heading이 준 text-shadow 상속을 여기서 끊는다 — spec 개정 2). */
 @utility text-grad-primary {
   background-image: linear-gradient(100deg, var(--primary) 10%, var(--primary-grad-to) 90%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  text-shadow: none;
+  filter: var(--heading-grad-shadow);
   @media (forced-colors: active) {
     color: CanvasText;
+    filter: none;
   }
 }
 
@@ -306,10 +321,26 @@ html {
   background-image: linear-gradient(135deg, var(--board-soft), var(--board-grad-to));
 }
 
-/* Jua는 weight 400 하나뿐이다. 굵게 지정된 제목에서 가짜 볼드가 합성되지 않게 한다. */
+/* G마켓 산스는 Bold(700) 한 굵기뿐이다. font-synthesis:none으로 가짜 굵게를 막고,
+   font-weight:700을 강제해 대체 글꼴(Pretendard)로 넘어가도 계속 굵게 보이게 한다.
+   이 규칙은 레이어에 안 묶인 일반 CSS라 Tailwind 유틸리티 레이어(font-normal 등)보다 항상 이긴다
+   → 제목 요소에 붙은 font-normal/font-medium 클래스를 고치지 않아도 700으로 그려진다(build-5 확인).
+   제목 그림자(spec 개정 2 "A 부드러운")도 여기서 같이 준다. */
 .font-heading {
   font-synthesis: none;
   letter-spacing: 0;
+  font-weight: 700;
+  text-shadow: var(--heading-shadow);
+  @media (forced-colors: active) {
+    text-shadow: none;
+  }
+}
+/* 18px 이하 작은 제목(카드·대화상자 제목, 사이드바 응원 카드 등)은 흐림이 덜 번지도록 더 약하게 */
+.font-heading:is(.text-xs, .text-sm, .text-base) {
+  text-shadow: var(--heading-shadow-sm);
+  @media (forced-colors: active) {
+    text-shadow: none;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -488,9 +519,13 @@ html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
 }
 .markdown-reading :where(h1, h2, h3) {
   font-family: var(--font-heading);
-  font-weight: 400;
+  font-weight: 700;
   font-synthesis: none;
   letter-spacing: 0;
+  text-shadow: var(--heading-shadow);
+  @media (forced-colors: active) {
+    text-shadow: none;
+  }
 }
 .markdown-reading a { color: var(--primary); }
 .markdown-reading a:hover { color: color-mix(in oklch, var(--primary) 80%, var(--foreground)); }

@@ -19,6 +19,8 @@ const eslintConfig = defineConfig([
     "scripts/templates/**",
     // 설계·보고 문서 폴더의 보조 스크립트(예: 마스코트 배경 제거 cutout.cjs)는 사이트 코드가 아니다.
     "docs/**",
+    // 다른 Claude 세션이 만드는 격리 작업 폴더(git worktree)는 저장소 사본이라 이 트리의 검사 대상이 아니다.
+    ".claude/**",
   ]),
 ]);
 

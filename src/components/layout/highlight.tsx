@@ -17,7 +17,7 @@ export function Highlight({ children }: { children: ReactNode }) {
   );
 }
 
-/** 섹션 제목: 앞에 작은 3D 반짝이 + Jua(홈 "어디로 가 볼까요?"와 같은 모양) */
+/** 섹션 제목: 앞에 작은 3D 반짝이 + 제목 글꼴(G마켓 산스, 홈 "어디로 가 볼까요?"와 같은 모양) */
 export function SectionHeading({
   id,
   children,

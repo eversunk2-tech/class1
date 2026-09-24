@@ -161,8 +161,8 @@ var share = SciSim.SharePrep.render($("share-root"), {
 - 검색어는 복사만 하고 외부 검색 결과로 자동 이동하지 않는다. 외부 링크는 새 창 + `rel="noopener noreferrer"` + "선생님과 함께" 안내.
 - 이 앱은 글을 올리거나 보내지 않는다(모둠 공유는 교실의 공유 플랫폼에서). 저장은 로그인했을 때 `class1-record.js`로만.
 - 색만으로 구분하지 않는다: 무리 카드는 이름·기호 + 테두리 색, 성질 고르기는 글자 버튼.
-- 디자인(2026-09-24): `scripts/templates/science-sim/README.md`의 "디자인" 절과 같다(주색 보라, 알약 버튼, Pretendard·Jua CDN). 조사 도우미 카드 제목 `.sg-card-h`도 Jua로 그린다. `style-guide.css`의 무리 테두리 색(`--sg-tone-a/b/c`)은 자료를 나누는 색이라 바꾸지 않았다.
-- 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만. 글꼴 CSS(Pretendard·Jua)만 예외로 `persist.js` 맨 위가 `<link>`로 CDN에서 붙인다(Pretendard는 버전 고정 + SRI, Google Fonts의 Jua는 SRI를 붙일 수 없다 — science-sim README 디자인 절). `style-common.css`에 `@import`를 넣지 않는다(첫 화면을 막는다).
+- 디자인(2026-09-24): `scripts/templates/science-sim/README.md`의 "디자인" 절과 같다(주색 보라, 알약 버튼, 본문 Pretendard CDN, 제목 G마켓 산스 Bold + 부드러운 그림자 — 개편 5단계). 조사 도우미 카드 제목 `.sg-card-h`도 제목 글꼴로 그린다. `style-guide.css`의 무리 테두리 색(`--sg-tone-a/b/c`)은 자료를 나누는 색이라 바꾸지 않았다.
+- 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만. 글꼴 CSS만 예외로 `persist.js` 맨 위가 `<link>`로 붙인다(Pretendard는 jsDelivr, 버전 고정 + SRI / 제목 G마켓 산스는 사이트와 같은 파일 `../../fonts/gmarket-sans/gmarket-sans.css` — science-sim README 디자인 절). `style-common.css`에 `@import`를 넣지 않는다(첫 화면을 막는다).
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
 - **질문-답 표준 목록 `detail.qa`**(2026-09-22, `docs/admin/responses-spec.md` §3.3): `predict`·`quiz`·`conclude`·`curiosity`·`worksheet`·`share-prep`에 `qa(stage)`가 있다(science-sim과 같은 항목 모양, 기존 값은 그대로). 새 조사 도우미 앱은 `buildDetail()`에 `qa: [].concat(predict.qa("intro"), ws.qa("research"), share.qa("share"), quiz.qa("quiz"), conclude.qa("conclude"), cur.qa("curiosity"))`처럼 넣는다(단계 id는 그 앱의 `stages`에 맞춘다). 이미 만든 조사 도우미 앱 3개(sci-6-1-1-5·6, sci-6-1-2-6)는 소급하지 않고 `src/data/app-responses/` 매핑으로 보여 준다.
 

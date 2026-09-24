@@ -21,7 +21,7 @@ type Status = "loading" | "ready" | "error" | "setup" | "locked";
  * `tone="vivid"`(홈, 디자인 개편 개정 2): 더 둥근 칸 + 메뉴색 부드러운 그림자 + 원형 파스텔 배지 위 3D 아이콘 +
  * 굵은 메뉴색 숫자(큰 글씨라 대비 3:1 기준, 라이트 4.1~5.3:1).
  * 기본값(`default`)은 관리자 개요에서만 쓴다(디자인 개편 4단계): 사이트 그림자 단계(--shadow-md) +
- * 숫자는 제목 글꼴(Jua) 대신 본문 글꼴 600·고정폭 숫자(관리자 화면은 숫자를 정확히 읽는 게 우선).
+ * 숫자는 제목 글꼴(G마켓 산스) 대신 본문 글꼴 600·고정폭 숫자(관리자 화면은 숫자를 정확히 읽는 게 우선).
  */
 export function StatTile({
   label,
@@ -109,7 +109,7 @@ export function StatTile({
           <span
             className={cn(
               "leading-none",
-              // Jua는 굵기가 하나뿐이라, 더 굵은 숫자는 본문 글꼴 800으로 그린다.
+              // 제목 글꼴(G마켓 산스)은 굵기가 하나뿐이라, 더 굵은 숫자는 본문 글꼴 800으로 그린다.
               vivid ? cn("text-3xl font-extrabold tracking-tight tabular-nums", colors.strongText) : "text-2xl font-semibold tracking-tight tabular-nums",
             )}
           >

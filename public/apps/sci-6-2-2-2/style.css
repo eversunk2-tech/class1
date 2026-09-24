@@ -106,7 +106,7 @@
 .d2-metal { fill: #9aa3ad; stroke: #6e7780; stroke-width: 1; }
 .d2-lampwick { fill: #f2efe6; stroke: #b9b2a0; stroke-width: 1; }
 .d2-cap { fill: rgba(210, 232, 255, 0.45); stroke: #7f9bb5; stroke-width: 2; }
-.d2-sel { fill: none; stroke: #2f6fd6; stroke-width: 4; stroke-dasharray: 10 6; }
+.d2-sel { fill: none; stroke: var(--ss-primary); stroke-width: 4; stroke-dasharray: 10 6; }
 .d2-name { font: 700 17px system-ui, sans-serif; fill: #1f2733; }
 .d2-lighter-h { fill: #d8434f; }
 .d2-spark { fill: #ffd24a; }

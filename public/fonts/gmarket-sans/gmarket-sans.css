@@ -1,0 +1,14 @@
+/*
+ * 제목 글꼴: G마켓 산스 Bold (SIL Open Font License 1.1, © 2019 eBay Korea Co., Ltd., Reserved Font Name "Gmarket Sans Font").
+ * 파일은 공식 배포(corp.gmarket.com/fonts, GmarketSansOTF.zip)의 GmarketSansBold.otf 원본을 **수정 없이** 그대로 둔다.
+ * WOFF2 변환·글자 조각(서브셋)은 OFL에서 "수정본"이라 원래 이름을 쓸 수 없으므로 하지 않는다. 고지: LICENSE-gmarket-sans-OFL.txt.
+ * 사이트(src/app/layout.tsx)와 과학 앱(persist.js가 ../../fonts/gmarket-sans/gmarket-sans.css를 붙임)이 이 파일 하나를 같이 쓴다
+ * → 한 번 받으면 브라우저 캐시를 함께 쓴다. 굵기 파일은 Bold(700) 하나뿐이다. 못 받으면 대체 글꼴로 먼저 그리고(swap) 오면 바뀐다.
+ */
+@font-face {
+  font-family: "Gmarket Sans";
+  src: url("./GmarketSansBold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

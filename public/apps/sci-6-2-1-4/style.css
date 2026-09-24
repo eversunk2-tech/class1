@@ -186,3 +186,23 @@
 .axis-note { display: none; margin: 0 0 4px; font-size: 0.85rem; font-weight: 700; color: var(--ss-muted); }
 
 @media (max-width: 640px) { .ss-exp-view .ss-view-tip { font-size: 0.74rem; } }
+
+/* 태블릿 가로(예: 1024×768)처럼 높이가 낮은 가로 화면: 실험하기 첫 화면에서 '기록하기' 버튼이
+   아래 이동 막대에 가리는 문제(review-34.md §2, 2026-09-24) — ① 카드 안 여백과 각도 슬라이더 줄을
+   조금 더 촘촘히 배치해 버튼까지 한 화면에 들어오게 한다. 실측 결과 이 폭에서는 오른쪽 카드 열이
+   왼쪽 3D 무대보다 항상 더 길어(예: 747px vs 534px) 무대 높이는 버튼 위치에 영향이 없으므로 그대로
+   둔다(3D 장면을 지나치게 줄이지 않기 위해). 인터랙티브 요소(눈금 버튼)는 44px 터치 영역을 유지한다. */
+@media (min-width: 901px) and (orientation: landscape) and (max-height: 850px) {
+  .ss-intro { padding-top: 5px; padding-bottom: 5px; margin-bottom: 5px; }
+  .ss-lead { margin-bottom: 5px; }
+  .ang-card { padding-top: 4px; }
+  .ang-card .ss-step-h { margin-bottom: 2px; }
+  .ang-how { margin-bottom: 3px; }
+  .ang-track { padding-top: 46px; }
+  .ang-snap { min-height: 44px; padding: 1px 6px; }
+  .ang-snap-note { font-size: 0.64rem; }
+  .ang-step { margin-top: 46px; }
+  .ang-scale { margin-top: 0; }
+  .val-grid { margin: 3px 0; }
+  .val-tile { padding: 4px 4px; }
+}

@@ -102,7 +102,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
 /**
  * 대시보드 화면 공통 제목 영역.
- * 제목은 사이트 H1과 같은 제목 글꼴(Jua, spec §1.5 H1 단계)로 — 관리자 메뉴·섹션 제목(이미 Jua)과도 맞춘다.
+ * 제목은 사이트 H1과 같은 제목 글꼴(G마켓 산스, spec §1.5 H1 단계)로 — 관리자 메뉴·섹션 제목과도 맞춘다.
+ * 관리자 화면은 제목 그림자만 없다(admin-theme.css --heading-shadow:none, spec 개정 2).
  */
 export function AdminPageHeader({
   title,

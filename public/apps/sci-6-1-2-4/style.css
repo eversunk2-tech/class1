@@ -32,7 +32,7 @@
 .sw-num { font-size: 1.7rem; min-width: 3.6ch; text-align: right; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 .sw-unit { font-size: 0.95rem; }
 .sw-state { font-size: 0.78rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
-.sw-hud.is-run { border-color: #6ea0ff; }
+.sw-hud.is-run { border-color: #aa9dff; }
 .sw-hud.is-stop { border-color: #ffd166; }
 .sw-hud.is-stop .sw-state { background: #ffd166; color: #2a2000; }
 .sw-shout {

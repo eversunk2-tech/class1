@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Jua } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { ForcePasswordChangeGate } from "@/components/force-password-change-gate";
 import { LoginGate } from "@/components/login-gate";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SessionProvider } from "@/hooks/use-session";
 import { SIDEBAR_INIT_SCRIPT } from "@/hooks/use-sidebar";
 import { THEME_INIT_SCRIPT } from "@/hooks/use-theme";
+import { withBasePath } from "@/lib/base-path";
 // 본문 한글 글꼴 Pretendard(SIL OFL 1.1, npm 패키지 `pretendard`로 자체 호스팅).
 // 가변 글꼴(Pretendard Variable) 한 벌이 모든 굵기를 담는다(화면은 400·500·600을 쓴다).
 // 한글을 92조각(unicode-range)으로 나눈 dynamic subset이라 화면에 실제로 나온 글자가 든 조각만 내려받는다.
@@ -30,14 +31,13 @@ const geistMono = Geist_Mono({
   preload: false, // 관리자·코드 칸에서만 쓰므로 첫 화면에서 미리 받지 않는다
 });
 
-// 제목 전용 글꼴. Jua는 weight 400 하나뿐이고, next/font가 아는 subset은 "latin"뿐이다
-// (한글 글리프는 Google Fonts가 unicode-range 조각으로 나눠 필요할 때만 내려받는다).
-const jua = Jua({
-  variable: "--font-heading-kr",
-  weight: "400",
-  subsets: ["latin"],
-  display: "swap",
-});
+// 제목 전용 글꼴 G마켓 산스 Bold(SIL OFL 1.1, docs/design/redesign/spec.md 개정 2).
+// next/font가 못 다루는 로컬 OTF라 작은 스타일시트(public/fonts/gmarket-sans/gmarket-sans.css)를 붙인다.
+// HTML에 <link>를 그대로 두면 이 CSS를 받을 때까지 첫 화면이 멈추므로(review-5 중간 지적), 과학 앱 persist.js처럼
+// 스크립트로 붙여 첫 화면을 막지 않는다 — 먼저 대체 글꼴(Pretendard 굵게)로 그리고 글꼴이 오면 바뀐다.
+const HEADING_FONT_SCRIPT = `(function(){try{var d=document,l=d.createElement("link");l.rel="stylesheet";l.href=${JSON.stringify(
+  withBasePath("/fonts/gmarket-sans/gmarket-sans.css"),
+)};d.head.appendChild(l)}catch(e){}})();`;
 
 export const metadata: Metadata = {
   title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
@@ -48,10 +48,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} ${jua.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
+        {/* 제목 글꼴 CSS를 첫 화면을 막지 않게 붙인다(위 HEADING_FONT_SCRIPT 설명 참고) */}
+        <script dangerouslySetInnerHTML={{ __html: HEADING_FONT_SCRIPT }} />
         {/* 저장된 테마를 첫 페인트 전에 적용(FOUC 방지). src/hooks/use-theme.ts 참고 */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         {/* 저장된 사이드바 접힘 상태를 첫 페인트 전에 적용. src/hooks/use-sidebar.ts 참고 */}
