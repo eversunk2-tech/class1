@@ -56,7 +56,7 @@ export function GameUploadField({
   if (lockedMessage) {
     return (
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">게임 파일 (index.html)</span>
+        <span className="text-sm font-medium">게임 파일 (.html)</span>
         <p className="text-sm text-muted-foreground">{lockedMessage}</p>
       </div>
     );
@@ -65,7 +65,7 @@ export function GameUploadField({
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={inputId} className="text-sm font-medium">
-        게임 파일 (index.html){required ? <span className="text-destructive"> *</span> : null}
+        게임 파일 (.html){required ? <span className="text-destructive"> *</span> : null}
       </label>
       {/* 파일 고르는 칸: 학습게임 색 점선 상자(디자인 개편 2단계, 동작은 그대로) */}
       {/* 숨긴 파일 입력칸에 키보드 초점이 오면 상자 둘레에 초점 링을 보여 준다(겉모양만) */}
@@ -127,7 +127,7 @@ export function GameUploadField({
         ) : null}
       </div>
       <ul className="list-disc pl-5 text-xs leading-5 text-muted-foreground">
-        <li>생성형 AI로 만든 게임의 index.html 한 개만 올려요(2MB 이하).</li>
+        <li>생성형 AI로 만든 게임 파일 한 개만 올려요(2MB 이하). 이름은 무엇이든 괜찮고, .html이나 .htm으로 끝나면 돼요.</li>
         <li>코드가 파일 안에 모두 들어 있거나, CDN 주소(https://…)로 불러오는 게임만 돌아가요. 따로 된 이미지·JS 파일은 쓸 수 없어요.</li>
         <li>게임 안에서 진행 저장(localStorage)과 alert 창은 동작하지 않아요. 화면 안 글자로 알려 주게 만들어 주세요.</li>
         <li>끝나지 않는 반복(while(true) 등)이 있으면 태블릿 화면이 통째로 멈출 수 있어요. 올리기 전에 꼭 미리 해보기로 확인해 주세요.</li>

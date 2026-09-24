@@ -128,7 +128,7 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
     if (t.length > LIMITS.title) return setError(`제목은 ${LIMITS.title}자까지 쓸 수 있어요.`);
     if (!isGame && !b) return setError("내용을 입력해 주세요.");
     if (b.length > bodyLimit) return setError(`${isGame ? "설명" : "내용"}은 ${bodyLimit.toLocaleString()}자까지 쓸 수 있어요.`);
-    if (isGame && !post && !file) return setError("게임 파일(index.html)을 골라 주세요.");
+    if (isGame && !post && !file) return setError("게임 파일(.html)을 골라 주세요.");
 
     setBusy(true);
     setError(null);

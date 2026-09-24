@@ -198,7 +198,7 @@ const HTML_SIGNATURE = /<(!doctype\s+html|html|head|body|script|canvas|div|svg|m
  * .html 1개, 2MB 이하, UTF-8, HTML로 보이는 내용.
  */
 export async function readGameFile(file: File): Promise<string> {
-  if (!/\.html?$/i.test(file.name)) throw new GameFileError("index.html처럼 .html로 끝나는 파일만 올릴 수 있어요.");
+  if (!/\.html?$/i.test(file.name)) throw new GameFileError("이름이 .html이나 .htm으로 끝나는 파일만 올릴 수 있어요.");
   if (file.size === 0) throw new GameFileError("빈 파일이에요.");
   if (file.size > LIMITS.gameBytes) {
     throw new GameFileError(`파일이 너무 커요(${formatBytes(file.size)}). 2MB 이하만 올릴 수 있어요.`);

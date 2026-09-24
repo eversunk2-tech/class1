@@ -32,7 +32,7 @@ export default function GamesPage() {
             놀면서 배우는 <Highlight>게임</Highlight> 놀이터
           </>
         }
-        description="생성형 AI로 만든 게임(index.html)을 올리면 친구들이 바로 해 볼 수 있어요!"
+        description="생성형 AI로 만든 게임(HTML 파일)을 올리면 친구들이 바로 해 볼 수 있어요!"
         media={
           <PropStage props={GAME_PROPS} className="aspect-square w-[11rem] @2xl:w-[12.5rem]">
             <StageIcon name="video-game" />
