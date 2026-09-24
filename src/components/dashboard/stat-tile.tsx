@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FlaskConicalIcon, Gamepad2Icon, LockIcon, MessageSquareIcon, NewspaperIcon, RotateCwIcon, type LucideIcon } from "lucide-react";
 import { scienceAppCount } from "@/components/dashboard/science-app-status";
+import { Icon3D, type Icon3DName } from "@/components/illustrations/icon-3d";
 import type { MenuColor } from "@/data/menu";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { formatCount } from "@/lib/format";
@@ -14,29 +15,61 @@ import { cn } from "@/lib/utils";
 // "locked" = "로그인해야만 이용"이 켜져 있고 로그인하지 않음 → 0이 아니라 잠김 표시를 보여 준다.
 type Status = "loading" | "ready" | "error" | "setup" | "locked";
 
-/** 통계 타일 1개(표시 전용). 숫자는 제목 글꼴로 크게, 라벨은 본문 색으로 보여 준다. */
+/**
+ * 통계 타일 1개(표시 전용). 숫자는 제목 글꼴로 크게, 라벨은 본문 색으로 보여 준다.
+ * `image`를 주면 lucide 아이콘 대신 3D 아이콘 칩을 쓴다(홈). 관리자 화면은 lucide 그대로(spec §3.2).
+ * `tone="vivid"`(홈, 디자인 개편 개정 2): 더 둥근 칸 + 메뉴색 부드러운 그림자 + 원형 파스텔 배지 위 3D 아이콘 +
+ * 굵은 메뉴색 숫자(큰 글씨라 대비 3:1 기준, 라이트 4.1~5.3:1). 기본값(`default`)은 예전 모양 그대로.
+ */
 export function StatTile({
   label,
   value,
   unit = "개",
   icon: Icon,
+  image,
   color,
   status = "ready",
   onRetry,
+  tone = "default",
+  className,
 }: {
   label: string;
   value: number | null;
   unit?: string;
   icon: LucideIcon;
+  /** 3D 아이콘 이름(public/illustrations/3d/). 있으면 icon 대신 쓴다. */
+  image?: Icon3DName;
   color: MenuColor;
   status?: Status;
   onRetry?: () => void;
+  tone?: "default" | "vivid";
+  className?: string;
 }) {
   const colors = menuColorClasses[color];
+  const vivid = tone === "vivid";
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-card p-4 shadow-lg shadow-foreground/5 ring-1 ring-foreground/10 dark:shadow-none">
-      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", colors.chip)} aria-hidden>
-        <Icon className="size-5.5" />
+    <div
+      className={cn(
+        "flex items-center gap-3 bg-card ring-1",
+        vivid
+          ? cn("rounded-[1.75rem] p-4 ring-foreground/5 sm:gap-3.5 sm:p-5 dark:shadow-none dark:ring-foreground/10", colors.glowShadow)
+          : "rounded-2xl p-4 shadow-lg shadow-foreground/5 ring-foreground/10 dark:shadow-none",
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          "flex shrink-0 items-center justify-center",
+          // vivid: 휴대폰 2열에서는 라벨이 잘리지 않게 배지를 44px, sm부터 56px
+          vivid ? cn("size-11 rounded-full sm:size-14", colors.gradientBg) : cn("size-11 rounded-xl", colors.chip),
+        )}
+        aria-hidden
+      >
+        {image ? (
+          <Icon3D name={image} size={vivid ? 36 : 30} className={vivid ? "size-7.5 sm:size-9" : "size-7.5"} />
+        ) : (
+          <Icon className="size-5.5" />
+        )}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-xs text-muted-foreground sm:text-sm">{label}</span>
@@ -71,9 +104,17 @@ export function StatTile({
             ) : null}
           </span>
         ) : (
-          <span className="font-heading text-2xl leading-none">
+          <span
+            className={cn(
+              "leading-none",
+              // Jua는 굵기가 하나뿐이라, 더 굵은 숫자는 본문 글꼴 800으로 그린다.
+              vivid ? cn("text-3xl font-extrabold tracking-tight tabular-nums", colors.strongText) : "font-heading text-2xl",
+            )}
+          >
             {formatCount(value ?? 0)}
-            <span className="ml-0.5 text-sm text-muted-foreground">{unit}</span>
+            <span className={cn("ml-0.5 text-sm text-muted-foreground", vivid && "ml-1 font-medium tracking-normal")}>
+              {unit}
+            </span>
           </span>
         )}
       </div>
@@ -96,14 +137,18 @@ function PostCountTile({
   tag,
   community,
   icon,
+  image,
   color,
+  tone,
 }: {
   label: string;
   tag?: string;
   /** 있으면 posts 대신 community_posts(kind)의 숨기지 않은 글 수를 센다. */
   community?: CommunityKind;
   icon: LucideIcon;
+  image?: Icon3DName;
   color: MenuColor;
+  tone?: "default" | "vivid";
 }) {
   const [count, setCount] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>("loading");
@@ -137,33 +182,52 @@ function PostCountTile({
       label={label}
       value={count}
       icon={icon}
+      image={image}
       color={color}
       status={locked ? "locked" : status}
       onRetry={retry}
+      tone={tone}
     />
   );
 }
 
 /**
- * 홈 대시보드 통계 타일 4개(과학 차시 앱 · 자유게시판 · 학습게임 · 선생님 글).
+ * 홈 대시보드 통계 타일 4개(과학 차시 앱 · 자유게시판 · 학습게임 · 선생님 글), `tone="vivid"`.
  * 과학 카드는 차시 앱 개수(src/data/science-curriculum.ts, 로컬 계산)를 센다(spec §6).
  * 아이콘 컴포넌트는 서버 컴포넌트에서 props로 넘길 수 없으므로 이 클라이언트 컴포넌트 안에서 조립한다.
+ * 열 수는 본문 폭(@container) 기준: 사이드바가 펼쳐진 태블릿에서도 글자가 눌리지 않게 한다.
  */
 export function StatTiles() {
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-      <li>
-        <StatTile label="과학 차시 앱" value={scienceAppCount()} icon={FlaskConicalIcon} color="science" />
-      </li>
-      <li>
-        <PostCountTile label="자유게시판 글" community="board" icon={MessageSquareIcon} color="board" />
-      </li>
-      <li>
-        <PostCountTile label="학습게임" community="game" icon={Gamepad2Icon} color="games" />
-      </li>
-      <li>
-        <PostCountTile label="선생님 글" icon={NewspaperIcon} color="home" />
-      </li>
-    </ul>
+    <div className="@container">
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 @3xl:grid-cols-4">
+        <li>
+          <StatTile
+            label="과학 차시 앱"
+            value={scienceAppCount()}
+            icon={FlaskConicalIcon}
+            image="test-tube"
+            color="science"
+            tone="vivid"
+          />
+        </li>
+        <li>
+          <PostCountTile
+            label="자유게시판 글"
+            community="board"
+            icon={MessageSquareIcon}
+            image="speech-balloon"
+            color="board"
+            tone="vivid"
+          />
+        </li>
+        <li>
+          <PostCountTile label="학습게임" community="game" icon={Gamepad2Icon} image="video-game" color="games" tone="vivid" />
+        </li>
+        <li>
+          <PostCountTile label="선생님 글" icon={NewspaperIcon} image="newspaper" color="home" tone="vivid" />
+        </li>
+      </ul>
+    </div>
   );
 }

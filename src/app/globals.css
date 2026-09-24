@@ -10,7 +10,7 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   /* 제목 전용 글꼴(Jua). layout.tsx의 --font-heading-kr 변수를 가리킨다. */
-  --font-heading: var(--font-heading-kr), var(--font-sans), "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-heading: var(--font-heading-kr), var(--font-sans), var(--font-body-kr), "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   /* 메뉴별 accent 색. soft = 배경 틴트, strong = 아이콘·테두리·포인트 */
   --color-home-soft: var(--home-soft);
   --color-home-strong: var(--home-strong);
@@ -20,6 +20,12 @@
   --color-science-strong: var(--science-strong);
   --color-board-soft: var(--board-soft);
   --color-board-strong: var(--board-strong);
+  /* ink = soft 배경 위 작은 글자용 메뉴색(strong 70% + foreground 30%).
+     strong 그대로는 soft 위 대비가 3.4~4.4:1이라 12~14px 글자에 모자라다 → 라이트 6.0:1+, 다크 7.9:1+ */
+  --color-home-ink: color-mix(in oklch, var(--home-strong) 70%, var(--foreground));
+  --color-games-ink: color-mix(in oklch, var(--games-strong) 70%, var(--foreground));
+  --color-science-ink: color-mix(in oklch, var(--science-strong) 70%, var(--foreground));
+  --color-board-ink: color-mix(in oklch, var(--board-strong) 70%, var(--foreground));
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,18 +71,22 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* 사이트 포인트색(브랜드 보라, docs/design/redesign/spec.md §1.2).
+     spec 값 0.58 0.19는 흰 글자 대비가 4.48:1이라 AA(4.5:1)를 맞추려고 명도만 낮췄다(흰 글자 5.56:1). */
+  --primary: oklch(0.53 0.2 288);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 새 연보라 배경(--bg-grad-top·블롭) 위에서도 4.5:1을 넘도록 0.556 → 0.52로 한 단계 진하게 */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* 옅은 보라 회색 초점 링(spec 0.7 0.06은 흰 배경 대비 2.7:1 → 3:1 넘게 조정) */
+  --ring: oklch(0.65 0.1 288);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -91,10 +101,41 @@
   --science-strong: oklch(0.55 0.12 165);
   --board-soft: oklch(0.94 0.04 80);
   --board-strong: oklch(0.6 0.14 70);
+  /* 큰 카드(기능 바로가기 카드·히어로) 전용 그라데이션 끝색. 시작색은 각 메뉴의 -soft (spec §1.2) */
+  --home-grad-to: oklch(0.9 0.05 218);
+  --games-grad-to: oklch(0.91 0.05 352);
+  --science-grad-to: oklch(0.9 0.05 148);
+  --board-grad-to: oklch(0.9 0.06 48);
+  /* 본문 한글 글꼴(layout.tsx에서 가변 글꼴 CSS import). 기기에 설치된 정적 Pretendard는 예비 */
+  --font-body-kr: "Pretendard Variable", "Pretendard";
+  /* 페이지 배경: 위쪽 연보라 → 흰색 그라데이션 + 흐린 보라 빛(블롭) */
+  --bg-grad-top: oklch(0.97 0.02 288);
+  --bg-blob: color-mix(in oklch, var(--primary) 12%, transparent);
+  /* 그림자 단계(spec §1.4). 다크모드는 ring-foreground/10 관례를 우선한다. */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.05);
+  --shadow-md: 0 6px 16px -4px oklch(0 0 0 / 0.08);
+  --shadow-lg: 0 16px 32px -8px oklch(0 0 0 / 0.12);
+  --shadow-brand: 0 10px 24px -6px color-mix(in oklch, var(--primary) 45%, transparent);
+  /* ── 개정 2(더 화려하게) ── */
+  /* 보라 그라데이션(주 버튼·강조 글자) 끝색. 흰 글자 대비 5.6~6.0:1 */
+  --primary-grad-to: oklch(0.52 0.21 312);
+  /* 메뉴색 그림자 빛(카드 hover·통계 칸·정보 카드의 부드러운 색 그림자) */
+  --home-glow: color-mix(in oklch, var(--home-strong) 40%, transparent);
+  --games-glow: color-mix(in oklch, var(--games-strong) 40%, transparent);
+  --science-glow: color-mix(in oklch, var(--science-strong) 40%, transparent);
+  --board-glow: color-mix(in oklch, var(--board-strong) 40%, transparent);
+  /* 홈 히어로: 흰색 → 연보라 + 보라·분홍·하늘 빛 번짐, 형광펜 */
+  --hero-from: oklch(1 0 0);
+  --hero-to: oklch(0.94 0.045 292);
+  --hero-blob-1: color-mix(in oklch, var(--primary) 18%, transparent);
+  --hero-blob-2: oklch(0.86 0.1 350 / 0.45);
+  --hero-blob-3: oklch(0.88 0.08 230 / 0.45);
+  --highlight: oklch(0.93 0.13 95 / 0.7);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  /* spec Q5: 쓰이지 않던 sidebar-primary를 브랜드 보라와 통일 */
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
@@ -108,8 +149,9 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /* 다크: 밝은 보라 바탕 + 짙은 보라 글자(기존 무채색 primary의 반전 관례 유지, 8.1:1) */
+  --primary: oklch(0.75 0.15 288);
+  --primary-foreground: oklch(0.18 0.05 288);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -119,16 +161,35 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.55 0.08 288);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  --home-grad-to: oklch(0.36 0.07 218);
+  --games-grad-to: oklch(0.36 0.08 352);
+  --science-grad-to: oklch(0.36 0.07 148);
+  --board-grad-to: oklch(0.36 0.08 48);
+  --bg-grad-top: oklch(0.2 0.035 288);
+  --bg-blob: color-mix(in oklch, var(--primary) 10%, transparent);
+  --shadow-brand: 0 10px 24px -6px color-mix(in oklch, var(--primary) 25%, transparent);
+  --primary-grad-to: oklch(0.77 0.14 315);
+  --home-glow: color-mix(in oklch, var(--home-strong) 22%, transparent);
+  --games-glow: color-mix(in oklch, var(--games-strong) 22%, transparent);
+  --science-glow: color-mix(in oklch, var(--science-strong) 22%, transparent);
+  --board-glow: color-mix(in oklch, var(--board-strong) 22%, transparent);
+  /* 다크: 짙은 남보라 그라데이션 + 같은 빛 번짐 */
+  --hero-from: oklch(0.27 0.07 288);
+  --hero-to: oklch(0.21 0.05 268);
+  --hero-blob-1: color-mix(in oklch, var(--primary) 22%, transparent);
+  --hero-blob-2: oklch(0.55 0.16 350 / 0.3);
+  --hero-blob-3: oklch(0.55 0.12 230 / 0.25);
+  --highlight: oklch(0.55 0.12 90 / 0.4);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -155,14 +216,94 @@
   }
 }
 /* ─────────────────────────────────────────────
-   한국어 글꼴 폴백
+   한국어 글꼴: 라틴·숫자는 Geist, 한글은 Pretendard Variable(layout.tsx에서 npm 패키지 CSS로 자체 호스팅).
+   Pretendard를 못 불러오면 기기 기본 한글 글꼴로 넘어간다.
    ───────────────────────────────────────────── */
 html {
   font-family:
-    var(--font-sans), "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic",
+    var(--font-sans), var(--font-body-kr), "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
     system-ui, sans-serif;
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+
+/* ─────────────────────────────────────────────
+   페이지 배경(spec §1.2): 위쪽 연보라 → 흰색 그라데이션 + 흐린 보라 빛 2개.
+   순수 CSS 배경이라 움직임·추가 요소가 없고, 글자는 항상 카드·패널 위나 이 옅은 배경 위에 놓인다
+   (muted-foreground 4.5:1 이상 유지되도록 블롭 농도를 12%/10%로 제한하고, 빛의 중심을 화면 가장자리
+   바깥(4rem)에 두어 본문 글자 자리에서는 가장 진한 곳이 나오지 않게 했다 — 계산상 최저 약 4.65:1).
+   ───────────────────────────────────────────── */
+body {
+  background-image:
+    radial-gradient(38rem 30rem at 100% -4rem, var(--bg-blob), transparent 70%),
+    radial-gradient(30rem 26rem at -4rem 34rem, var(--bg-blob), transparent 70%),
+    /* 개정 2: 스크롤 아래쪽 본문에도 아주 흐린 보라 빛 두 군데(10% 이하 → 흐린 글자 4.78:1 이상) */
+    radial-gradient(34rem 28rem at 92% 64rem, var(--bg-blob-soft), transparent 70%),
+    radial-gradient(34rem 28rem at 22% 104rem, var(--bg-blob-soft), transparent 70%),
+    linear-gradient(180deg, var(--bg-grad-top) 0%, var(--background) 44rem);
+  background-repeat: no-repeat;
+}
+/* html에 배경색을 따로 주어 body 배경이 캔버스로 옮겨 가지 않게 한다. 옮겨 가면 그라데이션이 <html>(h-full = 화면 한 장
+   높이) 크기로 잘려 아래쪽 빛 번짐에 딱 끊긴 선이 생긴다. 이렇게 하면 body 상자(문서 전체 높이) 기준으로 그려진다. */
+html {
+  background-color: var(--background);
+}
+:root {
+  --bg-blob-soft: color-mix(in oklch, var(--primary) 9%, transparent);
+}
+.dark {
+  --bg-blob-soft: color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+/* ─────────────────────────────────────────────
+   개정 2(더 화려하게): 홈 히어로 배경·보라 그라데이션·형광펜·떠다니는 3D 소품
+   ───────────────────────────────────────────── */
+/* 히어로: 흰색 → 연보라(다크: 짙은 남보라) 위에 보라·분홍·하늘 빛 번짐 3개(이미지·blur 필터 없이 그라데이션만) */
+@utility bg-hero-home {
+  background-image:
+    radial-gradient(26rem 20rem at 88% 18%, var(--hero-blob-1), transparent 70%),
+    radial-gradient(22rem 16rem at 62% 100%, var(--hero-blob-2), transparent 70%),
+    radial-gradient(22rem 16rem at 4% 0%, var(--hero-blob-3), transparent 70%),
+    linear-gradient(135deg, var(--hero-from) 0%, var(--hero-to) 100%);
+}
+/* 주 버튼 등 보라 그라데이션 바탕(글자는 primary-foreground) */
+@utility bg-grad-primary {
+  background-image: linear-gradient(120deg, var(--primary) 0%, var(--primary-grad-to) 100%);
+}
+/* 보라 그라데이션 글자(큰 제목의 핵심 낱말 전용). 고대비 모드에서는 일반 글자색으로 */
+@utility text-grad-primary {
+  background-image: linear-gradient(100deg, var(--primary) 10%, var(--primary-grad-to) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  @media (forced-colors: active) {
+    color: CanvasText;
+  }
+}
+
+/* 히어로의 떠다니는 3D 소품: 각자 기울기(--tilt)·속도(--dur)·지연(--delay)이 다르다. transform만 움직인다. */
+@keyframes prop-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-10px) rotate(calc(var(--tilt, 0deg) + 4deg)); }
+}
+.prop-float {
+  transform: rotate(var(--tilt, 0deg));
+  animation: prop-float var(--dur, 6s) ease-in-out var(--delay, 0s) infinite;
+  will-change: transform;
+}
+
+/* 메뉴별 큰 카드 그라데이션(135deg, soft → grad-to). 작은 칩·배지에는 쓰지 않는다. */
+@utility bg-grad-home {
+  background-image: linear-gradient(135deg, var(--home-soft), var(--home-grad-to));
+}
+@utility bg-grad-games {
+  background-image: linear-gradient(135deg, var(--games-soft), var(--games-grad-to));
+}
+@utility bg-grad-science {
+  background-image: linear-gradient(135deg, var(--science-soft), var(--science-grad-to));
+}
+@utility bg-grad-board {
+  background-image: linear-gradient(135deg, var(--board-soft), var(--board-grad-to));
 }
 
 /* Jua는 weight 400 하나뿐이다. 굵게 지정된 제목에서 가짜 볼드가 합성되지 않게 한다. */
@@ -243,6 +384,15 @@ html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
   animation-delay: -1.2s;
 }
 
+/* 홈 히어로 마스코트가 천천히 둥실 떠 있는 효과 */
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.mascot-float {
+  animation: mascot-float 6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-sidebar,
   .app-sidebar .sidebar-label,
@@ -253,7 +403,9 @@ html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
   .illo-float,
   .illo-float-slow,
   .illo-twinkle,
-  .illo-twinkle-late {
+  .illo-twinkle-late,
+  .mascot-float,
+  .prop-float {
     animation: none;
   }
 }

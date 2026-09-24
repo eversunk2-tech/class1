@@ -55,7 +55,7 @@ export function ScienceAppStatus({ recent = 4 }: { recent?: number }) {
               <span className="font-medium">
                 {unit.number}. {unit.title}
               </span>
-              <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", colors.chip)}>
+              <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", colors.softBg, colors.ink)}>
                 앱 {withApp}/{total}
               </span>
             </Link>
@@ -73,7 +73,8 @@ export function ScienceAppStatus({ recent = 4 }: { recent?: number }) {
               <span
                 className={cn(
                   "shrink-0 rounded-md px-2 py-0.5 text-xs font-medium",
-                  lesson.app.kind === "sim" ? colors.chip : "bg-home-soft text-home-strong",
+                  // 작은 글자라 strong 대신 ink(대비 4.5:1 이상)
+                  lesson.app.kind === "sim" ? cn(colors.softBg, colors.ink) : "bg-home-soft text-home-ink",
                 )}
               >
                 {lesson.app.kind === "sim" ? "실험" : "조사"}

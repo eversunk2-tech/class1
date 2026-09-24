@@ -20,6 +20,18 @@ export type MenuColorClasses = {
   chip: string;
   /** 키보드 포커스 링 */
   focusRing: string;
+  /** 큰 카드 전용 그라데이션 배경(soft → grad-to, globals.css의 @utility bg-grad-*). 칩·배지에는 쓰지 않는다. */
+  gradientBg: string;
+  /** 그라데이션 카드의 옅은 윤곽선(ring) */
+  softRing: string;
+  /** soft 배경 위 **작은 글자**용 메뉴색(strong + foreground 섞음, AA 4.5:1 이상). 아이콘은 strongText 그대로 */
+  ink: string;
+  /** 부드러운 메뉴색 그림자(통계 칸·정보 카드) — globals.css의 --{color}-glow */
+  glowShadow: string;
+  /** hover 때 진해지는 메뉴색 그림자(기능 카드) */
+  hoverGlow: string;
+  /** "더 보기" 같은 작은 알약 링크: soft 바탕 + ink 글자, hover 때 바탕이 조금 진해짐 */
+  pill: string;
 };
 
 export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
@@ -31,6 +43,12 @@ export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
     hoverBorder: "hover:border-home-strong/60",
     chip: "bg-home-soft text-home-strong",
     focusRing: "focus-visible:ring-home-strong/50",
+    gradientBg: "bg-grad-home",
+    softRing: "ring-home-strong/15",
+    ink: "text-home-ink",
+    glowShadow: "shadow-[0_14px_32px_-18px_var(--home-glow)]",
+    hoverGlow: "hover:shadow-[0_26px_48px_-20px_var(--home-glow)]",
+    pill: "bg-home-soft text-home-ink hover:bg-[color-mix(in_oklch,var(--home-soft),var(--home-strong)_14%)]",
   },
   games: {
     softBg: "bg-games-soft",
@@ -40,6 +58,12 @@ export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
     hoverBorder: "hover:border-games-strong/60",
     chip: "bg-games-soft text-games-strong",
     focusRing: "focus-visible:ring-games-strong/50",
+    gradientBg: "bg-grad-games",
+    softRing: "ring-games-strong/15",
+    ink: "text-games-ink",
+    glowShadow: "shadow-[0_14px_32px_-18px_var(--games-glow)]",
+    hoverGlow: "hover:shadow-[0_26px_48px_-20px_var(--games-glow)]",
+    pill: "bg-games-soft text-games-ink hover:bg-[color-mix(in_oklch,var(--games-soft),var(--games-strong)_14%)]",
   },
   science: {
     softBg: "bg-science-soft",
@@ -49,6 +73,12 @@ export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
     hoverBorder: "hover:border-science-strong/60",
     chip: "bg-science-soft text-science-strong",
     focusRing: "focus-visible:ring-science-strong/50",
+    gradientBg: "bg-grad-science",
+    softRing: "ring-science-strong/15",
+    ink: "text-science-ink",
+    glowShadow: "shadow-[0_14px_32px_-18px_var(--science-glow)]",
+    hoverGlow: "hover:shadow-[0_26px_48px_-20px_var(--science-glow)]",
+    pill: "bg-science-soft text-science-ink hover:bg-[color-mix(in_oklch,var(--science-soft),var(--science-strong)_14%)]",
   },
   board: {
     softBg: "bg-board-soft",
@@ -58,5 +88,11 @@ export const menuColorClasses: Record<MenuColor, MenuColorClasses> = {
     hoverBorder: "hover:border-board-strong/60",
     chip: "bg-board-soft text-board-strong",
     focusRing: "focus-visible:ring-board-strong/50",
+    gradientBg: "bg-grad-board",
+    softRing: "ring-board-strong/15",
+    ink: "text-board-ink",
+    glowShadow: "shadow-[0_14px_32px_-18px_var(--board-glow)]",
+    hoverGlow: "hover:shadow-[0_26px_48px_-20px_var(--board-glow)]",
+    pill: "bg-board-soft text-board-ink hover:bg-[color-mix(in_oklch,var(--board-soft),var(--board-strong)_14%)]",
   },
 };

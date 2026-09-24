@@ -50,21 +50,34 @@ export function LoginGate({ children }: { children: ReactNode }) {
 
 /**
  * 홈·과학수업처럼 화면은 열어 두고 한 칸만 막을 때 쓰는 안내 카드.
- * 오류가 아니라 "지금은 로그인해야 볼 수 있다"는 설명이므로 EmptyState와 같은 점선 테두리를 쓴다.
+ * 오류가 아니라 "지금은 로그인해야 볼 수 있다"는 설명이므로 경고색 대신 옅은 브랜드 보라 판 + 흰 자물쇠 칩 +
+ * 흰 알약 버튼을 쓴다(디자인 개편 1단계, 동작은 그대로).
  */
 export function LoginNeededNotice({ what, className }: { what: string; className?: string }) {
   const pathname = usePathname();
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
   return (
     <div
-      className={cn("flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center", className)}
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 rounded-2xl bg-primary/5 px-6 py-10 text-center ring-1 ring-primary/15 dark:bg-primary/10",
+        className,
+      )}
     >
-      <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground" aria-hidden>
+      <span
+        className="flex size-12 items-center justify-center rounded-2xl bg-card text-primary shadow-(--shadow-sm) ring-1 ring-primary/10 dark:shadow-none"
+        aria-hidden
+      >
         <LockIcon className="size-5" />
       </span>
-      <p className="font-medium">로그인하면 볼 수 있어요</p>
+      <p className="mt-1 font-semibold">로그인하면 볼 수 있어요</p>
       <p className="text-sm text-muted-foreground">지금은 로그인한 우리 반 친구들만 {what}을 볼 수 있어요.</p>
-      <Link href={loginHref(path)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}>
+      <Link
+        href={loginHref(path)}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          "mt-2 h-9 rounded-full bg-card px-4 text-sm shadow-(--shadow-sm) dark:shadow-none",
+        )}
+      >
         로그인하기
       </Link>
     </div>

@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     // 정적 웹앱(순수 HTML/CSS/JS, CLAUDE.md 웹앱 규칙)과 그 공통 틀은 Next/React 규칙 대상이 아니다.
     "public/apps/**",
     "scripts/templates/**",
+    // 설계·보고 문서 폴더의 보조 스크립트(예: 마스코트 배경 제거 cutout.cjs)는 사이트 코드가 아니다.
+    "docs/**",
   ]),
 ]);
 

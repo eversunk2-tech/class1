@@ -40,11 +40,18 @@ export function UserMenu() {
   // 학생: 선생님이 보낸 안 읽은 메시지 / 관리자: 학생이 보낸 안 읽은 메시지
   const unread = useUnreadFeedback();
 
-  if (loading) return <Skeleton className="size-8 rounded-full" />;
+  if (loading) return <Skeleton className="size-8 rounded-full sm:size-9" />;
 
   if (!user) {
+    // 머리말의 알약 모양 흰 버튼(spec §4.2). 휴대폰에서는 사이트 이름이 잘리지 않게 예전 크기 유지.
     return (
-      <Button variant="outline" size="sm" render={<Link href="/login/" />} nativeButton={false}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="rounded-full shadow-(--shadow-sm) sm:ml-1 sm:h-9 sm:px-4 sm:text-sm dark:shadow-none"
+        render={<Link href="/login/" />}
+        nativeButton={false}
+      >
         로그인
       </Button>
     );
@@ -60,7 +67,7 @@ export function UserMenu() {
             <Button
               variant="ghost"
               size="icon"
-              className="relative rounded-full"
+              className="relative rounded-full sm:size-9"
               aria-label={unread > 0 ? `사용자 메뉴 (안 읽은 피드백 ${unread}개)` : "사용자 메뉴"}
             />
           }

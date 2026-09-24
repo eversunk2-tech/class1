@@ -10,6 +10,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SessionProvider } from "@/hooks/use-session";
 import { SIDEBAR_INIT_SCRIPT } from "@/hooks/use-sidebar";
 import { THEME_INIT_SCRIPT } from "@/hooks/use-theme";
+// 본문 한글 글꼴 Pretendard(SIL OFL 1.1, npm 패키지 `pretendard`로 자체 호스팅).
+// 가변 글꼴(Pretendard Variable) 한 벌이 모든 굵기를 담는다(화면은 400·500·600을 쓴다).
+// 한글을 92조각(unicode-range)으로 나눈 dynamic subset이라 화면에 실제로 나온 글자가 든 조각만 내려받는다.
+// 정적 3굵기보다 CSS 약 1/3, 요청 수 절반, 배포 용량이 작다(docs/design/redesign/build-1-report.md 개정 1).
+// 글꼴 파일은 빌드 때 _next/static/media/로 복사되고 CSS의 상대 경로(../media/)라 basePath(/class1)와 무관하게 동작한다.
+// 라이선스 고지: public/fonts/LICENSE-pretendard-OFL.txt(패키지의 LICENSE.txt 원문).
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 const geistSans = Geist({
