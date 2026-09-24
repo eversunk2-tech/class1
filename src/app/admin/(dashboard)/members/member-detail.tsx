@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, KeyRoundIcon, Loader2Icon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from "lucide-react";
 import { toast } from "sonner";
+import { dangerSolidClass } from "@/components/admin/admin-styles";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
@@ -177,7 +178,7 @@ export function MemberDetail({ id }: { id: string }) {
 
       <section
         aria-labelledby="member-name"
-        className="flex flex-col gap-5 rounded-2xl bg-card p-5 shadow-lg shadow-foreground/5 ring-1 ring-foreground/10 sm:p-6 dark:shadow-none"
+        className="flex flex-col gap-5 rounded-2xl bg-card p-5 shadow-(--shadow-md) ring-1 ring-foreground/10 sm:p-6 dark:shadow-none"
       >
         <div className="flex flex-wrap items-center gap-4">
           <MemberAvatar member={member} size="lg" />
@@ -313,7 +314,12 @@ export function MemberDetail({ id }: { id: string }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={roleBusy}>취소</AlertDialogCancel>
-            <AlertDialogAction variant={isAdmin ? "destructive" : "default"} disabled={roleBusy} onClick={onChangeRole}>
+            <AlertDialogAction
+              variant={isAdmin ? "destructive" : "default"}
+              className={isAdmin ? dangerSolidClass : undefined}
+              disabled={roleBusy}
+              onClick={onChangeRole}
+            >
               {roleBusy ? <Loader2Icon className="animate-spin" /> : null}
               {isAdmin ? "해제" : "지정"}
             </AlertDialogAction>

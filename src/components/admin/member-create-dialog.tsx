@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { adminTabPanelClass } from "@/components/admin/admin-styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,10 +98,10 @@ export function MemberCreateDialog({
           </TabsList>
           {/* keepMounted: 탭을 잠깐 바꿔도 고른 파일·입력이 사라지지 않게 한다.
               (모달이 완전히 닫히면 위 reset()이 key를 바꿔 비밀번호까지 함께 지운다.) */}
-          <TabsContent value="one" className="pt-4" keepMounted>
+          <TabsContent value="one" className={cn("pt-4", adminTabPanelClass)} keepMounted>
             <SingleForm key={singleKey} onCreated={onCreated} onClose={() => onOpenChange(false)} />
           </TabsContent>
-          <TabsContent value="file" className="pt-4" keepMounted>
+          <TabsContent value="file" className={cn("pt-4", adminTabPanelClass)} keepMounted>
             <FileForm key={fileKey} onCreated={onCreated} />
           </TabsContent>
         </Tabs>

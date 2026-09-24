@@ -36,6 +36,7 @@ import {
 } from "@/lib/community";
 import { isWithdrawnProfile } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
+import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
 
 async function fetchComments(postId: string): Promise<CommunityComment[]> {
@@ -386,6 +387,7 @@ function DeleteCommentButton({ onConfirm }: { onConfirm: () => Promise<void> }) 
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            className={dangerSolidClass}
             disabled={busy}
             onClick={async () => {
               setBusy(true);

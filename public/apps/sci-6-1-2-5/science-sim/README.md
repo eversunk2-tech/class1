@@ -8,7 +8,7 @@
 
 | 파일 | 전역 이름 | 하는 일 |
 |---|---|---|
-| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce`(+`flush`, 떠날 때 자동 저장) | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사(숫자로 끝나는 말도 숫자 읽기의 받침을 따른다 — "실험 1을", "실험 2를") |
+| `persist.js` | `SciSim.createStore`, `SciSim.el`, `SciSim.rich`, `SciSim.josa`, `SciSim.debounce`(+`flush`, 떠날 때 자동 저장) | localStorage 임시 저장(모든 접근 try/catch), DOM 도우미, `**굵게**` 글, 받침에 맞는 조사(숫자로 끝나는 말도 숫자 읽기의 받침을 따른다 — "실험 1을", "실험 2를"). 맨 위에서 글꼴 CSS(Pretendard·Jua)를 첫 화면을 막지 않게 `<link>`로 붙인다(디자인 절) |
 | `stage-nav.js` | `SciSim.StageNav` | 단계 진행바(앞 단계는 언제든, 뒤 단계는 조건 통과 시) |
 | `lesson.js` | `SciSim.Lesson` | 앱 뼈대: 알림, 학습 시간, 단계 이동 연결·새로고침 복원, 마치기·결과 저장(실패 까닭별 문구), 처음부터 다시 |
 | `predict.js` | `SciSim.Predict` | 예상하기(직접 타이핑 + 한 단계씩 열리는 힌트, 최소 글자 수 안내) |
@@ -21,7 +21,7 @@
 | `conclude.js` | `SciSim.Conclude` | 결론·발전 질문: 적고 제출해야 모범 답안이 나오고 나란히 비교 |
 | `curiosity.js` | `SciSim.Curiosity` | 더 탐구하고 싶은 점 |
 | `answer-check.js` | `SciSim.AnswerCheck` | **답 되짚기·차단**(예상하기·정리하기). 로컬 규칙으로 확실한 무의미만 막고, 나머지는 `check-answer` Edge Function(Gemini)이 ok/rethink/block을 정한다. 설계: `docs/science/answer-check/spec.md` |
-| `style-common.css` | — | 공통 스타일(태블릿 우선, 44px 이상 터치 영역, 다크모드, 실험 화면 틀·분류·그래프 스타일) |
+| `style-common.css` | — | 공통 스타일(태블릿 우선, 44px 이상 터치 영역, 다크모드, 실험 화면 틀·분류·그래프 스타일). 2026-09-24부터 사이트와 같은 보라 톤·알약 버튼·Pretendard/Jua(CDN) — 아래 "디자인" 절 |
 
 각 파일 맨 위 주석에 자세한 사용법이 있다.
 
@@ -326,7 +326,7 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
 - 화면의 값·색·용어는 **지도서 값만** 쓴다. 단순화한 곳은 화면에 "모형"이라고 밝힌다(`modelNote`, 3D 화면 "모형" 배지).
 - 예상하기에서는 답을 알려 주지 않는다. 힌트도 생각거리만. 새 용어·개념 설명은 예상하기 **뒤**(실험하기 `intro` 또는 분석 단계)에 둔다.
 - 색만으로 구분하지 않는다: 색 칩 옆에 항상 글자, 그래프는 점 모양·선 무늬·범례.
-- 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI.
+- 상대경로만(`./science-sim/…`), 외부 라이브러리는 버전 고정 + SRI. 글꼴 CSS(Pretendard·Jua)는 `persist.js` 맨 위가 `<link>`로 CDN에서 붙인다(Pretendard는 버전 고정 + SRI, Google Fonts의 Jua는 응답이 브라우저마다 달라 SRI를 붙일 수 없는 예외 — 아래 "디자인" 절).
 - **화면 여백(2026-09-23)**: 아래쪽 이동 막대(`.ss-footer-nav`)와 머리말(`.ss-header`)은 고정이라 본문을 가린다. `lesson.js`가 두 높이를 `--ss-header-h`·`--ss-footer-h`에 넣고, `style-common.css`가 `.ss-main`의 아래 여백과 `scroll-margin-top/bottom`에 쓴다. 앱 `style.css`에서 `.ss-main`의 `padding-bottom`을 작은 고정값으로 덮어쓰지 않는다. `experiment.js`는 '확인하기' 뒤에 '기록하기' 버튼이 막대에 가리면 그만큼 스크롤한다.
 - **낮은 화면(2026-09-23)**: `@media (max-height: 480px)`(휴대폰 가로 812×375 등)에서 머리말·단계 진행바·이동 막대를 낮게 한다. 앱 `style.css`에서 머리말 요소 크기를 고정값으로 다시 키우지 않는다.
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
@@ -334,6 +334,27 @@ T.renderBar($("bar-root"), Object.assign({}, C.chart.bar, {
   `qa: [].concat(predict.qa("predict"), quiz.qa("analyze"), conclude.qa("conclude"), curiosity.qa("curiosity"))` (+ 분류가 있으면 `sorter.qa("analyze")`).
   항목 모양은 `{ stage, id, label, question, kind, answer }` — `kind: "text"`(answer: 글), `"choice"`(answer: `{ chosen: [보기 라벨…], correct, tries }`), `"groups"`(분류), `"table"`(answer: `{ columns: [{ key, label }], rows: [{…}] }`). 기록 표처럼 모듈이 없는 값은 앱이 같은 모양으로 직접 넣는다(예: `{ stage: "experiment", id: "records", label: "내 기록", question: "…", kind: "table", answer: { columns, rows } }`).
 - 이미 만든 앱의 `detail` 모양을 바꾸면 `src/data/app-responses/{앱}.ts` 응답 매핑도 같이 고친다.
+
+## 디자인 (2026-09-24, 디자인 개편 3단계 — `docs/design/redesign/spec.md` §6·개정 1)
+
+사이트(`src/app/globals.css`)와 같은 인상으로 **색·글꼴·버튼·카드·단계 막대 모양만** 바꿨다. 동작·저장 키·저장 구조·측정값·문구는 그대로이고 CSS만 다르다(`science-guide/style-common.css`도 같은 디자인).
+
+- **주색 = 사이트 `--primary`**: 밝음 `#6c4dd6`(oklch 0.53 0.2 288) · 어두움 `#aa9dff`(oklch 0.75 0.15 288). 그라데이션 끝색 `--ss-primary-2`(= 사이트 `--primary-grad-to`) `#9033bd` / `#d698f1`, `--ss-grad-primary`로 쓴다. 주색 위 글자 `--ss-on-primary`는 밝음 흰색(5.7:1 이상) · 어두움 `#110d26`(8.1:1 이상).
+- **바탕**: `--ss-bg`(아주 옅은 보라) + 페이지 위쪽 연보라 그라데이션(`--ss-bg-top`) + 가장자리 흐린 보라 빛(`--ss-bg-blob`). 머리말·아래 막대는 반투명 유리(`--ss-glass` + 흐림).
+- **카드** `.ss-card`: 모서리 `--ss-radius` 20px + 옅은 보라 그림자(`--ss-shadow`). 관찰·기록 카드(`.ss-observe`)는 보라 테두리 + 위쪽 옅은 보라, 되짚기 카드(`.ss-ac-*`)·제출 안내(`.ss-submit-note`)·마치기 카드(`.finish-card`)·완료 카드(`.done-card`, 모든 앱 index.html의 공통 클래스)도 같은 톤으로 맞췄다.
+- **버튼**: `.ss-btn` = 흰 알약(모서리 28px — 높이 56px까지는 완전한 알약, 두 줄로 높아지면 둥근 사각형), `.ss-btn-primary` = 보라 그라데이션 알약 + 색 그림자, `.ss-btn-ghost` = 투명 알약. 선택 격자(`.ss-choice`·`.ss-option` 12px, `.ss-mini-cell` 8px, `.ss-round-tab` 14px)는 알약으로 바꾸지 않고 둥근 사각형으로 둔다(촘촘한 곳이 어수선해지지 않게). 올림(hover) 효과는 `(hover: hover)`인 기기에서만, 움직임 줄이기(`prefers-reduced-motion`)면 떠오르지 않는다.
+- **단계 막대**: 지금 단계는 보라 그라데이션 + 굵은 글자(800) + 아래 작은 막대 표시(`.ss-step.is-current::after`) — 색만으로 구분하지 않는다(`aria-current="step"`). 완료는 초록 ✓, 잠김은 점선 테두리.
+- **키보드 초점**: `:focus-visible` 3px 보라 테두리(`--ss-focus`, 밝음 `#6c4dd6` · 어두움 `#c0b8ff`). 입력칸은 보라 테두리 + 옅은 보라 둘레.
+- **미리 계산한 틴트**: 제출 안내·관찰 카드·마치기 카드·힌트 카드의 테두리와 바탕은 `color-mix()` 대신 `--ss-primary-tint`(주색 7%)·`--ss-primary-line`(주색 55%)·`--ss-hint-line`(주황 45%)을 쓴다 — `color-mix()`를 모르는 옛 Safari(16.2 전)에서도 테두리·바탕이 남는다. 주색을 바꾸면 이 셋도 다시 계산한다.
+- **초록(`--ss-good`)**: 밝음 `#1d8a52` → `#17784a`(옅은 초록 바탕 위 4.9:1, 흰 글자 5.5:1 — 전에는 3.9:1로 AA 미달). 빨강·노랑·주황(`--ss-bad`·`--ss-warn-bg`·`--ss-accent`)은 그대로.
+- **바꾸지 않는 것**: 그래프·표 자료 계열 색 `--ss-s1`~`--ss-s4`(범례·과학적 의미와 연결), 3D·2D 실험 화면 바탕 `--ss-scene-bg`, 실험 화면 칸 `.ss-exp-view`(모서리 16px, 색 그림자·그라데이션 없음). 계열 표시가 없는 `.ss-bar`·`.ss-line`·`.ss-dot`은 주색이 아니라 `--ss-s1`(전과 같은 파랑)을 쓴다.
+- **글꼴**: `persist.js` 맨 위의 작은 코드가 글꼴 CSS 두 개를 `<link rel="stylesheet">`로 `<head>`에 붙인다(개정 1 — 앱 index.html은 그대로, 한 번만, 오류를 던지지 않음, `fonts.gstatic.com` preconnect 포함). 스크립트가 붙인 스타일시트는 첫 화면을 막지 않으므로 먼저 기기 글꼴로 그리고 글꼴이 오면 바뀐다. **`style-common.css`에 `@import`를 다시 넣지 않는다**(CDN이 응답 없이 걸리면 그 시간만큼 빈 화면이 된다).
+  - 본문 Pretendard(가변, SIL OFL 1.1): `https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css` — 사이트가 쓰는 npm 패키지와 같은 버전·같은 파일, `integrity="sha384-uR1wgObmx89ZQ4VVXHdzjbDJZ1PvBK01K+E3GebmaBKdZ87qRJvBWPoPbzWeEd5T"` + `crossorigin="anonymous"`. 버전을 바꾸면 SRI를 다시 계산한다.
+  - 제목 Jua(SIL OFL 1.1): `https://fonts.googleapis.com/css2?family=Jua&display=swap`.
+  - `--ss-font`: `"Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif` / `--ss-font-heading`: `"Jua", var(--ss-font)`.
+  - Jua는 제목류(`.ss-title`, `.ss-stage-title`, `.ss-step-h`, `.ss-q-num`, 분류·되짚기·완료 카드 제목, `h3.sub-h` 등)에만 쓴다. **측정값 입력·표·그래프 숫자에는 쓰지 않는다**(Pretendard `tabular-nums`). Jua는 굵기가 하나라 `font-synthesis: none` — 못 불러오면 대체 글꼴의 원래 굵기(700)로 그린다.
+  - CDN을 못 쓰거나 응답 없이 걸려 있어도 첫 화면은 기기 기본 글꼴로 곧바로 그린다(build-3 보고서 개정 1의 측정 참고).
+- **앱 `style.css`를 새로 쓸 때**: 강조(선택·초점)에는 `var(--ss-primary)`를 쓰고 예전 파랑(`#2f6fd6`)을 직접 쓰지 않는다. 자료·그래프 색은 `--ss-s1`~`--ss-s4`를 쓴다. 주색·바탕·글자·글꼴 같은 공통 틀 변수는 앱에서 다시 정의하지 않는다(그래프 칸 안에서 계열 색 `--ss-s1`~`--ss-s4`만 바꾸는 것은 괜찮다 — 예: `sci-6-2-1-2`의 `.chart-solar`).
 
 ## 로그인 필수 · 진행 상황 DB 저장 (2026-09-22)
 

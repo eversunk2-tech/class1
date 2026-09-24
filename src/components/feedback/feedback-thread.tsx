@@ -249,7 +249,7 @@ export function FeedbackThread({
             placeholder={audience === "student" ? "선생님께 메시지를 남겨 보세요" : "피드백을 입력하세요"}
             disabled={sending}
             autoFocus={autoFocus}
-            className={cn("min-h-20", student && "rounded-2xl")}
+            className={cn("min-h-20", student ? "rounded-2xl" : "bg-card")}
             onKeyDown={(e) => {
               // Ctrl/⌘ + Enter로 전송
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

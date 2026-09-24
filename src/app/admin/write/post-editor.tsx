@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeftIcon, ExternalLinkIcon, Loader2Icon, SaveIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
 import { useSession } from "@/hooks/use-session";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { editPostHref, postHref } from "@/components/post-card";
@@ -398,7 +399,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
           <ArrowLeftIcon />
           글 관리
         </Button>
-        <h1 className="mr-auto text-xl font-semibold tracking-tight sm:text-2xl">{isEdit ? "글 수정" : "새 글 작성"}</h1>
+        <h1 className="mr-auto font-heading text-2xl leading-tight font-normal sm:text-3xl">{isEdit ? "글 수정" : "새 글 작성"}</h1>
         {dirty ? <span className="text-xs text-muted-foreground">저장하지 않은 변경 사항</span> : null}
         {isEdit && initial.published ? (
           <Button variant="outline" size="sm" render={<Link href={postHref(initial.slug)} />} nativeButton={false}>
@@ -410,7 +411,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
       {pendingDraft ? (
         <div
           role="status"
-          className="flex flex-col gap-2 rounded-xl border bg-muted/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <p>
             로그인이 만료되었을 때 임시 저장된 내용이 있습니다
@@ -436,7 +437,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
             maxLength={200}
             placeholder="글 제목"
             aria-invalid={Boolean(errors.title)}
-            className="h-9 text-base"
+            className="h-9 bg-card text-base"
           />
         </Field>
 
@@ -463,7 +464,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
             spellCheck={false}
             autoCapitalize="off"
             aria-invalid={Boolean(errors.slug)}
-            className="h-9 font-mono"
+            className="h-9 bg-card font-mono"
           />
         </Field>
 
@@ -473,7 +474,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
             value={form.tagsText}
             onChange={(e) => set("tagsText", e.target.value)}
             placeholder="nextjs, 수업, 회고"
-            className="h-9"
+            className="h-9 bg-card"
           />
           <TagList tags={parseTags(form.tagsText)} linked={false} />
         </Field>
@@ -485,6 +486,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
             onChange={(e) => set("summary", e.target.value)}
             rows={2}
             placeholder="한두 문장으로 글을 소개해 주세요."
+            className="bg-card"
           />
         </Field>
 
@@ -496,7 +498,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
             onChange={(e) => set("coverUrl", e.target.value)}
             placeholder="https://…"
             aria-invalid={Boolean(errors.cover)}
-            className="h-9"
+            className="h-9 bg-card"
           />
         </Field>
       </div>
@@ -522,12 +524,12 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
               onChange={(e) => set("content", e.target.value)}
               placeholder={"# 제목\n\n마크다운으로 본문을 작성하세요."}
               spellCheck={false}
-              className="min-h-[60vh] font-mono text-sm leading-6 md:text-sm"
+              className="min-h-[60vh] bg-card font-mono text-sm leading-6 md:text-sm"
             />
           ) : null}
           {showPreview ? (
             <div
-              className="min-h-[60vh] min-w-0 rounded-lg border px-4 py-3 lg:max-h-[80vh] lg:overflow-y-auto"
+              className={cn("min-h-[60vh] min-w-0 rounded-xl px-4 py-3 lg:max-h-[80vh] lg:overflow-y-auto", adminSurfaceClass)}
               aria-label="미리보기"
             >
               {deferredContent.trim() ? (
@@ -540,7 +542,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t bg-background/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-4">
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t bg-background/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:px-4 sm:shadow-(--shadow-md) dark:shadow-none">
         <label className="flex items-center gap-2 text-sm">
           <Switch
             checked={form.published}
@@ -565,7 +567,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={deleting}>취소</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" disabled={deleting} onClick={onDelete}>
+                  <AlertDialogAction variant="destructive" className={dangerSolidClass} disabled={deleting} onClick={onDelete}>
                     {deleting ? <Loader2Icon className="animate-spin" /> : null}
                     삭제
                   </AlertDialogAction>

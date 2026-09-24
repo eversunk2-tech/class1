@@ -12,10 +12,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { dangerSolidClass } from "@/lib/danger-button";
 
 /**
  * 확인 다이얼로그(삭제 등). 처리 중에는 닫히지 않는다.
  * 더블클릭으로 onConfirm이 두 번 불리지 않도록 ref로 막는다(review #14) — busy가 false로 돌아오거나 다시 열 때 풀린다.
+ * `destructive`면 확인 버튼을 진한 빨강 + 흰 글자(dangerSolidClass)로 그린다 — 관리자·학생 화면 공통(디자인 개편 4단계 개정 1).
  */
 export function ConfirmDialog({
   open,
@@ -61,7 +63,12 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
-          <AlertDialogAction variant={destructive ? "destructive" : "default"} disabled={busy} onClick={confirm}>
+          <AlertDialogAction
+            variant={destructive ? "destructive" : "default"}
+            className={destructive ? dangerSolidClass : undefined}
+            disabled={busy}
+            onClick={confirm}
+          >
             {busy ? <Loader2Icon className="animate-spin" /> : null}
             {confirmLabel}
           </AlertDialogAction>

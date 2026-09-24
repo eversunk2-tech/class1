@@ -4,6 +4,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { CalendarClockIcon, EyeIcon, Loader2Icon, PencilIcon, PencilLineIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
 import { AsyncView, SectionTitle } from "@/components/learning/learning-ui";
 import { MarkdownViewer } from "@/components/markdown-viewer";
@@ -32,6 +33,7 @@ import {
   type AssignmentWithCount,
 } from "@/lib/learning";
 import type { Assignment } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const TITLE_MAX = 200;
 
@@ -135,7 +137,7 @@ export function AssignmentManager() {
         }
       >
         {({ assignments, studentCount }) => (
-          <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10" aria-label="과제 목록">
+          <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="과제 목록">
             {assignments.map((a) => (
               <li key={a.id} className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:gap-4">
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">

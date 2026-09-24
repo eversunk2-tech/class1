@@ -13,6 +13,7 @@ import {
   SearchIcon,
   UsersIcon,
 } from "lucide-react";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { PraiseDialog, type PraiseCandidate } from "@/components/admin/praise-dialog";
 import { PraisePresetManagerButton } from "@/components/admin/praise-preset-manager";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
@@ -200,7 +201,8 @@ function StudentCard({
   return (
     <li
       className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-2xl p-3 ring-1 ring-foreground/10 sm:p-4",
+        "flex min-w-0 flex-col gap-3 rounded-2xl p-3 sm:p-4",
+        adminSurfaceClass,
         entry.status === "none" && "opacity-60",
       )}
     >
@@ -584,7 +586,7 @@ export function ResponsesView({ appParam, viewParam, questionParam }: { appParam
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg p-0.5 ring-1 ring-foreground/10" role="group" aria-label="보기 방식">
+          <div className="inline-flex rounded-xl bg-card p-0.5 ring-1 ring-foreground/10" role="group" aria-label="보기 방식">
             <Button type="button" size="sm" variant={view === "student" ? "secondary" : "ghost"} aria-pressed={view === "student"} onClick={() => navigate({ view: "student" })}>
               <UsersIcon />
               학생별
@@ -709,7 +711,7 @@ function StudentList({
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="학생 이름 검색" aria-label="학생 이름 검색" className="h-9 pl-8" />
+          <Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="학생 이름 검색" aria-label="학생 이름 검색" className="h-9 bg-card pl-8" />
         </div>
         <NativeSelect value={filter} onChange={(e) => onFilter(e.target.value as Filter)} aria-label="상태로 거르기" className="h-9">
           <option value="all">모든 학생</option>

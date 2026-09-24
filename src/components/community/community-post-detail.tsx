@@ -46,6 +46,7 @@ import {
 } from "@/lib/community";
 import { formatDateTime } from "@/lib/format";
 import { backPillClass, outlinePillClass } from "@/lib/pill";
+import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -294,6 +295,7 @@ function DeletePostButton({ noun, onConfirm }: { noun: string; onConfirm: () => 
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            className={dangerSolidClass}
             disabled={busy}
             onClick={async () => {
               setBusy(true);

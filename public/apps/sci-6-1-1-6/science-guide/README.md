@@ -15,20 +15,21 @@
 
 | 파일 | science-sim과 | 하는 일 |
 |---|---|---|
-| `persist.js` | **같음** | localStorage 임시 저장, `SciSim.el`·`rich`·`josa`·`debounce` |
+| `persist.js` | **같음** | localStorage 임시 저장, `SciSim.el`·`rich`·`josa`·`debounce`. 맨 위에서 글꼴 CSS를 첫 화면을 막지 않게 `<link>`로 붙인다(2026-09-24, science-sim과 같은 코드) |
 | `stage-nav.js` | 조금 다름 | 단계 진행바. **잠긴 단계에는 ✓(완료)를 보이지 않는다**(앞 단계를 비워 다시 잠겼을 때 표시 어긋남 방지) |
 | `predict.js` | **같음** | 도입 질문(직접 타이핑) + 한 단계씩 열리는 힌트. 조사 앱에서는 "조사 시작하기"에 쓴다 |
 | `conclude.js` | 조금 다름 | 적고 제출해야 모범 답안이 나오는 결론·발전 질문. **제출한 글(`sent`)만** 비교 칸과 `values()`에 쓴다. 제출 뒤 고치면 "다시 제출해야 반영돼요" 안내 |
 | `curiosity.js` | **같음** | 더 탐구하고 싶은 점 |
 | `answer-check.js` | **같음** | 답 되짚기·차단(머리 주석의 파일 이름만 다름). 설계: `docs/science/answer-check/spec.md` |
-| `style-common.css` | **같음** | 공통 스타일(색 변수·카드·버튼·다크모드·단계바·퀴즈·비교) |
+| `style-common.css` | 디자인 같음 | 공통 스타일(색 변수·카드·버튼·다크모드·단계바·퀴즈·비교). **색·글꼴·버튼·카드·단계 막대 디자인은 science-sim과 같다**(2026-09-24, science-sim README "디자인" 절). 레이아웃은 조사 도우미 판 그대로다 — science-sim의 2026-09-23 공통 틀 수정 1(낮은 화면 머리말 축소, 아래 막대 높이만큼의 여백·`scroll-margin`)과 실험 전용 규칙(카운트다운·관찰 확인 줄)은 넣지 않았다 |
 | `lesson.js` | 조금 다름 | `texts` 옵션 추가(마침 카드 제목·안내, 처음부터 다시 확인 문구, 너무 긴 글 문구). **기본 문구가 "조사"** |
 | `quiz.js` | 조금 다름 | 마지막 인자 `{ numLabel, key }` 추가(문항 앞 말 기본 "문제", 저장 키 기본 "analysis") |
 
 > **2026-09-23 마치기 조건**: `lesson.js`가 '학습 마치기' 직전에 정리하기 답과 '더 탐구하고 싶은 점'(필수)을 한 번 더 본다.
 > 자세한 내용은 `scripts/templates/science-sim/README.md`의 "마치기 조건"과 `docs/science/answer-check/finish-gate-report.md`를 본다(동작은 실험 앱과 같다).
 
-"같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity}.js scripts/templates/science-sim/style-common.css scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다).
+"같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity}.js scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다).
+`style-common.css`는 통째로 복사하지 않는다(위 표의 레이아웃 차이가 사라진다). science-sim에서 **디자인(색·글꼴·버튼·카드)** 규칙을 바꾸면 같은 규칙만 이 파일에 옮기고 `diff`로 차이가 위 표에 적은 것뿐인지 확인한다.
 `stage-nav.js`·`conclude.js`는 2026-09 수정 1차에서 위 동작을 더해 달라졌으니 **덮어쓰지 말고** 차이를 옮긴다.
 "조금 다름" 파일은 덧붙인 옵션이 모두 선택(기본값 있음)이라 나중에 science-sim 쪽으로 합쳐도 실험 앱이 깨지지 않는다.
 
@@ -160,7 +161,8 @@ var share = SciSim.SharePrep.render($("share-root"), {
 - 검색어는 복사만 하고 외부 검색 결과로 자동 이동하지 않는다. 외부 링크는 새 창 + `rel="noopener noreferrer"` + "선생님과 함께" 안내.
 - 이 앱은 글을 올리거나 보내지 않는다(모둠 공유는 교실의 공유 플랫폼에서). 저장은 로그인했을 때 `class1-record.js`로만.
 - 색만으로 구분하지 않는다: 무리 카드는 이름·기호 + 테두리 색, 성질 고르기는 글자 버튼.
-- 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만.
+- 디자인(2026-09-24): `scripts/templates/science-sim/README.md`의 "디자인" 절과 같다(주색 보라, 알약 버튼, Pretendard·Jua CDN). 조사 도우미 카드 제목 `.sg-card-h`도 Jua로 그린다. `style-guide.css`의 무리 테두리 색(`--sg-tone-a/b/c`)은 자료를 나누는 색이라 바꾸지 않았다.
+- 상대경로만(`./science-guide/…`), 외부 라이브러리는 supabase-js(버전 고정 + SRI)만. 글꼴 CSS(Pretendard·Jua)만 예외로 `persist.js` 맨 위가 `<link>`로 CDN에서 붙인다(Pretendard는 버전 고정 + SRI, Google Fonts의 Jua는 SRI를 붙일 수 없다 — science-sim README 디자인 절). `style-common.css`에 `@import`를 넣지 않는다(첫 화면을 막는다).
 - 저장 detail은 16,000자 이하(`class1-record.js`). 입력칸은 `maxlength`로 제한한다.
 - **질문-답 표준 목록 `detail.qa`**(2026-09-22, `docs/admin/responses-spec.md` §3.3): `predict`·`quiz`·`conclude`·`curiosity`·`worksheet`·`share-prep`에 `qa(stage)`가 있다(science-sim과 같은 항목 모양, 기존 값은 그대로). 새 조사 도우미 앱은 `buildDetail()`에 `qa: [].concat(predict.qa("intro"), ws.qa("research"), share.qa("share"), quiz.qa("quiz"), conclude.qa("conclude"), cur.qa("curiosity"))`처럼 넣는다(단계 id는 그 앱의 `stages`에 맞춘다). 이미 만든 조사 도우미 앱 3개(sci-6-1-1-5·6, sci-6-1-2-6)는 소급하지 않고 `src/data/app-responses/` 매핑으로 보여 준다.
 

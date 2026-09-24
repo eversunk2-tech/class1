@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { ClipboardCheckIcon, Gamepad2Icon, MessageCircleIcon } from "lucide-react";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { CompletedMark } from "@/components/learning/activity-panels";
 import {
   AsyncView,
@@ -30,6 +31,7 @@ import {
   isLate,
   type ActivityItem,
 } from "@/lib/learning";
+import { cn } from "@/lib/utils";
 
 function percent(n: number | null): string {
   return n == null ? "—" : `${Math.round(n * 100)}%`;
@@ -63,7 +65,8 @@ function AppSummarySection() {
         {({ total, apps }) => (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              전체 웹앱 시도 <span className="font-heading text-2xl text-foreground">{formatCount(total)}</span>회
+              전체 웹앱 시도{" "}
+              <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{formatCount(total)}</span>회
               <span className="ml-2 text-xs">(전체 기록 기준)</span>
             </p>
             {!apps.length ? (
@@ -149,7 +152,7 @@ function FeedbackInbox() {
         empty={<EmptyState title="아직 주고받은 피드백이 없습니다" description="회원 상세나 과제 제출 현황에서 피드백을 남길 수 있습니다." />}
       >
         {(rows) => (
-          <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+          <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
             {rows.map((t) => (
               <li key={t.id}>
                 <Link
@@ -211,7 +214,7 @@ export function RecentActivitySection({ limit, compact = false }: { limit: numbe
         empty={<EmptyState title="아직 활동이 없습니다" />}
       >
         {(rows) => (
-          <ul className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
+          <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
             {rows.map((item) => (
               <ActivityRow key={item.id} item={item} />
             ))}

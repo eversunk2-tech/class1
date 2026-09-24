@@ -25,6 +25,7 @@ import { useSession } from "@/hooks/use-session";
 import { isWithdrawnProfile, profileDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import { primaryPillClass } from "@/lib/pill";
+import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
 import { AUTHOR_PROFILE_COLUMNS, type CommentWithAuthor } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -236,6 +237,7 @@ function DeleteCommentButton({ onConfirm }: { onConfirm: () => Promise<void> }) 
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            className={dangerSolidClass}
             disabled={busy}
             onClick={async () => {
               setBusy(true);

@@ -19,7 +19,9 @@ type Status = "loading" | "ready" | "error" | "setup" | "locked";
  * 통계 타일 1개(표시 전용). 숫자는 제목 글꼴로 크게, 라벨은 본문 색으로 보여 준다.
  * `image`를 주면 lucide 아이콘 대신 3D 아이콘 칩을 쓴다(홈). 관리자 화면은 lucide 그대로(spec §3.2).
  * `tone="vivid"`(홈, 디자인 개편 개정 2): 더 둥근 칸 + 메뉴색 부드러운 그림자 + 원형 파스텔 배지 위 3D 아이콘 +
- * 굵은 메뉴색 숫자(큰 글씨라 대비 3:1 기준, 라이트 4.1~5.3:1). 기본값(`default`)은 예전 모양 그대로.
+ * 굵은 메뉴색 숫자(큰 글씨라 대비 3:1 기준, 라이트 4.1~5.3:1).
+ * 기본값(`default`)은 관리자 개요에서만 쓴다(디자인 개편 4단계): 사이트 그림자 단계(--shadow-md) +
+ * 숫자는 제목 글꼴(Jua) 대신 본문 글꼴 600·고정폭 숫자(관리자 화면은 숫자를 정확히 읽는 게 우선).
  */
 export function StatTile({
   label,
@@ -53,7 +55,7 @@ export function StatTile({
         "flex items-center gap-3 bg-card ring-1",
         vivid
           ? cn("rounded-[1.75rem] p-4 ring-foreground/5 sm:gap-3.5 sm:p-5 dark:shadow-none dark:ring-foreground/10", colors.glowShadow)
-          : "rounded-2xl p-4 shadow-lg shadow-foreground/5 ring-foreground/10 dark:shadow-none",
+          : "rounded-2xl p-4 shadow-(--shadow-md) ring-foreground/10 dark:shadow-none",
         className,
       )}
     >
@@ -108,11 +110,11 @@ export function StatTile({
             className={cn(
               "leading-none",
               // Jua는 굵기가 하나뿐이라, 더 굵은 숫자는 본문 글꼴 800으로 그린다.
-              vivid ? cn("text-3xl font-extrabold tracking-tight tabular-nums", colors.strongText) : "font-heading text-2xl",
+              vivid ? cn("text-3xl font-extrabold tracking-tight tabular-nums", colors.strongText) : "text-2xl font-semibold tracking-tight tabular-nums",
             )}
           >
             {formatCount(value ?? 0)}
-            <span className={cn("ml-0.5 text-sm text-muted-foreground", vivid && "ml-1 font-medium tracking-normal")}>
+            <span className={cn("ml-0.5 text-sm font-medium tracking-normal text-muted-foreground", vivid && "ml-1")}>
               {unit}
             </span>
           </span>

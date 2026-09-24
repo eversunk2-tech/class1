@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -83,7 +84,12 @@ export function LoginRequiredCard() {
   return (
     <section
       aria-labelledby="login-required-heading"
-      className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl p-4 transition-shadow sm:p-5",
+        adminSurfaceClass,
+        // 켜짐(방문자 잠김)은 눈에 띄게: 빨간 자물쇠 칩 + 옅은 빨간 윤곽(글자·스위치 상태로도 알 수 있어 색만으로 구분하지 않는다)
+        on && "ring-destructive/35",
+      )}
     >
       <div className="flex flex-wrap items-center gap-3">
         <span

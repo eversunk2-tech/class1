@@ -14,6 +14,7 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { dangerSolidClass } from "@/components/admin/admin-styles";
 import { Input } from "@/components/ui/input";
 import { AdminActionError, accountLabel, memberRealName, withdrawMember } from "@/lib/admin";
 import type { MemberRow } from "@/lib/types";
@@ -131,7 +132,8 @@ export function MemberWithdrawDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={busy || !matches} onClick={onConfirm}>
+          {/* 되돌릴 수 없는 동작이라 마지막 확인 버튼은 진한 빨강(이름을 맞게 입력하기 전에는 흐리게 꺼져 있다) */}
+          <AlertDialogAction variant="destructive" className={dangerSolidClass} disabled={busy || !matches} onClick={onConfirm}>
             {busy ? <Loader2Icon className="animate-spin" /> : null}
             {stage.kind === "confirm" && stage.error ? "다시 시도" : "탈퇴 처리"}
           </AlertDialogAction>

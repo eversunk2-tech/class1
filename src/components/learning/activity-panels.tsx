@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useState } from "react";
 import Link from "next/link";
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, CircleDashedIcon, ExternalLinkIcon, HeartIcon, MessageSquareIcon } from "lucide-react";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
 import {
   AsyncView,
@@ -263,11 +264,11 @@ function PostTitleLink({ post }: { post: { title: string; slug: string; publishe
   );
 }
 
-/** 목록 틀: 학생 화면은 흰 둥근 카드(디자인 개편 2단계), 관리자 화면은 예전 모양 그대로 */
+/** 목록 틀: 학생 화면은 흰 둥근 카드(디자인 개편 2단계), 관리자 화면은 흰 판 + 작은 그림자(4단계, adminSurfaceClass) */
 function listShell(audience: Audience) {
   return audience === "student"
     ? "overflow-hidden rounded-[1.5rem] bg-card shadow-(--shadow-sm) ring-1 ring-foreground/5 dark:shadow-none dark:ring-foreground/10"
-    : "rounded-xl ring-1 ring-foreground/10";
+    : cn("rounded-xl", adminSurfaceClass);
 }
 
 /** 읽은 글 탭 */
@@ -471,7 +472,7 @@ export function UserSubmissions({ userId, studentName }: { userId: string; stude
       empty={<EmptyState title="제출한 과제가 없습니다" />}
     >
       {(rows) => (
-        <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+        <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
           {rows.map((s) => (
             <SubmissionRow key={s.id} s={s} userId={userId} studentName={studentName} />
           ))}

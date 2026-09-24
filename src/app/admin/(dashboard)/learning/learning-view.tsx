@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3Icon, ClipboardListIcon, Gamepad2Icon, LayoutGridIcon, MessageSquareQuoteIcon } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { adminTabPanelClass } from "@/components/admin/admin-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UUID_RE } from "@/lib/admin";
@@ -67,18 +68,18 @@ export function LearningView() {
             })}
           </TabsList>
         </div>
-        <TabsContent value="overview">
+        <TabsContent value="overview" className={adminTabPanelClass}>
           <LearningOverview />
         </TabsContent>
-        <TabsContent value="apps">
+        <TabsContent value="apps" className={adminTabPanelClass}>
           <AppResultsView initialApp={params.get("app")} />
         </TabsContent>
-        <TabsContent value="responses">
+        <TabsContent value="responses" className={adminTabPanelClass}>
           {tab === "responses" ? (
             <ResponsesView appParam={params.get("app")} viewParam={params.get("view")} questionParam={params.get("q")} />
           ) : null}
         </TabsContent>
-        <TabsContent value="assignments">
+        <TabsContent value="assignments" className={adminTabPanelClass}>
           {assignmentId ? (
             UUID_RE.test(assignmentId) ? (
               <SubmissionReview key={assignmentId} assignmentId={assignmentId} />
@@ -89,7 +90,7 @@ export function LearningView() {
             <AssignmentManager />
           )}
         </TabsContent>
-        <TabsContent value="engagement">
+        <TabsContent value="engagement" className={adminTabPanelClass}>
           <EngagementTable />
         </TabsContent>
       </Tabs>

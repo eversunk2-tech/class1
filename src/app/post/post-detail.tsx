@@ -32,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { formatDate } from "@/lib/format";
 import { outlinePillClass } from "@/lib/pill";
+import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
 import type { Post } from "@/lib/types";
 
@@ -189,7 +190,7 @@ function AdminActions({ post }: { post: Post }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={busy} onClick={onDelete}>
+            <AlertDialogAction variant="destructive" className={dangerSolidClass} disabled={busy} onClick={onDelete}>
               {busy ? <Loader2Icon className="animate-spin" /> : null}
               삭제
             </AlertDialogAction>

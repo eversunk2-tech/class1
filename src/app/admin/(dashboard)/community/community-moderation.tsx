@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
 import { CommunitySetupNotice } from "@/components/community/community-setup-notice";
 import { REPORT_REASON_LABELS, type ReportReason } from "@/components/community/report-dialog";
 import { ListSkeleton } from "@/components/learning/learning-ui";
@@ -219,7 +220,7 @@ function ReportsPanel() {
             const isComment = r.target_kind === "comment" || !!r.comment_id;
             const targetHidden = isComment ? comment?.hidden : post?.hidden;
             return (
-              <li key={r.id} className="flex flex-col gap-3 rounded-xl p-4 ring-1 ring-foreground/10">
+              <li key={r.id} className={cn("flex flex-col gap-3 rounded-xl p-4", adminSurfaceClass)}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Badge variant="destructive">{REPORT_REASON_LABELS[r.reason] ?? r.reason}</Badge>
                   <Badge variant="outline">{isComment ? "댓글" : KIND_META[kind].noun}</Badge>
@@ -390,7 +391,7 @@ function PostsPanel() {
       ) : !state.rows.length ? (
         <EmptyState title="아직 올라온 글이 없습니다" className="py-10" />
       ) : (
-        <ul className="divide-y rounded-xl ring-1 ring-foreground/10">
+        <ul className={cn("divide-y rounded-xl", adminSurfaceClass)}>
           {state.rows.map((r) => {
             const reports = r.community_reports?.[0]?.count ?? 0;
             return (
@@ -496,7 +497,7 @@ function DeleteTargetDialog({ target, onClose, onDeleted }: { target: Target | n
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={busy} onClick={onDelete}>
+          <AlertDialogAction variant="destructive" className={dangerSolidClass} disabled={busy} onClick={onDelete}>
             {busy ? <Loader2Icon className="animate-spin" /> : null}
             삭제
           </AlertDialogAction>

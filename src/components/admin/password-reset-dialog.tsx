@@ -14,6 +14,7 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { dangerSolidClass } from "@/components/admin/admin-styles";
 import { Button } from "@/components/ui/button";
 import { AdminActionError, accountLabel, memberName, resetMemberPassword } from "@/lib/admin";
 import type { MemberRow } from "@/lib/types";
@@ -166,7 +167,12 @@ export function PasswordResetDialog({
             ) : null}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={stage.kind === "working"}>취소</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" disabled={stage.kind === "working"} onClick={onConfirm}>
+              <AlertDialogAction
+                variant="destructive"
+                className={dangerSolidClass}
+                disabled={stage.kind === "working"}
+                onClick={onConfirm}
+              >
                 {stage.kind === "working" ? <Loader2Icon className="animate-spin" /> : null}
                 {stage.kind === "confirm" && stage.error ? "다시 시도" : "초기화"}
               </AlertDialogAction>

@@ -3,6 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { AlarmClockIcon } from "lucide-react";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -64,17 +65,29 @@ const STATUS_VARIANTS: Record<SubmissionStatus | "none", ComponentProps<typeof B
   needs_revision: "destructive",
 };
 
+/**
+ * "수정 요청"(옅은 빨강 배지) 글자색: 사이트 기본 빨강은 옅은 빨강 바탕 위 3.99:1로 AA(4.5) 미달이라
+ * 관리자 영역(admin-theme.css)과 같은 진한 빨강을 쓴다 — 밝음 oklch(0.5 0.2 25) 5.58:1, 어두움 oklch(0.74 0.17 22) 5.26:1
+ * (디자인 개편 4단계 개정 1). 관리자 화면은 원래 이 값이라 변화 없음. 문구·빨강 계열은 그대로.
+ */
+const NEEDS_REVISION_TEXT = "text-[color:oklch(0.5_0.2_25)] dark:text-[color:oklch(0.74_0.17_22)]";
+
 /** 제출 상태 배지(미제출/제출/검토 완료/수정 요청) */
 export function SubmissionStatusBadge({ status }: { status: SubmissionStatus | null }) {
   return (
-    <Badge variant={STATUS_VARIANTS[status ?? "none"]}>{status ? SUBMISSION_STATUS_LABELS[status] : "미제출"}</Badge>
+    <Badge variant={STATUS_VARIANTS[status ?? "none"]} className={status === "needs_revision" ? NEEDS_REVISION_TEXT : undefined}>
+      {status ? SUBMISSION_STATUS_LABELS[status] : "미제출"}
+    </Badge>
   );
 }
 
-/** §14 Q1 지각 배지 */
+/**
+ * §14 Q1 지각 배지(학생·관리자 공용). 글자는 board-ink(board-strong 70% + 글자색 30%):
+ * 예전 board-strong 12px 글자는 흰 바탕 위 4.06:1로 AA(4.5) 미달이었다(디자인 개편 4단계 개정 1). 색 계열·아이콘·문구는 그대로.
+ */
 export function LateBadge() {
   return (
-    <Badge variant="outline" className="border-board-strong/40 text-board-strong" title="마감 시각 이후에 처음 제출했어요">
+    <Badge variant="outline" className="border-board-strong/40 text-board-ink" title="마감 시각 이후에 처음 제출했어요">
       <AlarmClockIcon aria-hidden />
       지각
     </Badge>
@@ -121,10 +134,15 @@ export function SectionTitle({ children, actions }: { children: ReactNode; actio
   );
 }
 
-/** 간단한 표 래퍼(가로 스크롤) */
+/** 간단한 표 래퍼(가로 스크롤). 관리자 화면 전용 — 디자인 개편 4단계에서 흰 판 + 작은 그림자(adminSurfaceClass)를 깔았다. */
 export function TableWrap({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="relative overflow-x-auto rounded-xl ring-1 ring-foreground/10" role="region" aria-label={label} tabIndex={0}>
+    <div
+      className={cn("relative overflow-x-auto rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50", adminSurfaceClass)}
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
       <table className="w-full min-w-[36rem] border-collapse text-sm">{children}</table>
     </div>
   );

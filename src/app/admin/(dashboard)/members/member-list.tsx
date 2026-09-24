@@ -15,6 +15,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
 import { MemberCreateDialog } from "@/components/admin/member-create-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
@@ -52,13 +53,32 @@ type Sort = { key: SortKey; dir: "asc" | "desc" };
 const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "name", label: "이름" },
   { key: "account", label: "아이디/이메일" },
-  { key: "provider", label: "가입 방식" },
+  // 목록 폭이 56rem(896px)보다 좁으면 가입 방식 칸을 숨긴다(회원 상세·카드 목록에는 그대로 보인다) — 표가 상자 안에 들어오게.
+  { key: "provider", label: "가입 방식", className: "hidden @4xl:table-cell" },
   { key: "signed_up_at", label: "가입일" },
   { key: "last_sign_in_at", label: "마지막 로그인" },
   { key: "role", label: "역할" },
 ];
 
 const collator = new Intl.Collator("ko");
+
+/** 표 오른쪽 끝 ⋮(작업) 칸: 가로로 스크롤해도 오른쪽에 붙어 있다. 왼쪽 1px 선(inset 그림자)으로 칸을 구분한다. */
+const STICKY_CELL = "sticky right-0 z-[1] shadow-[inset_1px_0_0_var(--border)]";
+
+/**
+ * "2026년 9월 23일 오전 10:00"을 칸이 좁을 때 날짜와 시각 사이에서만 줄바꿈되게 그린다(보이는 글자·읽히는 글자는 그대로).
+ * 형식이 예상과 다르면 한 덩어리로 그린다.
+ */
+function DateTimeText({ iso }: { iso: string }) {
+  const text = formatDateTime(iso);
+  const m = /^(.*일)\s+(.+)$/.exec(text);
+  if (!m) return <span className="whitespace-nowrap">{text}</span>;
+  return (
+    <>
+      <span className="whitespace-nowrap">{m[1]}</span> <span className="whitespace-nowrap">{m[2]}</span>
+    </>
+  );
+}
 
 function compare(a: MemberRow, b: MemberRow, key: SortKey): number {
   switch (key) {
@@ -209,7 +229,7 @@ export function MemberList() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="이름, 아이디, 이메일로 검색"
           aria-label="회원 검색"
-          className="h-9 pr-8 pl-8"
+          className="h-9 bg-card pr-8 pl-8"
         />
         {query ? (
           <button
@@ -258,140 +278,162 @@ export function MemberList() {
             {formatCount(rows.length)}명 표시 중
           </p>
 
-          {/* md 이상: 정렬 가능한 표 */}
-          <div className="hidden overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10 md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                <tr>
-                  {COLUMNS.map((col) => {
-                    const active = sort.key === col.key;
-                    return (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-                        className="px-3 py-2 font-medium whitespace-nowrap"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleSort(col.key)}
-                          className={cn(
-                            "-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
-                            active && "text-foreground",
-                          )}
+          {/* 표·카드 전환은 화면 폭이 아니라 이 목록 자리의 폭(@container)으로 정한다(spec §4 공통 — 전역 사이드바·관리자 메뉴가
+              옆에 있어 화면 폭과 목록 폭이 크게 다르다). 목록 폭 46rem(736px, 1280 화면) 이상: 정렬 가능한 표, 그보다 좁으면 카드 목록. */}
+          <div className="@container">
+            {/* 표. relative: 머리글의 sr-only "작업"(position:absolute)이 이 상자 밖 문서 폭을 늘려 화면 전체가 옆으로 밀리던 문제를 막는다.
+                ⋮(작업) 칸은 오른쪽에 붙박이(sticky)라, 긴 이메일 등으로 표가 상자보다 넓어져도 항상 보인다. */}
+            <div className={cn("relative hidden overflow-x-auto rounded-xl @min-[46rem]:block", adminSurfaceClass)}>
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                  <tr>
+                    {COLUMNS.map((col) => {
+                      const active = sort.key === col.key;
+                      return (
+                        <th
+                          key={col.key}
+                          scope="col"
+                          aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                          className={cn("px-3 py-2 font-medium whitespace-nowrap", col.className)}
                         >
-                          {col.label}
-                          {active ? (
-                            sort.dir === "asc" ? (
-                              <ArrowUpIcon className="size-3.5" aria-hidden />
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(col.key)}
+                            className={cn(
+                              "-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
+                              active && "text-foreground",
+                            )}
+                          >
+                            {col.label}
+                            {active ? (
+                              sort.dir === "asc" ? (
+                                <ArrowUpIcon className="size-3.5" aria-hidden />
+                              ) : (
+                                <ArrowDownIcon className="size-3.5" aria-hidden />
+                              )
                             ) : (
-                              <ArrowDownIcon className="size-3.5" aria-hidden />
-                            )
-                          ) : (
-                            <ArrowUpDownIcon className="size-3.5 opacity-40" aria-hidden />
-                          )}
-                        </button>
-                      </th>
-                    );
-                  })}
-                  <th scope="col" className="px-3 py-2 text-right font-medium">
-                    <span className="sr-only">작업</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={(e) => onRowClick(e, row)}
-                    className="cursor-pointer transition-colors hover:bg-muted/50"
-                  >
-                    <td className="px-3 py-2.5">
-                      <Link
-                        href={detailHref(row)}
-                        className="flex items-center gap-2.5 rounded-md font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                              <ArrowUpDownIcon className="size-3.5 opacity-40" aria-hidden />
+                            )}
+                          </button>
+                        </th>
+                      );
+                    })}
+                    <th
+                      scope="col"
+                      // 머리글 줄(bg-muted/40)과 같은 색을 불투명하게 합성해 칠한다
+                      className={cn("px-3 py-2 text-right font-medium", STICKY_CELL, "bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]")}
+                    >
+                      <span className="sr-only">작업</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={(e) => onRowClick(e, row)}
+                      className="group/row cursor-pointer transition-colors hover:bg-muted/50"
+                    >
+                      <td className="px-3 py-2.5">
+                        <Link
+                          href={detailHref(row)}
+                          className="flex items-center gap-2.5 rounded-md font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          <MemberAvatar member={row} size="sm" />
+                          <span className="max-w-40 truncate">{memberName(row)}</span>
+                        </Link>
+                      </td>
+                      {/* 긴 이메일은 잘라 보이고(마우스를 올리면 전체), 1280 화면에서도 표가 상자 안에 들어오게 폭을 12rem으로 */}
+                      <td className="max-w-48 truncate px-3 py-2.5 text-muted-foreground" title={row.email || undefined}>
+                        {accountLabel(row.email)}
+                      </td>
+                      <td className="hidden px-3 py-2.5 @4xl:table-cell">
+                        <ProviderBadges member={row} />
+                      </td>
+                      {/* 날짜 칸은 날짜와 시각 사이에서만 줄을 바꾼다(글자는 그대로) → 1280~1440 화면에서도 표가 상자 안에 다 들어온다 */}
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        <DateTimeText iso={row.signed_up_at} />
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {row.last_sign_in_at ? <DateTimeText iso={row.last_sign_in_at} /> : "로그인 기록 없음"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <RoleBadge member={row} />
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-2.5 text-right",
+                          STICKY_CELL,
+                          // 붙박이 칸은 불투명해야 밑으로 지나가는 글자를 가린다 — 줄 hover 색(bg-muted/50)을 같은 색으로 맞춘다
+                          "bg-card transition-colors group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]",
+                        )}
                       >
-                        <MemberAvatar member={row} size="sm" />
-                        <span className="max-w-40 truncate">{memberName(row)}</span>
-                      </Link>
-                    </td>
-                    <td className="max-w-52 truncate px-3 py-2.5 text-muted-foreground">{accountLabel(row.email)}</td>
-                    <td className="px-3 py-2.5">
-                      <ProviderBadges member={row} />
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{formatDateTime(row.signed_up_at)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
-                      {row.last_sign_in_at ? formatDateTime(row.last_sign_in_at) : "로그인 기록 없음"}
-                    </td>
-                    <td className="px-3 py-2.5">
+                        <MemberActions
+                          row={row}
+                          myId={myId}
+                          onReset={() => openReset(row)}
+                          onWithdraw={() => openWithdraw(row)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 목록 폭이 좁을 때(태블릿·휴대폰, 사이드바가 펼쳐진 1024 등): 카드 목록 + 정렬 선택 */}
+            <div className="flex flex-col gap-3 @min-[46rem]:hidden">
+              <label className="flex items-center gap-2 self-end text-sm text-muted-foreground">
+                정렬
+                <select
+                  value={`${sort.key}:${sort.dir}`}
+                  onChange={(e) => {
+                    const [key, dir] = e.target.value.split(":") as [SortKey, Sort["dir"]];
+                    setSort({ key, dir });
+                  }}
+                  className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                  <option value="signed_up_at:desc">최근 가입순</option>
+                  <option value="signed_up_at:asc">오래된 가입순</option>
+                  <option value="last_sign_in_at:desc">최근 로그인순</option>
+                  <option value="name:asc">이름순</option>
+                  <option value="account:asc">아이디순</option>
+                  <option value="role:asc">역할순</option>
+                </select>
+              </label>
+              <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
+                {rows.map((row) => (
+                  <li key={row.id} className="flex flex-col gap-2 p-3">
+                    <Link
+                      href={detailHref(row)}
+                      className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      <MemberAvatar member={row} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-medium">{memberName(row)}</span>
+                        <span className="truncate text-xs text-muted-foreground">{accountLabel(row.email)}</span>
+                      </span>
                       <RoleBadge member={row} />
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <ProviderBadges member={row} />
+                      <span>가입 {formatDateTime(row.signed_up_at)}</span>
+                      <span>
+                        최근 로그인 {row.last_sign_in_at ? formatDateTime(row.last_sign_in_at) : "없음"}
+                      </span>
+                    </div>
+                    <div className="flex justify-end">
                       <MemberActions
                         row={row}
                         myId={myId}
                         onReset={() => openReset(row)}
                         onWithdraw={() => openWithdraw(row)}
                       />
-                    </td>
-                  </tr>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* md 미만: 카드 목록 + 정렬 선택 */}
-          <div className="flex flex-col gap-3 md:hidden">
-            <label className="flex items-center gap-2 self-end text-sm text-muted-foreground">
-              정렬
-              <select
-                value={`${sort.key}:${sort.dir}`}
-                onChange={(e) => {
-                  const [key, dir] = e.target.value.split(":") as [SortKey, Sort["dir"]];
-                  setSort({ key, dir });
-                }}
-                className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-              >
-                <option value="signed_up_at:desc">최근 가입순</option>
-                <option value="signed_up_at:asc">오래된 가입순</option>
-                <option value="last_sign_in_at:desc">최근 로그인순</option>
-                <option value="name:asc">이름순</option>
-                <option value="account:asc">아이디순</option>
-                <option value="role:asc">역할순</option>
-              </select>
-            </label>
-            <ul className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
-              {rows.map((row) => (
-                <li key={row.id} className="flex flex-col gap-2 p-3">
-                  <Link
-                    href={detailHref(row)}
-                    className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    <MemberAvatar member={row} />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-medium">{memberName(row)}</span>
-                      <span className="truncate text-xs text-muted-foreground">{accountLabel(row.email)}</span>
-                    </span>
-                    <RoleBadge member={row} />
-                  </Link>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <ProviderBadges member={row} />
-                    <span>가입 {formatDateTime(row.signed_up_at)}</span>
-                    <span>
-                      최근 로그인 {row.last_sign_in_at ? formatDateTime(row.last_sign_in_at) : "없음"}
-                    </span>
-                  </div>
-                  <div className="flex justify-end">
-                    <MemberActions
-                      row={row}
-                      myId={myId}
-                      onReset={() => openReset(row)}
-                      onWithdraw={() => openWithdraw(row)}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
+              </ul>
+            </div>
           </div>
         </>
       )}

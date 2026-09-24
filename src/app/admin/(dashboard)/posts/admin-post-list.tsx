@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
 import { editPostHref, postHref } from "@/components/post-card";
 import { EmptyState, ErrorState } from "@/components/states";
 import {
@@ -23,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import type { Post } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type AdminRow = Pick<Post, "id" | "slug" | "title" | "published" | "published_at" | "updated_at">;
 const ADMIN_COLUMNS = "id,slug,title,published,published_at,updated_at";
@@ -110,15 +113,15 @@ export function AdminPostList() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">글 관리</h1>
-          <p className="text-sm text-muted-foreground">발행된 글과 초안을 모두 볼 수 있습니다.</p>
-        </div>
-        <Button className="h-9 px-4" render={<Link href="/admin/write/" />} nativeButton={false}>
-          <PlusIcon />새 글 작성
-        </Button>
-      </div>
+      <AdminPageHeader
+        title="글 관리"
+        description="발행된 글과 초안을 모두 볼 수 있습니다."
+        actions={
+          <Button className="h-9 px-4" render={<Link href="/admin/write/" />} nativeButton={false}>
+            <PlusIcon />새 글 작성
+          </Button>
+        }
+      />
 
       {state.status === "loading" ? (
         <div className="flex flex-col gap-2" aria-busy="true" aria-label="글 목록을 불러오는 중">
@@ -138,7 +141,7 @@ export function AdminPostList() {
           }
         />
       ) : (
-        <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10" aria-label="전체 글">
+        <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="전체 글">
           {state.rows.map((row) => (
             <li key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -209,7 +212,7 @@ export function AdminPostList() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteBusy}>취소</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={deleteBusy} onClick={onDelete}>
+            <AlertDialogAction variant="destructive" className={dangerSolidClass} disabled={deleteBusy} onClick={onDelete}>
               {deleteBusy ? <Loader2Icon className="animate-spin" /> : null}
               삭제
             </AlertDialogAction>

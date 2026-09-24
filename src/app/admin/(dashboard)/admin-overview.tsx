@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { LoginRequiredCard } from "@/components/admin/login-required-card";
 import { MemberAvatar, ProviderBadges } from "@/components/admin/member-badges";
 import { StatTile } from "@/components/dashboard/stat-tile";
@@ -117,7 +118,7 @@ function RecentMembers() {
   }
   if (!state.rows.length) return <EmptyState title="아직 가입한 회원이 없습니다" />;
   return (
-    <ul className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
+    <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
       {state.rows.map((m) => (
         <li key={m.id}>
           <Link
@@ -158,14 +159,16 @@ function ShortcutLink({
     <Link
       href={href}
       className={cn(
-        "group/shortcut flex h-full items-center gap-3 rounded-2xl border p-4 outline-none transition-[transform,border-color] hover:-translate-y-0.5 focus-visible:ring-3 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+        // Tailwind v4는 hover:-translate-y를 transform이 아니라 translate 속성으로 움직인다 →
+        // transition에 translate를 적어야 떠오름이 부드럽다(예전 transition-[transform,…]은 뚝 끊겼다, 디자인 개편 1단계 보고).
+        "group/shortcut flex h-full items-center gap-3 rounded-2xl border p-4 outline-none transition-[translate,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-md) focus-visible:ring-3 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:shadow-none",
         colors.softBg,
         colors.border,
         colors.hoverBorder,
         colors.focusRing,
       )}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card" aria-hidden>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card shadow-(--shadow-sm) dark:shadow-none" aria-hidden>
         <Icon className={cn("size-5", colors.strongText)} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">

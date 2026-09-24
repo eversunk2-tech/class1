@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, CalendarClockIcon, ChevronDownIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
 import { SubmissionContent } from "@/components/learning/activity-panels";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
@@ -27,6 +28,7 @@ import {
   type StudentMini,
 } from "@/lib/learning";
 import type { Assignment, AssignmentSubmission, SubmissionStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { AssignmentForm } from "./assignment-manager";
 
 type Data = { assignment: Assignment | null; students: StudentMini[]; submissions: AssignmentSubmission[] };
@@ -149,7 +151,7 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
               {!visible.length ? (
                 <EmptyState title={rows.length ? "해당하는 학생이 없습니다" : "등록된 학생이 없습니다"} />
               ) : (
-                <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10" aria-label="학생별 제출 현황">
+                <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="학생별 제출 현황">
                   {visible.map((r) => (
                     <SubmissionRow
                       key={r.studentId}
@@ -185,9 +187,9 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
 function AssignmentHeader({ assignment, onEdit }: { assignment: Assignment; onEdit: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/10 sm:p-5 dark:shadow-none">
+    <section className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-(--shadow-md) ring-1 ring-foreground/10 sm:p-5 dark:shadow-none">
       <div className="flex flex-wrap items-start gap-2">
-        <h2 className="min-w-0 flex-1 text-xl leading-snug font-semibold break-keep">{assignment.title}</h2>
+        <h2 className="min-w-0 flex-1 font-heading text-2xl leading-snug font-normal break-keep">{assignment.title}</h2>
         <Badge variant={assignment.published ? "default" : "outline"}>{assignment.published ? "공개" : "비공개"}</Badge>
       </div>
       <p className="inline-flex items-center gap-1 text-sm text-muted-foreground">
@@ -229,7 +231,9 @@ function SubmissionRow({
   const [statusBusy, setStatusBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const name = adminDisplayName(row.student, row.student?.email?.split("@")[0] || "이름 없음");
+  // 표시 이름이 없으면 아이디(이메일 앞부분)로. 탈퇴 학생은 "탈퇴한 학생(원래 이름)"(관리자 화면 공통 형식).
+  const fallbackName = row.student?.email?.split("@")[0] || "이름 없음";
+  const name = adminDisplayName(row.student, fallbackName);
 
   async function onStatus(next: SubmissionStatus) {
     if (!s || next === s.status) return;
@@ -263,13 +267,16 @@ function SubmissionRow({
     <li className="flex flex-col gap-3 p-3 sm:p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="min-w-0 flex-1 basis-40">
+          {/* StudentLink가 adminDisplayName으로 한 번만 감싼다 — 이미 감싼 이름(name)을 다시 넘기면
+              "탈퇴한 학생(탈퇴한 학생(원래 이름))"처럼 두 번 감싸졌다. 원래 표시 이름과 아이디 대체값을 넘긴다. */}
           <StudentLink
             id={row.studentId}
             profile={
               row.student
-                ? { display_name: name, avatar_url: row.student.avatar_url, withdrawn_at: row.student.withdrawn_at }
+                ? { display_name: row.student.display_name, avatar_url: row.student.avatar_url, withdrawn_at: row.student.withdrawn_at }
                 : null
             }
+            fallback={fallbackName}
             tab="assignments"
           />
         </span>

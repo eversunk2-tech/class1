@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ClipboardListIcon, Gamepad2Icon, HeartIcon, MessageCircleIcon, NewspaperIcon } from "lucide-react";
+import { adminTabPanelClass } from "@/components/admin/admin-styles";
 import { FeedbackCenter } from "@/components/feedback/feedback-center";
 import { UserAppResults, UserPostReads, UserSocial, UserSubmissions } from "@/components/learning/activity-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,19 +61,19 @@ export function MemberLearning({
             })}
           </TabsList>
         </div>
-        <TabsContent value="apps">
+        <TabsContent value="apps" className={adminTabPanelClass}>
           <UserAppResults userId={memberId} audience="admin" studentName={memberName} />
         </TabsContent>
-        <TabsContent value="posts">
+        <TabsContent value="posts" className={adminTabPanelClass}>
           <UserPostReads userId={memberId} audience="admin" />
         </TabsContent>
-        <TabsContent value="social">
+        <TabsContent value="social" className={adminTabPanelClass}>
           <UserSocial userId={memberId} audience="admin" />
         </TabsContent>
-        <TabsContent value="assignments">
+        <TabsContent value="assignments" className={adminTabPanelClass}>
           <UserSubmissions userId={memberId} studentName={memberName} />
         </TabsContent>
-        <TabsContent value="feedback">
+        <TabsContent value="feedback" className={adminTabPanelClass}>
           <FeedbackCenter
             studentId={memberId}
             audience="admin"

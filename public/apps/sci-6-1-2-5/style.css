@@ -17,7 +17,7 @@
 .calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
 .calc-key { min-height: 48px; border: 0; border-radius: 10px; background: #454f61; color: #fff; font-size: 1.2rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 .calc-key:active { transform: translateY(1px); }
-.calc-key.is-op { background: #d9822b; }
+.calc-key.is-op { background: #ad5f17; }
 .calc-key.is-fn { background: #6b7587; }
 .calc-key.is-eq { grid-column: span 2; background: #2f6fd6; }
 .calc-key:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }

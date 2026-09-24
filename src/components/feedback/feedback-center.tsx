@@ -133,10 +133,12 @@ export function FeedbackCenter({
                           "flex w-60 items-start gap-2 rounded-xl px-3 py-2 text-left text-sm outline-none ring-1 ring-foreground/10 transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 xl:w-full",
                           // 학생 화면(디자인 개편 2단계): 흰 둥근 카드, 고른 대화는 옅은 보라 + 굵은 글자
                           audience === "student" && "rounded-2xl bg-card px-4 py-3 shadow-(--shadow-sm) dark:shadow-none",
+                          // 관리자 화면(4단계): 흰 판, 고른 대화는 관리자 톤 보라를 옅게 + 굵은 글자(색만으로 구분하지 않음)
+                          audience === "admin" && "bg-card",
                           active
                             ? audience === "student"
                               ? "bg-primary/8 font-semibold ring-primary/30 dark:bg-primary/15"
-                              : "bg-muted font-medium"
+                              : "bg-primary/8 font-semibold ring-primary/30 dark:bg-primary/15"
                             : "hover:bg-muted/60",
                         )}
                       >
