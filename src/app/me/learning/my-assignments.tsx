@@ -8,7 +8,7 @@ import { SubmissionContent } from "@/components/learning/activity-panels";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
 import { AsyncView, LateBadge, SubmissionStatusBadge } from "@/components/learning/learning-ui";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { EmptyState } from "@/components/states";
+import { EmptyOwl, EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,6 +33,8 @@ import {
 } from "@/lib/learning";
 import { isHttpUrl } from "@/lib/slug";
 import type { Assignment, AssignmentSubmission } from "@/lib/types";
+import { primaryPillClass } from "@/lib/pill";
+import { cn } from "@/lib/utils";
 
 type Item = { assignment: Assignment; submission: AssignmentSubmission | null };
 
@@ -62,7 +64,13 @@ export function MyAssignments({ userId }: { userId: string }) {
       audience="student"
       errorText="과제를 불러오지 못했어요."
       isEmpty={(items) => !items.length}
-      empty={<EmptyState title="아직 올라온 과제가 없어요" description="선생님이 과제를 올리면 여기에서 제출할 수 있어요." />}
+      empty={
+        <EmptyState
+          title="아직 올라온 과제가 없어요"
+          description="선생님이 과제를 올리면 여기에서 제출할 수 있어요."
+          illustration={<EmptyOwl />}
+        />
+      }
     >
       {(items) => (
         <ul className="flex flex-col gap-4">
@@ -114,9 +122,9 @@ function AssignmentCard({
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/10 sm:p-5 dark:shadow-none">
+    <li className="flex flex-col gap-3 rounded-[1.75rem] bg-card p-5 shadow-(--shadow-md) ring-1 ring-foreground/5 sm:p-6 dark:shadow-none dark:ring-foreground/10">
       <div className="flex flex-wrap items-start gap-2">
-        <h3 className="min-w-0 flex-1 text-lg leading-snug font-semibold break-keep">{a.title}</h3>
+        <h3 className="min-w-0 flex-1 font-heading text-xl leading-snug font-normal break-keep">{a.title}</h3>
         <SubmissionStatusBadge status={s?.status ?? null} />
         {s && isLate(s.submitted_at, a.due_at) ? <LateBadge /> : null}
       </div>
@@ -152,7 +160,7 @@ function AssignmentCard({
 
       {showDesc ? (
         a.description_md.trim() ? (
-          <MarkdownViewer content={a.description_md} className="rounded-xl bg-muted/30 p-3 text-sm" />
+          <MarkdownViewer content={a.description_md} className="rounded-2xl bg-muted/40 p-4 text-sm" />
         ) : (
           <p className="text-sm text-muted-foreground">설명이 없는 과제예요.</p>
         )
@@ -196,7 +204,7 @@ function AssignmentCard({
             ) : null}
           </>
         ) : (
-          <Button size="sm" className="px-3" onClick={() => setFormOpen(true)}>
+          <Button className={cn(primaryPillClass, "h-10")} onClick={() => setFormOpen(true)}>
             <SendIcon />
             제출하기
           </Button>

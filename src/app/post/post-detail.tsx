@@ -11,7 +11,8 @@ import { MarkdownViewer } from "@/components/markdown-viewer";
 import { editPostHref } from "@/components/post-card";
 import { SITE_NAME } from "@/components/layout/topbar";
 import { PostReadRecorder } from "@/components/post-read-recorder";
-import { EmptyState, ErrorState } from "@/components/states";
+import { Icon3D } from "@/components/illustrations/icon-3d";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { TagList } from "@/components/tag-chip";
 import { ViewCounter } from "@/components/view-counter";
 import {
@@ -27,10 +28,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { formatDate } from "@/lib/format";
+import { outlinePillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
 import type { Post } from "@/lib/types";
 
@@ -108,36 +109,41 @@ function PostView({ post }: { post: Post }) {
   const date = post.published_at ?? post.created_at;
 
   return (
-    <article className="flex flex-col gap-8">
-      <header className="flex flex-col gap-4">
-        {!post.published ? (
-          <Badge variant="outline" className="w-fit">
-            비공개 글 (관리자에게만 보임)
-          </Badge>
-        ) : null}
-        <h1 className="text-2xl leading-tight font-bold tracking-tight break-keep sm:text-3xl">{post.title}</h1>
-        {post.summary ? <p className="text-muted-foreground">{post.summary}</p> : null}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-          <time dateTime={date}>{formatDate(date)}</time>
-          <ViewCounter postId={post.id} slug={post.slug} published={post.published} />
-          {/* 로그인 사용자의 읽기 기록(학습활동). 화면에는 아무것도 그리지 않는다. */}
-          <PostReadRecorder postId={post.id} published={post.published} />
-          {isAdmin ? <AdminActions post={post} /> : null}
-        </div>
-        <TagList tags={post.tags} />
-        {post.cover_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.cover_url} alt="" className="mt-2 w-full rounded-xl bg-muted object-cover" />
-        ) : null}
-      </header>
+    <article className="flex flex-col gap-6">
+      {/* 제목·정보·본문을 흰 둥근 판에(디자인 개편 2단계): 연보라 배경 위에서도 본문 대비·가독성을 지킨다. */}
+      <div className="flex flex-col gap-8 rounded-[2rem] bg-card p-5 shadow-(--shadow-md) ring-1 ring-foreground/5 sm:p-10 dark:shadow-none dark:ring-foreground/10">
+        <header className="flex flex-col gap-4">
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-home-soft py-1 pr-3 pl-1.5 text-xs font-semibold text-home-ink">
+            <Icon3D name="newspaper" size={20} className="size-5" />
+            선생님 글
+          </span>
+          {!post.published ? (
+            <Badge variant="outline" className="w-fit">
+              비공개 글 (관리자에게만 보임)
+            </Badge>
+          ) : null}
+          <h1 className="font-heading text-3xl leading-tight font-normal break-keep sm:text-[2.5rem]">{post.title}</h1>
+          {post.summary ? <p className="text-lg leading-relaxed text-muted-foreground">{post.summary}</p> : null}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+            <time dateTime={date}>{formatDate(date)}</time>
+            <ViewCounter postId={post.id} slug={post.slug} published={post.published} />
+            {/* 로그인 사용자의 읽기 기록(학습활동). 화면에는 아무것도 그리지 않는다. */}
+            <PostReadRecorder postId={post.id} published={post.published} />
+            {isAdmin ? <AdminActions post={post} /> : null}
+          </div>
+          <TagList tags={post.tags} />
+          {post.cover_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.cover_url} alt="" className="mt-2 w-full rounded-3xl bg-muted object-cover shadow-(--shadow-sm)" />
+          ) : null}
+        </header>
 
-      <MarkdownViewer content={post.content_md} />
+        <MarkdownViewer content={post.content_md} className="markdown-reading" />
+      </div>
 
       <div className="flex justify-center">
         <LikeButton postId={post.id} published={post.published} />
       </div>
-
-      <Separator />
 
       <CommentSection postId={post.id} published={post.published} />
     </article>
@@ -165,12 +171,12 @@ function AdminActions({ post }: { post: Post }) {
 
   return (
     <div className="ml-auto flex items-center gap-1">
-      <Button variant="ghost" size="sm" render={<Link href={editPostHref(post.slug)} />} nativeButton={false}>
+      <Button variant="ghost" size="sm" className="rounded-full px-3" render={<Link href={editPostHref(post.slug)} />} nativeButton={false}>
         <PencilIcon />
         수정
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="text-destructive" />}>
+        <AlertDialogTrigger render={<Button variant="ghost" size="sm" className="rounded-full px-3 text-destructive" />}>
           <Trash2Icon />
           삭제
         </AlertDialogTrigger>
@@ -200,10 +206,11 @@ function PostNotFound() {
       className="my-10"
       title="존재하지 않는 글입니다"
       description="주소가 잘못되었거나 삭제된 글일 수 있습니다."
+      illustration={<EmptyOwl />}
       action={
-        <Button variant="outline" render={<Link href="/" />} nativeButton={false}>
+        <Link href="/" className={outlinePillClass}>
           메인으로 이동
-        </Button>
+        </Link>
       }
     />
   );
@@ -211,7 +218,11 @@ function PostNotFound() {
 
 export function PostDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-6" aria-busy="true" aria-label="글을 불러오는 중">
+    <div
+      className="flex flex-col gap-6 rounded-[2rem] bg-card/70 p-5 ring-1 ring-foreground/5 sm:p-10 dark:ring-foreground/10"
+      aria-busy="true"
+      aria-label="글을 불러오는 중"
+    >
       <Skeleton className="h-9 w-3/4" />
       <Skeleton className="h-4 w-1/3" />
       <div className="flex flex-col gap-3 pt-4">

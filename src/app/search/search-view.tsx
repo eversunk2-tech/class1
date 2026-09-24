@@ -6,12 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2Icon, SearchIcon, XIcon } from "lucide-react";
 import { PostCard, PostCardSkeleton } from "@/components/post-card";
 import { fetchViewCounts } from "@/components/post-list";
-import { EmptyState, ErrorState } from "@/components/states";
+import { Icon3D } from "@/components/illustrations/icon-3d";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { outlinePillClass, primaryPillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import { POST_SUMMARY_COLUMNS, type PostSummary } from "@/lib/types";
 
 const PAGE_SIZE = 10;
@@ -86,10 +89,24 @@ export function SearchView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">검색</h1>
-      {/* key로 URL이 바뀔 때 입력창을 URL 값으로 다시 초기화한다. */}
-      <SearchForm key={`form:${key}`} q={q} tag={tag} />
-      <TagFilter tag={tag} q={q} />
+      {/* 머리 판: 연보라 그라데이션 + 돋보기 3D 아이콘 + 큰 둥근 검색창(디자인 개편 2단계) */}
+      <div className="relative isolate flex flex-col gap-5 overflow-hidden rounded-[2rem] bg-hero-home p-5 ring-1 ring-primary/10 shadow-(--shadow-md) sm:p-8 dark:shadow-none">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <h1 className="font-heading text-3xl leading-tight font-normal sm:text-4xl">검색</h1>
+            <p className="text-sm text-foreground/75">선생님 글의 제목·요약·태그로 찾아요.</p>
+          </div>
+          <Icon3D
+            name="magnifying-glass"
+            size={88}
+            loading="eager"
+            className="mascot-float size-16 drop-shadow-[0_12px_14px_oklch(0.3_0.1_288/0.22)] sm:size-20"
+          />
+        </div>
+        {/* key로 URL이 바뀔 때 입력창을 URL 값으로 다시 초기화한다. */}
+        <SearchForm key={`form:${key}`} q={q} tag={tag} />
+        <TagFilter tag={tag} q={q} />
+      </div>
       <SearchResults key={`results:${key}`} q={q} tag={tag} />
     </div>
   );
@@ -107,7 +124,7 @@ function SearchForm({ q, tag }: Filters) {
   return (
     <form role="search" onSubmit={onSubmit} className="flex gap-2">
       <div className="relative flex-1">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
           type="search"
           name="q"
@@ -116,10 +133,10 @@ function SearchForm({ q, tag }: Filters) {
           placeholder="제목이나 요약으로 검색"
           aria-label="검색어"
           maxLength={MAX_QUERY_LENGTH}
-          className="h-9 pl-8"
+          className="h-12 rounded-full bg-card pl-11 text-base shadow-(--shadow-sm) dark:bg-card dark:shadow-none"
         />
       </div>
-      <Button type="submit" className="h-9 px-4">
+      <Button type="submit" className={cn(primaryPillClass, "h-12 px-6")}>
         검색
       </Button>
     </form>
@@ -155,7 +172,7 @@ function TagFilter({ tag, q }: Filters) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium text-muted-foreground">태그</p>
+      <p className="text-xs font-semibold text-foreground/75">태그</p>
       <ul className="flex flex-wrap gap-1.5" aria-label="태그 필터">
         {list.map((t) => {
           const active = t === tag;
@@ -163,7 +180,10 @@ function TagFilter({ tag, q }: Filters) {
             <li key={t}>
               <Badge
                 variant={active ? "default" : "secondary"}
-                className="font-normal"
+                className={cn(
+                  "h-auto rounded-full px-2.5 py-1 text-xs",
+                  active ? "font-semibold" : "bg-card font-medium text-foreground ring-1 ring-foreground/10 hover:bg-muted",
+                )}
                 aria-current={active ? "true" : undefined}
                 render={<Link href={searchHref({ q, tag: active ? "" : t })} />}
               >
@@ -223,7 +243,13 @@ function SearchResults({ q, tag }: Filters) {
   }
 
   if (state.status === "idle") {
-    return <EmptyState title="검색어를 입력하거나 태그를 선택하세요" description="발행된 글의 제목과 요약에서 찾습니다." />;
+    return (
+      <EmptyState
+        title="검색어를 입력하거나 태그를 선택하세요"
+        description="발행된 글의 제목과 요약에서 찾습니다."
+        illustration={<EmptyOwl />}
+      />
+    );
   }
 
   if (state.status === "loading") {
@@ -251,7 +277,13 @@ function SearchResults({ q, tag }: Filters) {
   const summary = [q ? `“${q}”` : null, tag ? `#${tag}` : null].filter(Boolean).join(" · ");
 
   if (!state.posts.length) {
-    return <EmptyState title="검색 결과가 없습니다" description={`${summary}에 해당하는 글을 찾지 못했습니다.`} />;
+    return (
+      <EmptyState
+        title="검색 결과가 없습니다"
+        description={`${summary}에 해당하는 글을 찾지 못했습니다.`}
+        illustration={<EmptyOwl />}
+      />
+    );
   }
 
   return (
@@ -268,7 +300,7 @@ function SearchResults({ q, tag }: Filters) {
         </p>
       ) : null}
       {state.hasMore ? (
-        <Button variant="outline" className="mx-auto mt-2 h-9 px-4" onClick={loadMore} disabled={loadingMore}>
+        <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-2 h-10")} onClick={loadMore} disabled={loadingMore}>
           {loadingMore ? <Loader2Icon className="animate-spin" /> : null}더 보기
         </Button>
       ) : null}

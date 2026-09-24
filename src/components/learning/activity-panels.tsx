@@ -16,7 +16,9 @@ import {
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { ResponsePanel } from "@/components/learning/response-panel";
 import { postHref } from "@/components/post-card";
-import { EmptyState } from "@/components/states";
+import { Icon3D } from "@/components/illustrations/icon-3d";
+import { Mascot } from "@/components/illustrations/mascot";
+import { EmptyOwl, EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAsyncData } from "@/hooks/use-async-data";
@@ -38,6 +40,7 @@ import {
 } from "@/lib/learning";
 import { isHttpUrl } from "@/lib/slug";
 import type { AppResult } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type Audience = "admin" | "student";
 
@@ -91,76 +94,162 @@ export function UserAppResults({ userId, audience, studentName }: { userId: stri
         <EmptyState
           title="아직 기록이 없어요"
           description={audience === "student" ? "로그인한 상태로 학습 게임을 끝까지 하면 결과가 여기에 쌓여요." : "이 회원은 아직 웹앱 결과가 없습니다."}
+          illustration={audience === "student" ? <EmptyOwl /> : undefined}
         />
       }
     >
-      {(rows) => (
-        <TableWrap label="웹앱 결과">
-          <thead>
-            <tr>
-              <th className={thClass}>앱</th>
-              <th className={thClass}>점수</th>
-              <th className={thClass}>완료</th>
-              <th className={thClass}>소요 시간</th>
-              <th className={thClass}>일시</th>
-              <th className={thClass}>
-                <span className="sr-only">피드백</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <Fragment key={r.id}>
-                <tr>
-                  <td className={tdClass}>
-                    <span className={appTitle(r.app_id) ? "font-medium" : "text-muted-foreground"}>
-                      {audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)}
-                    </span>
-                    {!appTitle(r.app_id) ? (
-                      <span className="ml-1 text-xs text-muted-foreground">({audience === "admin" ? "목록에 없는 앱" : r.app_id})</span>
-                    ) : null}
-                  </td>
-                  <td className={tdClass}>
-                    {formatScore(r.score, r.max_score)}
-                    {audience === "admin" ? <SuspiciousMark result={r} /> : null}
-                  </td>
-                  <td className={tdClass}>
-                    <CompletedMark completed={r.completed} />
-                  </td>
-                  <td className={tdClass}>{formatDuration(r.duration_seconds)}</td>
-                  <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>{formatDateTime(r.created_at)}</td>
-                  <td className={`${tdClass} text-right whitespace-nowrap`}>
-                    {audience === "admin" ? (
-                      <Button type="button" variant="ghost" size="xs" onClick={() => toggle(r.id)} aria-expanded={openIds.has(r.id)}>
-                        <ChevronDownIcon className={openIds.has(r.id) ? "rotate-180 transition-transform" : "transition-transform"} />
-                        {openIds.has(r.id) ? "응답 접기" : "응답 보기"}
-                      </Button>
-                    ) : null}
-                    <FeedbackDialogButton
-                      studentId={userId}
-                      context={{ type: "app_result", id: r.id }}
-                      audience={audience}
-                      studentName={studentName}
-                      title={`${audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)} · ${formatDateTime(r.created_at)}`}
-                      size="xs"
-                      variant="ghost"
-                      label={audience === "admin" ? "피드백" : "대화"}
-                    />
-                  </td>
-                </tr>
-                {audience === "admin" && openIds.has(r.id) ? (
+      {(rows) =>
+        audience === "student" ? (
+          <StudentAppResults rows={rows} userId={userId} />
+        ) : (
+          <TableWrap label="웹앱 결과">
+            <thead>
+              <tr>
+                <th className={thClass}>앱</th>
+                <th className={thClass}>점수</th>
+                <th className={thClass}>완료</th>
+                <th className={thClass}>소요 시간</th>
+                <th className={thClass}>일시</th>
+                <th className={thClass}>
+                  <span className="sr-only">피드백</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <Fragment key={r.id}>
                   <tr>
-                    <td colSpan={6} className="border-b bg-muted/20 px-3 py-3">
-                      <ResponsePanel appId={r.app_id} details={r.details} />
+                    <td className={tdClass}>
+                      <span className={appTitle(r.app_id) ? "font-medium" : "text-muted-foreground"}>
+                        {audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)}
+                      </span>
+                      {!appTitle(r.app_id) ? (
+                        <span className="ml-1 text-xs text-muted-foreground">({audience === "admin" ? "목록에 없는 앱" : r.app_id})</span>
+                      ) : null}
+                    </td>
+                    <td className={tdClass}>
+                      {formatScore(r.score, r.max_score)}
+                      {audience === "admin" ? <SuspiciousMark result={r} /> : null}
+                    </td>
+                    <td className={tdClass}>
+                      <CompletedMark completed={r.completed} />
+                    </td>
+                    <td className={tdClass}>{formatDuration(r.duration_seconds)}</td>
+                    <td className={`${tdClass} whitespace-nowrap text-muted-foreground`}>{formatDateTime(r.created_at)}</td>
+                    <td className={`${tdClass} text-right whitespace-nowrap`}>
+                      {audience === "admin" ? (
+                        <Button type="button" variant="ghost" size="xs" onClick={() => toggle(r.id)} aria-expanded={openIds.has(r.id)}>
+                          <ChevronDownIcon className={openIds.has(r.id) ? "rotate-180 transition-transform" : "transition-transform"} />
+                          {openIds.has(r.id) ? "응답 접기" : "응답 보기"}
+                        </Button>
+                      ) : null}
+                      <FeedbackDialogButton
+                        studentId={userId}
+                        context={{ type: "app_result", id: r.id }}
+                        audience={audience}
+                        studentName={studentName}
+                        title={`${audience === "admin" ? appLabelAdmin(r.app_id) : appLabel(r.app_id)} · ${formatDateTime(r.created_at)}`}
+                        size="xs"
+                        variant="ghost"
+                        label={audience === "admin" ? "피드백" : "대화"}
+                      />
                     </td>
                   </tr>
-                ) : null}
-              </Fragment>
-            ))}
-          </tbody>
-        </TableWrap>
-      )}
+                  {audience === "admin" && openIds.has(r.id) ? (
+                    <tr>
+                      <td colSpan={6} className="border-b bg-muted/20 px-3 py-3">
+                        <ResponsePanel appId={r.app_id} details={r.details} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              ))}
+            </tbody>
+          </TableWrap>
+        )
+      }
     </AsyncView>
+  );
+}
+
+/**
+ * 학생 화면의 웹앱 결과(디자인 개편 2단계): 요약 카드(완료하면 응원하는 부엉이 owl-cheer) + 둥근 기록 카드 목록.
+ * 관리자 화면은 위의 표 그대로다. 보여 주는 값(앱 이름·점수·완료·시간·일시)과 "대화" 버튼은 표와 같다.
+ */
+function StudentAppResults({ rows, userId }: { rows: AppResult[]; userId: string }) {
+  const completed = rows.filter((r) => r.completed).length;
+  const totalSeconds = rows.reduce((sum, r) => sum + (r.duration_seconds ?? 0), 0);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="relative isolate flex items-center gap-4 overflow-hidden rounded-[2rem] bg-grad-science p-5 shadow-(--shadow-md) ring-1 ring-science-strong/15 sm:gap-5 sm:px-7 dark:shadow-none">
+        <span className="pointer-events-none absolute -top-10 -right-8 -z-10 size-40 rounded-full bg-card/45 dark:bg-card/20" aria-hidden />
+        {completed > 0 ? (
+          <Mascot pose="cheer" width={104} className="w-20 shrink-0 drop-shadow-[0_10px_14px_oklch(0.35_0.12_288/0.25)] sm:w-26" />
+        ) : (
+          <Icon3D name="test-tube" size={72} className="size-16 shrink-0 sm:size-18" />
+        )}
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="font-heading text-2xl leading-tight sm:text-3xl">
+            완료한 학습 <span className="text-science-ink">{completed}</span>개
+          </p>
+          <p className="text-sm text-foreground/75">
+            기록 {rows.length}개 · 모두 {formatDuration(totalSeconds)} 동안 탐구했어요
+          </p>
+        </div>
+      </div>
+      <ul className="flex flex-col gap-3" aria-label="웹앱 결과">
+        {rows.map((r) => (
+          <li
+            key={r.id}
+            className="flex flex-col gap-3 rounded-[1.5rem] bg-card p-4 shadow-(--shadow-sm) ring-1 ring-foreground/5 sm:flex-row sm:items-center sm:gap-4 sm:p-5 dark:shadow-none dark:ring-foreground/10"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3.5">
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-grad-science" aria-hidden>
+                <Icon3D name="test-tube" size={32} className="size-8" />
+              </span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="leading-snug font-semibold">
+                  <span className={appTitle(r.app_id) ? undefined : "text-muted-foreground"}>{appLabel(r.app_id)}</span>
+                  {!appTitle(r.app_id) ? <span className="ml-1 text-xs font-normal text-muted-foreground">({r.app_id})</span> : null}
+                </p>
+                <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span>점수 {formatScore(r.score, r.max_score)}</span>
+                  <span>소요 {formatDuration(r.duration_seconds)}</span>
+                  <time dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 sm:justify-end">
+              <CompletedPill completed={r.completed} />
+              <FeedbackDialogButton
+                studentId={userId}
+                context={{ type: "app_result", id: r.id }}
+                audience="student"
+                title={`${appLabel(r.app_id)} · ${formatDateTime(r.created_at)}`}
+                size="sm"
+                variant="outline"
+                label="대화"
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** 학생 기록 카드의 완료 표시: 아이콘 + 글자(색만으로 구분하지 않음) */
+function CompletedPill({ completed }: { completed: boolean }) {
+  return completed ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-science-soft px-2.5 py-1 text-xs font-semibold text-science-ink">
+      <CheckCircle2Icon className="size-3.5" aria-hidden />
+      완료
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+      <CircleDashedIcon className="size-3.5" aria-hidden />
+      미완료
+    </span>
   );
 }
 
@@ -172,6 +261,13 @@ function PostTitleLink({ post }: { post: { title: string; slug: string; publishe
       {post.published === false ? <span className="ml-1 text-xs font-normal text-muted-foreground">(비공개)</span> : null}
     </Link>
   );
+}
+
+/** 목록 틀: 학생 화면은 흰 둥근 카드(디자인 개편 2단계), 관리자 화면은 예전 모양 그대로 */
+function listShell(audience: Audience) {
+  return audience === "student"
+    ? "overflow-hidden rounded-[1.5rem] bg-card shadow-(--shadow-sm) ring-1 ring-foreground/5 dark:shadow-none dark:ring-foreground/10"
+    : "rounded-xl ring-1 ring-foreground/10";
 }
 
 /** 읽은 글 탭 */
@@ -189,11 +285,12 @@ export function UserPostReads({ userId, audience }: { userId: string; audience: 
         <EmptyState
           title="아직 읽은 글이 없어요"
           description={audience === "student" ? "로그인한 상태로 글을 열면 여기에 기록돼요." : undefined}
+          illustration={audience === "student" ? <EmptyOwl /> : undefined}
         />
       }
     >
       {(rows) => (
-        <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10" aria-label="읽은 글">
+        <ul className={cn("flex flex-col divide-y", listShell(audience))} aria-label="읽은 글">
           {rows.map((r) => (
             <li key={r.post_id} className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:gap-4">
               <span className="min-w-0 flex-1 truncate">
@@ -236,10 +333,10 @@ export function UserSocial({ userId, audience }: { userId: string; audience: Aud
           audience={audience}
           errorText="댓글을 불러오지 못했어요."
           isEmpty={(rows) => !rows.length}
-          empty={<EmptyState title="아직 쓴 댓글이 없어요" />}
+          empty={<EmptyState title="아직 쓴 댓글이 없어요" illustration={audience === "student" ? <EmptyOwl /> : undefined} />}
         >
           {(rows) => (
-            <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+            <ul className={cn("flex flex-col divide-y", listShell(audience))}>
               {rows.map((c) => (
                 <li key={c.id} className="flex flex-col gap-1 p-3">
                   <span className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -268,10 +365,10 @@ export function UserSocial({ userId, audience }: { userId: string; audience: Aud
           audience={audience}
           errorText="좋아요한 글을 불러오지 못했어요."
           isEmpty={(rows) => !rows.length}
-          empty={<EmptyState title="아직 좋아요한 글이 없어요" />}
+          empty={<EmptyState title="아직 좋아요한 글이 없어요" illustration={audience === "student" ? <EmptyOwl /> : undefined} />}
         >
           {(rows) => (
-            <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+            <ul className={cn("flex flex-col divide-y", listShell(audience))}>
               {rows.map((l) => (
                 <li key={l.post_id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                   <span className="min-w-0 truncate">

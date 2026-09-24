@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangleIcon, Maximize2Icon, Minimize2Icon, PlayIcon, RotateCcwIcon, ShieldCheckIcon, SquareIcon } from "lucide-react";
+import { Icon3D } from "@/components/illustrations/icon-3d";
 import { Button } from "@/components/ui/button";
 import { buildSandboxDocument, GAME_PERMISSIONS, GAME_SANDBOX } from "@/lib/community";
 import { cn } from "@/lib/utils";
@@ -158,7 +159,9 @@ export function GamePlayer({ html, title }: { html: string; title: string }) {
       <div
         ref={wrapperRef}
         className={cn(
-          "relative flex flex-col overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10",
+          // 겉모양만(디자인 개편 2단계): 둥근 학습게임 그라데이션 판. 전체 화면일 때는 예전처럼 검은 바탕.
+          "relative flex flex-col overflow-hidden rounded-[2rem] ring-1 ring-games-strong/15",
+          !expanded && "bg-grad-games shadow-(--shadow-md) dark:shadow-none",
           fullscreen && "rounded-none bg-black",
           maximized && "fixed inset-0 z-[60] rounded-none bg-black",
         )}
@@ -192,13 +195,22 @@ export function GamePlayer({ html, title }: { html: string; title: string }) {
           />
         ) : (
           <div className="flex h-[40vh] min-h-[240px] flex-col items-center justify-center gap-3 p-6 text-center">
-            <Button size="lg" className="h-11 gap-2 rounded-full px-6 text-base" onClick={start}>
+            <Icon3D
+              name="video-game"
+              size={96}
+              className="mascot-float size-20 drop-shadow-[0_14px_16px_oklch(0.3_0.1_330/0.25)] sm:size-24"
+            />
+            <Button
+              size="lg"
+              className="h-12 gap-2 rounded-full bg-grad-primary px-7 text-base font-semibold shadow-(--shadow-brand)"
+              onClick={start}
+            >
               <PlayIcon className="size-5" />
               게임 시작
             </Button>
-            <p className="text-xs text-muted-foreground">버튼을 누르면 게임이 시작돼요.</p>
+            <p className="text-xs text-foreground/75">버튼을 누르면 게임이 시작돼요.</p>
             {crashedBefore ? (
-              <p role="alert" className="flex max-w-sm items-start gap-1.5 text-left text-xs leading-5 break-keep text-amber-700 dark:text-amber-400">
+              <p role="alert" className="flex max-w-sm items-start gap-1.5 rounded-2xl bg-card/90 px-3 py-2 text-left text-xs leading-5 break-keep text-amber-800 dark:bg-card/70 dark:text-amber-400">
                 <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 지난번에 게임을 하다가 화면이 멈췄을 수 있어요. 또 멈추면 탭을 닫았다가 다시 열고, 선생님께 알려 주세요.
               </p>
@@ -217,15 +229,15 @@ export function GamePlayer({ html, title }: { html: string; title: string }) {
       <div className="flex flex-wrap items-center gap-2">
         {running ? (
           <>
-            <Button variant="outline" className="h-9 px-3.5" onClick={stop}>
+            <Button variant="outline" className="h-10 rounded-full bg-card px-4" onClick={stop}>
               <SquareIcon />
               정지
             </Button>
-            <Button variant="outline" className="h-9 px-3.5" onClick={start}>
+            <Button variant="outline" className="h-10 rounded-full bg-card px-4" onClick={start}>
               <RotateCcwIcon />
               다시 시작
             </Button>
-            <Button variant="outline" className="h-9 px-3.5" onClick={toggleFullscreen}>
+            <Button variant="outline" className="h-10 rounded-full bg-card px-4" onClick={toggleFullscreen}>
               <Maximize2Icon />
               전체 화면
             </Button>

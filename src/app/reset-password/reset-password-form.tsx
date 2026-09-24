@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { InfoIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState } from "@/components/states";
+import { AuthCardShell, authCardClass, authInputClass } from "@/components/auth-card-shell";
+import { EmptyOwl, EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/hooks/use-session";
 import { userHasPasswordLogin } from "@/lib/admin";
 import { passwordUpdateErrorMessage } from "@/lib/auth";
+import { outlinePillClass, primaryPillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 /** 화면에서 요구하는 최소 길이(spec §14 Q4: 8자 이상 권장. 서버 정책은 Supabase 기본값). */
 const MIN_LENGTH = 8;
@@ -106,10 +109,11 @@ export function ResetPasswordForm() {
         className="my-10"
         title="비밀번호가 없는 계정이에요"
         description="GitHub·Google 계정으로 로그인하고 있어서 이 사이트에서 바꿀 비밀번호가 없습니다."
+        illustration={<EmptyOwl />}
         action={
-          <Button variant="outline" render={<Link href="/" />} nativeButton={false}>
+          <Link href="/" className={outlinePillClass}>
             메인으로
-          </Button>
+          </Link>
         }
       />
     );
@@ -118,18 +122,18 @@ export function ResetPasswordForm() {
   const busy = phase === "saving" || phase === "confirming";
 
   return (
-    <div className="mx-auto w-full max-w-sm py-4 sm:py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">새 비밀번호 설정</CardTitle>
-          <CardDescription>
+    <AuthCardShell decoration="props">
+      <Card className={authCardClass}>
+        <CardHeader className="justify-items-center gap-2 text-center">
+          <CardTitle className="text-3xl font-normal">새 비밀번호 설정</CardTitle>
+          <CardDescription className="break-keep">
             {forced ? "계속하려면 나만 아는 새 비밀번호를 정해 주세요." : "새로 사용할 비밀번호를 입력해 주세요."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {forced ? (
-            <div className="flex gap-2 rounded-xl bg-muted p-3 text-sm" role="note">
-              <InfoIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <div className="flex gap-2.5 rounded-2xl bg-primary/5 p-3.5 text-sm ring-1 ring-primary/15 dark:bg-primary/10" role="note">
+              <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
               <div className="flex flex-col gap-1">
                 <p className="font-medium">왜 이 화면이 나오나요?</p>
                 <p className="text-muted-foreground">
@@ -146,7 +150,7 @@ export function ResetPasswordForm() {
                 새 비밀번호는 저장됐어요. 변경 완료가 반영됐는지 아직 확인하지 못했어요. 네트워크를 확인한 뒤 다시
                 확인해 주세요. (새 비밀번호를 다시 입력할 필요는 없어요.)
               </p>
-              <Button onClick={finish} disabled={phase === "confirming"}>
+              <Button className={cn(primaryPillClass, "h-11")} onClick={finish} disabled={phase === "confirming"}>
                 {phase === "confirming" ? <Loader2Icon className="animate-spin" /> : null}
                 다시 확인
               </Button>
@@ -166,7 +170,7 @@ export function ResetPasswordForm() {
                   disabled={busy}
                   aria-invalid={errors.password ? true : undefined}
                   aria-describedby="new-password-hint"
-                  className="h-10"
+                  className={authInputClass}
                 />
                 <p id="new-password-hint" className={errors.password ? "text-sm text-destructive" : "text-xs text-muted-foreground"}>
                   {errors.password ?? `${MIN_LENGTH}자 이상, 영문과 숫자를 섞으면 더 안전해요.`}
@@ -183,7 +187,7 @@ export function ResetPasswordForm() {
                   disabled={busy}
                   aria-invalid={errors.confirm ? true : undefined}
                   aria-describedby={errors.confirm ? "confirm-password-error" : undefined}
-                  className="h-10"
+                  className={authInputClass}
                 />
                 {errors.confirm ? (
                   <p id="confirm-password-error" className="text-sm text-destructive">
@@ -196,7 +200,7 @@ export function ResetPasswordForm() {
                   {errors.form}
                 </p>
               ) : null}
-              <Button type="submit" size="lg" className="h-10" disabled={busy}>
+              <Button type="submit" size="lg" className={cn(primaryPillClass, "mt-1 h-12 text-base")} disabled={busy}>
                 {busy ? <Loader2Icon className="animate-spin" /> : null}
                 새 비밀번호 저장
               </Button>
@@ -204,6 +208,6 @@ export function ResetPasswordForm() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AuthCardShell>
   );
 }

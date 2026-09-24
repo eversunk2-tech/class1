@@ -108,7 +108,7 @@ export function ReportButton({
       <Button
         variant="ghost"
         size={compact ? "icon-xs" : "sm"}
-        className="text-muted-foreground"
+        className={compact ? "rounded-full text-muted-foreground" : "rounded-full px-3 text-muted-foreground"}
         onClick={onOpen}
         aria-label={`${targetLabel} 신고하기`}
         title="신고하기"

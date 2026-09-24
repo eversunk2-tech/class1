@@ -131,7 +131,13 @@ export function FeedbackCenter({
                         aria-current={active ? "true" : undefined}
                         className={cn(
                           "flex w-60 items-start gap-2 rounded-xl px-3 py-2 text-left text-sm outline-none ring-1 ring-foreground/10 transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 xl:w-full",
-                          active ? "bg-muted font-medium" : "hover:bg-muted/60",
+                          // 학생 화면(디자인 개편 2단계): 흰 둥근 카드, 고른 대화는 옅은 보라 + 굵은 글자
+                          audience === "student" && "rounded-2xl bg-card px-4 py-3 shadow-(--shadow-sm) dark:shadow-none",
+                          active
+                            ? audience === "student"
+                              ? "bg-primary/8 font-semibold ring-primary/30 dark:bg-primary/15"
+                              : "bg-muted font-medium"
+                            : "hover:bg-muted/60",
                         )}
                       >
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -151,7 +157,7 @@ export function FeedbackCenter({
             </nav>
             <section aria-label={current.label} className="flex min-w-0 flex-col gap-2">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-medium">{current.label}</h3>
+                <h3 className={audience === "student" ? "font-heading text-xl font-normal" : "font-medium"}>{current.label}</h3>
                 {current.summary?.lastMessageAt ? (
                   <span className="text-xs text-muted-foreground">마지막 메시지 {formatDateTime(current.summary.lastMessageAt)}</span>
                 ) : null}

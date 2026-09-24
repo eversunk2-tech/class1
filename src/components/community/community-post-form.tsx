@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { CommunityDetailSkeleton } from "@/components/community/community-post-detail";
 import { CommunitySetupNotice } from "@/components/community/community-setup-notice";
 import { GameUploadField, type PickedGameFile } from "@/components/community/game-upload-field";
-import { EmptyState, ErrorState } from "@/components/states";
+import { Icon3D } from "@/components/illustrations/icon-3d";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,9 @@ import {
   type CommunityKind,
   type CommunityPost,
 } from "@/lib/community";
+import { backPillClass, outlinePillClass, primaryPillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 /** 새 글 · 새 게임 작성 화면(로그인 필요) */
 export function CommunityNewPost({ kind }: { kind: CommunityKind }) {
@@ -170,16 +173,22 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-      <Link
-        href={cancelHref}
-        className="inline-flex w-fit items-center gap-1 rounded-md text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
+      <Link href={cancelHref} className={backPillClass}>
         <ArrowLeftIcon className="size-4" aria-hidden />
         {post ? "돌아가기" : `${meta.label} 목록`}
       </Link>
-      <h1 className="font-heading text-2xl font-normal sm:text-3xl">
+      <h1 className="flex items-center gap-3 font-heading text-3xl font-normal">
+        <span
+          className={cn("grid size-13 shrink-0 place-items-center rounded-2xl", isGame ? "bg-grad-games" : "bg-grad-board")}
+          aria-hidden
+        >
+          <Icon3D name={isGame ? "video-game" : "speech-balloon"} size={36} className="size-9" />
+        </span>
         {post ? `${meta.noun} 고치기` : isGame ? "게임 올리기" : "글쓰기"}
       </h1>
+
+      {/* 입력칸을 흰 둥근 판에 모은다(디자인 개편 2단계) */}
+      <div className="flex flex-col gap-6 rounded-[2rem] bg-card p-5 shadow-(--shadow-md) ring-1 ring-foreground/5 sm:p-8 dark:shadow-none dark:ring-foreground/10">
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="community-title">
@@ -191,7 +200,7 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
           maxLength={LIMITS.title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={isGame ? "예) 산과 염기 퀴즈 게임" : "제목을 입력하세요"}
-          className="h-10"
+          className="h-11 rounded-xl px-3.5 text-base"
           disabled={busy}
           required
         />
@@ -226,7 +235,7 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
           maxLength={bodyLimit}
           onChange={(e) => setBody(e.target.value)}
           placeholder={isGame ? "어떻게 하는 게임인지, 무엇을 배울 수 있는지 적어 주세요." : "내용을 입력하세요. **굵게**, - 목록 같은 마크다운을 쓸 수 있어요."}
-          className={isGame ? "min-h-28" : "min-h-64"}
+          className={cn("rounded-2xl px-3.5 py-3 text-base", isGame ? "min-h-28" : "min-h-64")}
           disabled={busy}
         />
         <span className="text-right text-xs text-muted-foreground">
@@ -234,9 +243,10 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
         </span>
       </div>
 
-      <p className="text-xs leading-5 text-muted-foreground">
+      <p className="rounded-2xl bg-muted/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
         친구를 놀리거나 개인정보(전화번호·주소 등)를 올리지 말아 주세요. 문제가 있는 {meta.noun}은 선생님이 숨기거나 지울 수 있어요.
       </p>
+      </div>
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -245,10 +255,10 @@ function CommunityPostForm({ kind, userId, post }: { kind: CommunityKind; userId
       ) : null}
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" className="h-10 px-4" render={<Link href={cancelHref} />} nativeButton={false}>
+        <Link href={cancelHref} className={outlinePillClass}>
           취소
-        </Button>
-        <Button type="submit" className="h-10 px-5" disabled={busy}>
+        </Link>
+        <Button type="submit" className={cn(primaryPillClass, "px-6")} disabled={busy}>
           {busy ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
           {post ? "저장" : isGame ? "올리기" : "등록"}
         </Button>
@@ -264,11 +274,12 @@ function LoginNeeded({ kind }: { kind: CommunityKind }) {
       className="my-10"
       title="로그인이 필요해요"
       description={`${meta.noun}을 올리려면 먼저 로그인해 주세요.`}
+      illustration={<EmptyOwl />}
       action={
-        <Button render={<Link href={loginHrefHere()} />} nativeButton={false}>
-          <LogInIcon />
+        <Link href={loginHrefHere()} className={primaryPillClass}>
+          <LogInIcon className="size-4.5" aria-hidden />
           로그인
-        </Button>
+        </Link>
       }
     />
   );
@@ -281,10 +292,11 @@ function NotFound({ kind }: { kind: CommunityKind }) {
       className="my-10"
       title={`${meta.noun}을 찾을 수 없어요`}
       description="주소가 잘못되었거나 삭제되었을 수 있어요."
+      illustration={<EmptyOwl />}
       action={
-        <Button variant="outline" render={<Link href={meta.listHref} />} nativeButton={false}>
+        <Link href={meta.listHref} className={outlinePillClass}>
           {meta.label} 목록으로
-        </Button>
+        </Link>
       }
     />
   );

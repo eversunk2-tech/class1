@@ -52,6 +52,19 @@ export function PageHero({
           colors.border,
         )}
       >
+        {gradient ? (
+          // 그라데이션 위 흰 빛 번짐 2개(다크에서는 아래쪽이 은은한 보라 빛). 장식이라 가장자리에만 둔다.
+          <>
+            <span
+              className="pointer-events-none absolute -top-24 -right-16 -z-10 size-80 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--card)_70%,transparent),transparent)] dark:bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--card)_22%,transparent),transparent)]"
+              aria-hidden
+            />
+            <span
+              className="pointer-events-none absolute -bottom-28 -left-20 -z-10 size-80 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--card)_55%,transparent),transparent)] dark:bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_14%,transparent),transparent)]"
+              aria-hidden
+            />
+          </>
+        ) : null}
         <div className={cn("flex min-w-0 flex-col items-center @2xl:items-start", gradient ? "gap-3" : "gap-2")}>
           {eyebrow ? (
             <span

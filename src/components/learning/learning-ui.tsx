@@ -3,7 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { AlarmClockIcon } from "lucide-react";
-import { EmptyState, ErrorState } from "@/components/states";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,7 +51,9 @@ export function AsyncView<T>({
   if (state.status === "error") {
     return <ErrorState message={errorMessage(state.missing, errorText, audience)} onRetry={onRetry} />;
   }
-  if (isEmpty?.(state.data)) return <>{empty ?? <EmptyState title="아직 기록이 없어요" />}</>;
+  if (isEmpty?.(state.data)) {
+    return <>{empty ?? <EmptyState title="아직 기록이 없어요" illustration={audience === "student" ? <EmptyOwl /> : undefined} />}</>;
+  }
   return <>{children(state.data)}</>;
 }
 
@@ -85,7 +87,8 @@ export function UnreadCount({ count, className }: { count: number; className?: s
   return (
     <span
       className={cn(
-        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[0.7rem] leading-none font-semibold text-white",
+        // 다크모드의 --destructive는 밝은 빨강이라 흰 숫자 대비가 2.9:1 → 다크에서만 진한 빨강(흰 숫자 5.4:1)
+        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[0.7rem] leading-none font-semibold text-white dark:bg-[oklch(0.55_0.22_25)]",
         className,
       )}
     >

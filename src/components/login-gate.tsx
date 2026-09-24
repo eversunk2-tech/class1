@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LockIcon } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { LockIcon, LogInIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { loginHref } from "@/lib/community";
 import { cn } from "@/lib/utils";
@@ -32,18 +32,71 @@ export function LoginGate({ children }: { children: ReactNode }) {
   const blocked = locked && LOCKED_PREFIXES.some((p) => path.startsWith(p));
   if (!blocked) return <>{children}</>;
 
+  // 1단계 홈 안내 카드(LoginNeededNotice)와 같은 모양을 크게: 옅은 보라 판 + 흰 자물쇠 칩 + 알약 버튼
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 py-12 text-center">
-      <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden>
-        <LockIcon className="size-7" />
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center py-10">
+      <LockPanel
+        size="lg"
+        title="로그인이 필요해요"
+        description="지금은 로그인한 우리 반 친구들만 글과 게시판을 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
+        href={loginHref(path)}
+        headingLevel="h1"
+      />
+    </div>
+  );
+}
+
+/**
+ * 잠금 안내 판(공용). 오류가 아니라 "지금은 로그인해야 볼 수 있다"는 설명이므로 경고색 대신
+ * 옅은 브랜드 보라 판 + 흰 자물쇠 칩 + 알약 버튼을 쓴다(디자인 개편 1·2단계).
+ */
+function LockPanel({
+  size,
+  title,
+  description,
+  href,
+  headingLevel,
+  className,
+}: {
+  size: "sm" | "lg";
+  title: string;
+  description: string;
+  href: string;
+  headingLevel?: "h1" | "p";
+  className?: string;
+}) {
+  const large = size === "lg";
+  const Heading = headingLevel ?? "p";
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 bg-primary/5 px-6 text-center ring-1 ring-primary/15 dark:bg-primary/10",
+        large ? "gap-3 rounded-[2rem] py-12" : "rounded-2xl py-10",
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center justify-center bg-card text-primary shadow-(--shadow-sm) ring-1 ring-primary/10 dark:shadow-none",
+          large ? "size-16 rounded-3xl" : "size-12 rounded-2xl",
+        )}
+        aria-hidden
+      >
+        <LockIcon className={large ? "size-7" : "size-5"} />
       </span>
-      <h1 className="font-heading text-2xl font-normal">로그인이 필요해요</h1>
-      <p className="text-sm text-muted-foreground">
-        지금은 로그인한 우리 반 친구들만 글과 게시판을 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요.
-      </p>
-      <Button render={<Link href={loginHref(path)} />} nativeButton={false}>
+      <Heading className={cn("mt-1", large ? "font-heading text-2xl font-normal" : "font-semibold")}>{title}</Heading>
+      <p className="max-w-sm text-sm break-keep text-muted-foreground">{description}</p>
+      <Link
+        href={href}
+        className={cn(
+          large
+            ? "mt-2 inline-flex h-11 items-center gap-2 rounded-full bg-grad-primary px-6 text-base font-semibold text-primary-foreground shadow-(--shadow-brand) outline-none transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-solid focus-visible:outline-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            : cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2 h-9 rounded-full bg-card px-4 text-sm shadow-(--shadow-sm) dark:shadow-none"),
+        )}
+      >
+        {large ? <LogInIcon className="size-5" aria-hidden /> : null}
         로그인하기
-      </Button>
+      </Link>
     </div>
   );
 }
@@ -57,29 +110,12 @@ export function LoginNeededNotice({ what, className }: { what: string; className
   const pathname = usePathname();
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center justify-center gap-2 rounded-2xl bg-primary/5 px-6 py-10 text-center ring-1 ring-primary/15 dark:bg-primary/10",
-        className,
-      )}
-    >
-      <span
-        className="flex size-12 items-center justify-center rounded-2xl bg-card text-primary shadow-(--shadow-sm) ring-1 ring-primary/10 dark:shadow-none"
-        aria-hidden
-      >
-        <LockIcon className="size-5" />
-      </span>
-      <p className="mt-1 font-semibold">로그인하면 볼 수 있어요</p>
-      <p className="text-sm text-muted-foreground">지금은 로그인한 우리 반 친구들만 {what}을 볼 수 있어요.</p>
-      <Link
-        href={loginHref(path)}
-        className={cn(
-          buttonVariants({ variant: "outline", size: "sm" }),
-          "mt-2 h-9 rounded-full bg-card px-4 text-sm shadow-(--shadow-sm) dark:shadow-none",
-        )}
-      >
-        로그인하기
-      </Link>
-    </div>
+    <LockPanel
+      size="sm"
+      title="로그인하면 볼 수 있어요"
+      description={`지금은 로그인한 우리 반 친구들만 ${what}을 볼 수 있어요.`}
+      href={loginHref(path)}
+      className={className}
+    />
   );
 }

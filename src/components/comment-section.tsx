@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Loader2Icon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, SendIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { Icon3D } from "@/components/illustrations/icon-3d";
 import { ErrorState } from "@/components/states";
 import {
   AlertDialog,
@@ -23,8 +24,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/use-session";
 import { isWithdrawnProfile, profileDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
+import { primaryPillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
 import { AUTHOR_PROFILE_COLUMNS, type CommentWithAuthor } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const MAX_LENGTH = 2000;
 const COMMENT_COLUMNS = `id,body,created_at,user_id,profiles(${AUTHOR_PROFILE_COLUMNS})`;
@@ -112,8 +115,13 @@ export function CommentSection({ postId, published }: { postId: string; publishe
   }
 
   return (
-    <section aria-labelledby="comments-heading" className="flex flex-col gap-5">
-      <h2 id="comments-heading" className="text-lg font-semibold">
+    // 흰 둥근 판 안에 댓글 목록 + 입력(디자인 개편 2단계, 자유게시판 댓글과 같은 모양)
+    <section
+      aria-labelledby="comments-heading"
+      className="flex flex-col gap-5 rounded-[2rem] bg-card p-5 shadow-(--shadow-md) ring-1 ring-foreground/5 sm:p-7 dark:shadow-none dark:ring-foreground/10"
+    >
+      <h2 id="comments-heading" className="flex items-center gap-2 font-heading text-xl font-normal">
+        <Icon3D name="speech-balloon" size={28} className="size-7" />
         댓글 {status === "ready" ? <span className="text-muted-foreground">{comments.length}</span> : null}
       </h2>
 
@@ -132,7 +140,7 @@ export function CommentSection({ postId, published }: { postId: string; publishe
       ) : status === "error" ? (
         <ErrorState message="댓글을 불러오지 못했습니다." onRetry={reload} />
       ) : comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">첫 댓글을 남겨보세요.</p>
+        <p className="rounded-2xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">첫 댓글을 남겨보세요.</p>
       ) : (
         <ul className="flex flex-col gap-5">
           {comments.map((c) => {
@@ -140,7 +148,7 @@ export function CommentSection({ postId, published }: { postId: string; publishe
             const canDelete = !!user && (user.id === c.user_id || isAdmin);
             return (
               <li key={c.id} className="flex gap-3">
-                <Avatar size="sm" className="mt-0.5">
+                <Avatar size="sm" className="mt-1">
                   {c.profiles?.avatar_url && !isWithdrawnProfile(c.profiles) ? (
                     <AvatarImage src={c.profiles.avatar_url} alt="" />
                   ) : null}
@@ -154,7 +162,9 @@ export function CommentSection({ postId, published }: { postId: string; publishe
                     </time>
                     {canDelete ? <DeleteCommentButton onConfirm={() => onDelete(c.id)} /> : null}
                   </div>
-                  <p className="text-sm leading-6 break-words whitespace-pre-wrap">{c.body}</p>
+                  <p className="w-fit max-w-full rounded-2xl rounded-tl-md bg-muted/60 px-4 py-2.5 text-sm leading-6 break-words whitespace-pre-wrap">
+                    {c.body}
+                  </p>
                 </div>
               </li>
             );
@@ -163,9 +173,9 @@ export function CommentSection({ postId, published }: { postId: string; publishe
       )}
 
       {sessionLoading ? null : !user ? (
-        <div className="rounded-xl border border-dashed px-4 py-5 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border-2 border-dashed border-primary/15 bg-primary/5 px-4 py-5 text-center text-sm text-muted-foreground">
           댓글을 남기려면{" "}
-          <Link href="/login/" className="font-medium text-foreground underline underline-offset-4">
+          <Link href="/login/" className="font-semibold text-primary underline underline-offset-4">
             로그인
           </Link>
           이 필요합니다.
@@ -184,7 +194,7 @@ export function CommentSection({ postId, published }: { postId: string; publishe
             maxLength={MAX_LENGTH}
             onChange={(e) => setBody(e.target.value)}
             disabled={submitting}
-            className="min-h-24"
+            className="min-h-24 rounded-2xl"
           />
           <div className="flex items-center justify-between gap-3">
             {formError ? (
@@ -196,8 +206,8 @@ export function CommentSection({ postId, published }: { postId: string; publishe
                 {body.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}
               </span>
             )}
-            <Button type="submit" className="h-9 px-4" disabled={submitting || !body.trim()}>
-              {submitting ? <Loader2Icon className="animate-spin" /> : null}
+            <Button type="submit" className={cn(primaryPillClass, "h-10")} disabled={submitting || !body.trim()}>
+              {submitting ? <Loader2Icon className="animate-spin" /> : <SendIcon className="size-4" />}
               등록
             </Button>
           </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
+import { AuthCardShell, authCardClass, authInputClass } from "@/components/auth-card-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { useSession } from "@/hooks/use-session";
 import { authErrorMessage, signInWithId, signInWithOAuth, type OAuthProvider } from "@/lib/auth";
 import { goAfterLogin, nextFromLocation, rememberedLoginNext, rememberLoginNext } from "@/lib/login-redirect";
+import { outlinePillClass, primaryPillClass } from "@/lib/pill";
+import { cn } from "@/lib/utils";
 
 type Pending = null | "password" | OAuthProvider;
 
@@ -100,11 +103,11 @@ export function LoginForm() {
   const busy = pending !== null || (!loading && !!user);
 
   return (
-    <div className="mx-auto w-full max-w-sm py-4 sm:py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">로그인</CardTitle>
-          <CardDescription>계정은 관리자가 미리 발급합니다. 별도의 회원가입은 없습니다.</CardDescription>
+    <AuthCardShell decoration="owl">
+      <Card className={authCardClass}>
+        <CardHeader className="justify-items-center gap-2 text-center">
+          <CardTitle className="text-3xl font-normal">로그인</CardTitle>
+          <CardDescription className="break-keep">계정은 관리자가 미리 발급합니다. 별도의 회원가입은 없습니다.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -119,7 +122,7 @@ export function LoginForm() {
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 disabled={busy}
-                className="h-10"
+                className={authInputClass}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -132,7 +135,7 @@ export function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={busy}
-                className="h-10"
+                className={authInputClass}
               />
             </div>
             {error ? (
@@ -140,7 +143,7 @@ export function LoginForm() {
                 {error}
               </p>
             ) : null}
-            <Button type="submit" size="lg" className="h-10" disabled={busy}>
+            <Button type="submit" size="lg" className={cn(primaryPillClass, "mt-1 h-12 text-base")} disabled={busy}>
               {pending === "password" ? <Loader2Icon className="animate-spin" /> : null}
               로그인
             </Button>
@@ -156,7 +159,7 @@ export function LoginForm() {
             <Button
               variant="outline"
               size="lg"
-              className="h-10"
+              className={cn(outlinePillClass, "h-11")}
               disabled={busy}
               onClick={() => onOAuth("github")}
             >
@@ -166,7 +169,7 @@ export function LoginForm() {
             <Button
               variant="outline"
               size="lg"
-              className="h-10"
+              className={cn(outlinePillClass, "h-11")}
               disabled={busy}
               onClick={() => onOAuth("google")}
             >
@@ -176,7 +179,7 @@ export function LoginForm() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AuthCardShell>
   );
 }
 

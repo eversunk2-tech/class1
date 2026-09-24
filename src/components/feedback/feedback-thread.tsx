@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Loader2Icon, MessageCircleIcon, SendIcon } from "lucide-react";
-import { ErrorState } from "@/components/states";
+import { EmptyOwl, ErrorState } from "@/components/states";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,7 @@ import {
   type FeedbackContext,
   type FeedbackMessageWithSender,
 } from "@/lib/learning";
+import { primaryPillClass } from "@/lib/pill";
 import { cn } from "@/lib/utils";
 
 type ThreadData = { threadId: string | null; messages: FeedbackMessageWithSender[]; total: number };
@@ -157,6 +158,8 @@ export function FeedbackThread({
     return `선생님${teacher ? ` (${teacher})` : ""}`;
   }
 
+  const student = audience === "student";
+
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {state.status === "loading" ? (
@@ -167,8 +170,13 @@ export function FeedbackThread({
       ) : state.status === "error" ? (
         <ErrorState message={errorMessage(state.missing, "대화를 불러오지 못했어요.", audience)} onRetry={reload} />
       ) : state.data.messages.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-          <MessageCircleIcon className="size-5" aria-hidden />
+        <div
+          className={cn(
+            "flex flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground",
+            student && "rounded-3xl border-2 border-primary/15 bg-card/60",
+          )}
+        >
+          {student ? <EmptyOwl className="w-18 sm:w-20" /> : <MessageCircleIcon className="size-5" aria-hidden />}
           {audience === "student"
             ? "아직 대화가 없어요. 궁금한 점을 선생님께 남겨 보세요."
             : "아직 대화가 없습니다. 첫 피드백을 남겨 보세요."}
@@ -182,7 +190,11 @@ export function FeedbackThread({
         ) : null}
         <ol
           ref={listRef}
-          className="flex max-h-[28rem] flex-col gap-3 overflow-y-auto rounded-xl bg-muted/30 p-3"
+          className={cn(
+            "flex max-h-[28rem] flex-col gap-3 overflow-y-auto rounded-xl bg-muted/30 p-3",
+            // 학생 화면: 옅은 보라 대화 판 + 둥근 말풍선(디자인 개편 2단계)
+            student && "rounded-3xl bg-primary/5 p-4 ring-1 ring-primary/10 dark:bg-primary/10",
+          )}
           aria-label="대화 내용"
         >
           {state.data.messages.map((m) => {
@@ -205,6 +217,7 @@ export function FeedbackThread({
                     className={cn(
                       "rounded-2xl px-3.5 py-2 text-sm leading-6 break-words whitespace-pre-wrap",
                       mine ? "bg-primary text-primary-foreground" : "bg-card ring-1 ring-foreground/10",
+                      student && (mine ? "rounded-3xl rounded-br-md px-4 py-2.5" : "rounded-3xl rounded-bl-md px-4 py-2.5 shadow-(--shadow-sm) dark:shadow-none"),
                     )}
                   >
                     {m.body}
@@ -236,7 +249,7 @@ export function FeedbackThread({
             placeholder={audience === "student" ? "선생님께 메시지를 남겨 보세요" : "피드백을 입력하세요"}
             disabled={sending}
             autoFocus={autoFocus}
-            className="min-h-20"
+            className={cn("min-h-20", student && "rounded-2xl")}
             onKeyDown={(e) => {
               // Ctrl/⌘ + Enter로 전송
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -255,7 +268,7 @@ export function FeedbackThread({
                 {body.length.toLocaleString()} / {FEEDBACK_BODY_MAX.toLocaleString()}
               </span>
             )}
-            <Button type="submit" className="h-9 px-4" disabled={sending || !body.trim()}>
+            <Button type="submit" className={student ? cn(primaryPillClass, "h-10") : "h-9 px-4"} disabled={sending || !body.trim()}>
               {sending ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
               보내기
             </Button>

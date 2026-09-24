@@ -1,4 +1,5 @@
 import { webApps } from "@/data/apps";
+import { findResponseApp } from "@/data/app-responses";
 import { isMissingSchemaError, MISSING_SCHEMA_MESSAGE } from "@/lib/admin";
 import { chunk, fetchAllPages } from "@/lib/paging";
 import { supabase } from "@/lib/supabase";
@@ -38,9 +39,9 @@ export function errorMessage(missing: boolean, fallback: string, audience: "admi
 
 export { isMissingSchemaError };
 
-/** src/data/apps.ts에 등록된 앱 제목. 없으면 null */
+/** 앱 제목: src/data/apps.ts의 웹앱 → 과학 차시 앱(science-curriculum) 순서로 찾는다. 없으면 null */
 export function appTitle(appId: string): string | null {
-  return webApps.find((a) => a.id === appId)?.title ?? null;
+  return webApps.find((a) => a.id === appId)?.title ?? findResponseApp(appId)?.title ?? null;
 }
 
 /** 앱 표시 이름(학생 화면). 목록에 없으면 "삭제된 앱"(spec §3.8) */

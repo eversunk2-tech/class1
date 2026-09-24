@@ -77,7 +77,11 @@ export function LikeButton({ postId, published }: { postId: string; published: b
   const button = (
     <Button
       variant="outline"
-      className={cn("h-9 gap-1.5 rounded-full px-3.5", liked && "border-rose-300 text-rose-600 dark:border-rose-900 dark:text-rose-400")}
+      // 크고 둥근 흰 알약(디자인 개편 2단계). 누른 상태는 색 + 채운 하트 + aria-pressed로 알린다.
+      className={cn(
+        "h-11 gap-2 rounded-full bg-card px-5 text-sm font-semibold shadow-(--shadow-sm) transition-[translate,box-shadow] hover:-translate-y-0.5 hover:shadow-(--shadow-md) motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:shadow-none [&_svg:not([class*='size-'])]:size-5",
+        liked && "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400",
+      )}
       onClick={toggle}
       disabled={busy || !published}
       aria-pressed={liked}

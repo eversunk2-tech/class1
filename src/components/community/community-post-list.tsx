@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRightIcon, EyeOffIcon, Gamepad2Icon, HeartIcon, Loader2Icon, MessageSquareIcon } from "lucide-react";
+import { ArrowRightIcon, EyeOffIcon, HeartIcon, Loader2Icon, MessageSquareIcon } from "lucide-react";
 import { CommunitySetupNotice } from "@/components/community/community-setup-notice";
-import { EmptyBoxIllustration } from "@/components/illustrations/empty-box-illustration";
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
+import { Icon3D } from "@/components/illustrations/icon-3d";
 import { PostCardSkeleton } from "@/components/post-card";
 import { LoginNeededNotice } from "@/components/login-gate";
-import { EmptyState, ErrorState } from "@/components/states";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { outlinePillClass } from "@/lib/pill";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
 import {
@@ -117,7 +118,7 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
       <EmptyState
         title={kind === "board" ? "아직 올라온 글이 없어요" : "아직 올라온 게임이 없어요"}
         description={kind === "board" ? "첫 번째 글을 남겨 볼까요?" : "직접 만든 게임을 첫 번째로 올려 볼까요?"}
-        illustration={<EmptyBoxIllustration accent={kind === "board" ? "board" : "games"} className="h-28 w-36" />}
+        illustration={<EmptyOwl />}
         className="py-8"
       />
     );
@@ -140,13 +141,13 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
             </p>
           ) : null}
           {hasMore ? (
-            <Button variant="outline" className="mx-auto mt-2 h-9 px-4" onClick={loadMore} disabled={loadingMore}>
+            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-2 h-10")} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? <Loader2Icon className="animate-spin" /> : null}더 보기
             </Button>
           ) : null}
         </>
       ) : hasMore ? (
-        <Link href={meta.listHref} className={cn(buttonVariants({ variant: "ghost" }), "mx-auto h-9 px-4 text-muted-foreground")}>
+        <Link href={meta.listHref} className={cn(buttonVariants({ variant: "ghost" }), "mx-auto h-9 rounded-full px-4 text-muted-foreground")}>
           더 보기
           <ArrowRightIcon />
         </Link>
@@ -160,12 +161,15 @@ function CommunityPostCard({ post }: { post: CommunityPostSummary }) {
   const likes = embeddedCount(post.community_likes);
   const isGame = post.kind === "game";
   return (
-    <article className="group relative flex gap-3 rounded-xl p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
-      {isGame ? (
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-games-soft text-games-strong" aria-hidden>
-          <Gamepad2Icon className="size-5.5" />
-        </span>
-      ) : null}
+    // 흰 둥근 카드(디자인 개편 2단계): 3D 아이콘 칩, 올리면 살짝 떠오름. 카드 전체가 링크(after:inset-0)라
+    // 키보드 초점은 카드 테두리 링으로 보여 준다.
+    <article className="group relative flex gap-3.5 rounded-[1.5rem] bg-card p-4 shadow-(--shadow-sm) ring-1 ring-foreground/5 transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-md) motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5 dark:shadow-none dark:ring-foreground/10">
+      <span
+        className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl", isGame ? "bg-grad-games" : "bg-grad-board")}
+        aria-hidden
+      >
+        <Icon3D name={isGame ? "video-game" : "speech-balloon"} size={32} className="size-8" />
+      </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <h3 className="flex min-w-0 items-center gap-2 text-base leading-snug font-semibold">
           {post.hidden ? (
@@ -176,7 +180,7 @@ function CommunityPostCard({ post }: { post: CommunityPostSummary }) {
           ) : null}
           <Link
             href={communityPostHref(post.kind, post.id)}
-            className="min-w-0 truncate after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
+            className="min-w-0 truncate outline-none after:absolute after:inset-0 after:rounded-[1.5rem] focus-visible:underline focus-visible:after:ring-3 focus-visible:after:ring-ring/60"
           >
             {post.title}
           </Link>

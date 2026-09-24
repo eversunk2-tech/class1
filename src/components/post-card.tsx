@@ -15,7 +15,8 @@ export function editPostHref(slug: string) {
 
 export function PostCard({ post, views }: { post: PostSummary; views?: number | null }) {
   return (
-    <article className="group relative flex flex-col gap-3 rounded-xl p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40 sm:flex-row sm:items-start sm:gap-5">
+    // 흰 둥근 카드(디자인 개편 2단계). 카드 전체가 링크(after:inset-0)라 키보드 초점은 카드 테두리 링으로 보여 준다.
+    <article className="group relative flex flex-col gap-3 rounded-[1.5rem] bg-card p-4 shadow-(--shadow-sm) ring-1 ring-foreground/5 transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow-md) motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:flex-row sm:items-start sm:gap-5 sm:p-5 dark:shadow-none dark:ring-foreground/10">
       {post.cover_url ? (
         // 외부 URL 커버 이미지이므로 next/image 대신 img 사용(정적 export, 최적화 비활성)
         // eslint-disable-next-line @next/next/no-img-element
@@ -23,12 +24,15 @@ export function PostCard({ post, views }: { post: PostSummary; views?: number | 
           src={post.cover_url}
           alt=""
           loading="lazy"
-          className="aspect-[16/9] w-full rounded-lg bg-muted object-cover sm:w-40 sm:shrink-0"
+          className="aspect-[16/9] w-full rounded-2xl bg-muted object-cover sm:w-44 sm:shrink-0"
         />
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <h2 className="text-base leading-snug font-semibold sm:text-lg">
-          <Link href={postHref(post.slug)} className="after:absolute after:inset-0 focus-visible:underline">
+          <Link
+            href={postHref(post.slug)}
+            className="outline-none after:absolute after:inset-0 after:rounded-[1.5rem] focus-visible:underline focus-visible:after:ring-3 focus-visible:after:ring-ring/60"
+          >
             {post.title}
           </Link>
         </h2>
@@ -54,7 +58,7 @@ export function PostCard({ post, views }: { post: PostSummary; views?: number | 
 
 export function PostCardSkeleton() {
   return (
-    <div className="flex flex-col gap-3 rounded-xl p-4 ring-1 ring-foreground/10" aria-hidden>
+    <div className="flex flex-col gap-3 rounded-[1.5rem] bg-card/70 p-4 ring-1 ring-foreground/5 sm:p-5 dark:ring-foreground/10" aria-hidden>
       <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
       <div className="h-4 w-full animate-pulse rounded bg-muted" />
       <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />

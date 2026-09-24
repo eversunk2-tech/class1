@@ -480,6 +480,29 @@ html[data-sidebar="collapsed"] .app-sidebar .sidebar-extra {
 .markdown-body :where(th, td) { padding: 0.45em 0.8em; border: 1px solid var(--border); }
 .markdown-body th { background: var(--muted); font-weight: 600; }
 
+/* 글 읽기 화면(선생님 글 · 자유게시판 글, 디자인 개편 2단계): 조금 큰 글자 + 넉넉한 줄 간격.
+   과제 설명·관리자 미리보기 같은 다른 마크다운은 그대로 둔다(이 클래스를 붙인 곳만). */
+.markdown-body.markdown-reading {
+  font-size: 1.0625rem;
+  line-height: 1.9;
+}
+.markdown-reading :where(h1, h2, h3) {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0;
+}
+.markdown-reading a { color: var(--primary); }
+.markdown-reading a:hover { color: color-mix(in oklch, var(--primary) 80%, var(--foreground)); }
+.markdown-reading blockquote {
+  padding: 0.6em 1.1em;
+  border-left: 4px solid color-mix(in oklch, var(--primary) 40%, transparent);
+  border-radius: 0 1rem 1rem 0;
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+}
+.markdown-reading img { border-radius: 1.25rem; }
+.markdown-reading pre { border-radius: 1.25rem; }
+
 /* ─────────────────────────────────────────────
    highlight.js 토큰 색상 (라이트/다크, GitHub 계열)
    CDN 테마 CSS 대신 .dark 클래스에 맞춰 직접 정의한다.

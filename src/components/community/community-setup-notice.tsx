@@ -8,7 +8,7 @@ export function CommunitySetupNotice({ className }: { className?: string }) {
     <div
       role="status"
       className={cn(
-        "flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center",
+        "flex flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-primary/15 bg-card/60 px-6 py-10 text-center dark:bg-card/40",
         className,
       )}
     >

@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { FileCode2Icon, PlayIcon, UploadIcon, XIcon } from "lucide-react";
 import { GamePlayer } from "@/components/community/game-player";
+import { Icon3D } from "@/components/illustrations/icon-3d";
 import { Button } from "@/components/ui/button";
 import { formatBytes, GameFileError, readGameFile } from "@/lib/community";
 
@@ -66,54 +67,65 @@ export function GameUploadField({
       <label htmlFor={inputId} className="text-sm font-medium">
         게임 파일 (index.html){required ? <span className="text-destructive"> *</span> : null}
       </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          id={inputId}
-          ref={inputRef}
-          type="file"
-          accept=".html,.htm,text/html"
-          className="sr-only"
-          disabled={disabled || checking}
-          onChange={(e) => void onPick(e.target.files?.[0])}
-        />
-        <Button type="button" variant="outline" className="h-9 px-3.5" disabled={disabled || checking} onClick={() => inputRef.current?.click()}>
-          <UploadIcon />
-          {value || currentName ? "다른 파일 고르기" : "파일 고르기"}
-        </Button>
-        {value ? (
-          <span className="inline-flex min-w-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm">
-            <FileCode2Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="truncate">{value.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(value.size)}</span>
-            <button
-              type="button"
-              className="ml-1 rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-              onClick={() => {
-                onChange(null);
-                setPreview(false);
-              }}
-              aria-label="고른 파일 빼기"
-              disabled={disabled}
-            >
-              <XIcon className="size-3.5" />
-            </button>
-          </span>
-        ) : currentName ? (
-          <span className="text-sm text-muted-foreground">지금 파일을 그대로 써요. 바꾸려면 새 파일을 고르세요.</span>
-        ) : null}
-        {value ? (
-          <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => setPreview((v) => !v)} disabled={disabled}>
-            <PlayIcon />
-            {preview ? "미리 해보기 닫기" : "미리 해보기"}
+      {/* 파일 고르는 칸: 학습게임 색 점선 상자(디자인 개편 2단계, 동작은 그대로) */}
+      {/* 숨긴 파일 입력칸에 키보드 초점이 오면 상자 둘레에 초점 링을 보여 준다(겉모양만) */}
+      <div className="flex flex-col gap-3 rounded-3xl border-2 border-dashed border-games-strong/25 bg-games-soft/40 p-4 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/60 sm:p-5 dark:bg-games-soft/25">
+        <div className="flex flex-wrap items-center gap-2">
+          <Icon3D name="video-game" size={40} className="mr-1 size-10" />
+          <input
+            id={inputId}
+            ref={inputRef}
+            type="file"
+            accept=".html,.htm,text/html"
+            className="sr-only"
+            disabled={disabled || checking}
+            onChange={(e) => void onPick(e.target.files?.[0])}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-full bg-card px-4 shadow-(--shadow-sm) dark:shadow-none"
+            disabled={disabled || checking}
+            onClick={() => inputRef.current?.click()}
+          >
+            <UploadIcon />
+            {value || currentName ? "다른 파일 고르기" : "파일 고르기"}
           </Button>
+          {value ? (
+            <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-card px-3 py-1.5 text-sm shadow-(--shadow-sm) ring-1 ring-foreground/5 dark:shadow-none">
+              <FileCode2Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate">{value.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(value.size)}</span>
+              <button
+                type="button"
+                className="ml-1 rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                onClick={() => {
+                  onChange(null);
+                  setPreview(false);
+                }}
+                aria-label="고른 파일 빼기"
+                disabled={disabled}
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            </span>
+          ) : currentName ? (
+            <span className="text-sm text-muted-foreground">지금 파일을 그대로 써요. 바꾸려면 새 파일을 고르세요.</span>
+          ) : null}
+          {value ? (
+            <Button type="button" variant="ghost" className="h-10 rounded-full px-3.5" onClick={() => setPreview((v) => !v)} disabled={disabled}>
+              <PlayIcon />
+              {preview ? "미리 해보기 닫기" : "미리 해보기"}
+            </Button>
+          ) : null}
+        </div>
+        {checking ? <p className="text-sm text-muted-foreground">파일을 확인하는 중…</p> : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
         ) : null}
       </div>
-      {checking ? <p className="text-sm text-muted-foreground">파일을 확인하는 중…</p> : null}
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
       <ul className="list-disc pl-5 text-xs leading-5 text-muted-foreground">
         <li>생성형 AI로 만든 게임의 index.html 한 개만 올려요(2MB 이하).</li>
         <li>코드가 파일 안에 모두 들어 있거나, CDN 주소(https://…)로 불러오는 게임만 돌아가요. 따로 된 이미지·JS 파일은 쓸 수 없어요.</li>

@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRightIcon, Loader2Icon } from "lucide-react";
-import { EmptyBoxIllustration } from "@/components/illustrations/empty-box-illustration";
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
 import { PostCard, PostCardSkeleton } from "@/components/post-card";
 import { fetchViewCounts } from "@/components/post-list";
 import { LoginNeededNotice } from "@/components/login-gate";
-import { EmptyState, ErrorState } from "@/components/states";
+import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { outlinePillClass } from "@/lib/pill";
 import type { MenuColor } from "@/data/menu";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { supabase } from "@/lib/supabase";
@@ -40,14 +40,13 @@ export function TaggedPostList({
   tag,
   limit,
   moreHref,
-  accent,
   emptyTitle,
   emptyDescription,
 }: {
   tag?: string;
   limit?: number;
   moreHref?: string;
-  /** 빈 상태 일러스트의 리본 색 */
+  /** (예전 빈 상태 상자 그림의 리본 색. 지금은 빈 화면이 생각하는 부엉이라 쓰지 않지만 호출부 호환을 위해 남겨 둔다.) */
   accent?: MenuColor;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -142,7 +141,7 @@ export function TaggedPostList({
       <EmptyState
         title={emptyTitle ?? `아직 ${name}이 없어요`}
         description={emptyDescription ?? "새 글이 올라오면 여기에 나타나요."}
-        illustration={<EmptyBoxIllustration accent={accent} className="h-28 w-36" />}
+        illustration={<EmptyOwl />}
         className="py-8"
       />
     );
@@ -161,13 +160,13 @@ export function TaggedPostList({
             </p>
           ) : null}
           {hasMore ? (
-            <Button variant="outline" className="mx-auto mt-2 h-9 px-4" onClick={loadMore} disabled={loadingMore}>
+            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-2 h-10")} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? <Loader2Icon className="animate-spin" /> : null}더 보기
             </Button>
           ) : null}
         </>
       ) : moreHref && hasMore ? (
-        <Link href={moreHref} className={cn(buttonVariants({ variant: "ghost" }), "mx-auto h-9 px-4 text-muted-foreground")}>
+        <Link href={moreHref} className={cn(buttonVariants({ variant: "ghost" }), "mx-auto h-9 rounded-full px-4 text-muted-foreground")}>
           더 보기
           <ArrowRightIcon />
         </Link>
