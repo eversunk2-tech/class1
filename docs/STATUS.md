@@ -1,6 +1,6 @@
 # 진행 현황 (docs/STATUS.md)
 
-> 마지막 갱신: 2026-09-22. 규칙은 `CLAUDE.md`, 여기에는 **현황·확정 결정·남은 일**만 적는다. 작업이 끝나거나 결정이 바뀌면 이 파일을 갱신한다.
+> 마지막 갱신: 2026-09-24. 규칙은 `CLAUDE.md`, 여기에는 **현황·확정 결정·남은 일**만 적는다. 작업이 끝나거나 결정이 바뀌면 이 파일을 갱신한다.
 
 ## 배포
 * 사이트: https://eversunk2-tech.github.io/class1/ (저장소 `eversunk2-tech/class1`, main에 push하면 GitHub Actions로 배포)
@@ -128,7 +128,9 @@ Edge Function `admin-reset-password` 배포 완료(Verify JWT 켬).
 
 ## 사이트 디자인 개편 (2026-09-24, 참고: 똑똑! 수학탐험대의 느낌만 — 그림·문구는 가져오지 않음)
 * 설계 `docs/design/redesign/spec.md`(끝 "개정 1"), 보고서 `build-1-report.md`·`build-2-report.md`, 검증 `review-12.md`.
-* 1단계(색·글꼴·사이드바·홈, "더 화려하게" 반영)·2단계(과학수업·게시판·게임·글·검색·로그인·내 학습) **완료·로컬 커밋, 배포 대기**. 3단계(과학 앱 23개 공통 틀 색·글꼴·버튼, 글꼴은 CDN)·4단계(관리자 색) **남음**.
+* 1단계(색·글꼴·사이드바·홈, "더 화려하게" 반영)·2단계(과학수업·게시판·게임·글·검색·로그인·내 학습) **배포 완료**(2026-09-24).
+* 3단계(과학 앱 23개 공통 틀 CSS + `persist.js` 맨 위 글꼴 `<link>` 주입 — CDN이 막혀도 첫 화면 즉시)·4단계(관리자 색: 관리자 영역만 보라 채도 약 25% 낮춤, 회원 표 ⋮ 고정, 위험 버튼 진한 빨강) **완료·검증(review-34), 배포 대기**. 저장 키·저장 구조 불변.
+* 남은 낮은 지적(기존부터): `sci-6-2-1-4` 태블릿 가로에서 실험하기 진입 직후 기록하기 버튼이 아래 막대에 약간 걸침(스크롤하면 정상), 움직임 줄이기에서 검사 중 스피너가 멈춰 보임.
 * 마스코트: AI로 만든 "부엉이 과학자"(Canva 생성, 사용자 선택) — `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`, 원본·배경 제거 스크립트는 `docs/design/redesign/mascot-src/`.
 * 3D 아이콘 15개: Microsoft Fluent Emoji 3D(MIT) — `public/illustrations/3d/`, 고지 `LICENSE-fluent-emoji.txt`. 본문 글꼴 Pretendard(OFL, npm 자체 호스팅, 고지 `public/fonts/`), 제목 Jua.
 
