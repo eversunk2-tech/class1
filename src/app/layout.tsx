@@ -27,6 +27,7 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false, // 관리자·코드 칸에서만 쓰므로 첫 화면에서 미리 받지 않는다
 });
 
 // 제목 전용 글꼴. Jua는 weight 400 하나뿐이고, next/font가 아는 subset은 "latin"뿐이다

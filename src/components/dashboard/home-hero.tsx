@@ -61,7 +61,6 @@ function HeroStage() {
           <Icon3D
             name={p.name}
             size={p.size}
-            loading="eager"
             className="h-auto w-full drop-shadow-[0_8px_10px_oklch(0.3_0.1_288/0.2)]"
           />
         </span>
@@ -92,7 +91,7 @@ export function HomeHero() {
       >
         <div className="flex min-w-0 flex-col items-center gap-4 @2xl:items-start">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 text-sm font-medium text-muted-foreground shadow-(--shadow-sm) ring-1 ring-primary/10 dark:shadow-none">
-            <Icon3D name="sparkles" size={18} loading="eager" className="size-4.5" />
+            <Icon3D name="sparkles" size={18} className="size-4.5" />
             오늘도 반가워요
           </span>
           <h1

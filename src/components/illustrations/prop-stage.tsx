@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * 히어로 오른쪽 "무대": 가운데 큰 그림(마스코트·큰 3D 아이콘) + 뒤쪽 빛 + 발밑 빛 원판 + 둥실 떠다니는 3D 소품.
  * 홈 히어로(개정 2)와 같은 표현을 과학수업·게시판·학습게임 히어로에서 다시 쓰려고 뺀 공용 조각(디자인 개편 2단계).
- * - 소품은 모두 장식(alt="", aria-hidden, width/height). 히어로와 함께 보이므로 eager(각 5~9KB).
+ * - 소품은 모두 장식(alt="", aria-hidden, width/height). 첫 화면 안이라 lazy여도 곧바로 불러온다(각 5~9KB, preload 경고 방지).
  * - 움직임은 transform만(globals.css `.prop-float`), prefers-reduced-motion이면 멈춘다.
  * - `always`가 아닌 소품은 좁은 히어로(@2xl 미만: 휴대폰·태블릿 세로)에서 숨겨 2~3개만 남긴다.
  */
@@ -54,7 +54,7 @@ export function PropStage({
           <Icon3D
             name={p.name}
             size={p.size}
-            loading="eager"
+            loading="lazy"
             className="h-auto w-full drop-shadow-[0_8px_10px_oklch(0.3_0.1_288/0.2)]"
           />
         </span>
@@ -73,7 +73,7 @@ export function StageIcon({ name, size = 176, className }: { name: Icon3DName; s
         className,
       )}
     >
-      <Icon3D name={name} size={size} loading="eager" className="h-auto w-full" />
+      <Icon3D name={name} size={size} loading="lazy" className="h-auto w-full" />
     </div>
   );
 }

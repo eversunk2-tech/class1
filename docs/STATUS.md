@@ -126,6 +126,12 @@ Edge Function `admin-reset-password` 배포 완료(Verify JWT 켬).
   * 잠금 **켜짐**: 홈·메뉴는 그대로, 블로그 글·자유게시판·학습게임 글·과학 앱은 로그인 필요.
 * 설계 `docs/admin/admin-tools/spec.md`, 검증 `review.md`·`scope-fix-review.md`.
 
+## 사이트 디자인 개편 (2026-09-24, 참고: 똑똑! 수학탐험대의 느낌만 — 그림·문구는 가져오지 않음)
+* 설계 `docs/design/redesign/spec.md`(끝 "개정 1"), 보고서 `build-1-report.md`·`build-2-report.md`, 검증 `review-12.md`.
+* 1단계(색·글꼴·사이드바·홈, "더 화려하게" 반영)·2단계(과학수업·게시판·게임·글·검색·로그인·내 학습) **완료·로컬 커밋, 배포 대기**. 3단계(과학 앱 23개 공통 틀 색·글꼴·버튼, 글꼴은 CDN)·4단계(관리자 색) **남음**.
+* 마스코트: AI로 만든 "부엉이 과학자"(Canva 생성, 사용자 선택) — `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`, 원본·배경 제거 스크립트는 `docs/design/redesign/mascot-src/`.
+* 3D 아이콘 15개: Microsoft Fluent Emoji 3D(MIT) — `public/illustrations/3d/`, 고지 `LICENSE-fluent-emoji.txt`. 본문 글꼴 Pretendard(OFL, npm 자체 호스팅, 고지 `public/fonts/`), 제목 Jua.
+
 ## 남은 작업·메모
 * **공통 틀 수정 완료(2026-09-23, `docs/science/template-fix-1-report.md`)**: 가짜 충돌 창·기록하기 가림·휴대폰 가로 머리말·숫자 조사 4건 + 알림(`.ss-toast`) `pointer-events:none`. 저장 키·저장 구조 그대로라 학생 기록은 유지. 사본 동기화 완료(`science-sim` 20개, `science-guide` 3개, `class1-record.js`).
 * 조사 도우미 틀(`science-guide`)은 토스트만 함께 고쳤고 나머지 4건은 적용하지 않음(해당 앱 3개는 수업에 쓰지 않음).

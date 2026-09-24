@@ -86,3 +86,10 @@ git 명령·실 DB 쓰기 없음. 내 전용 headless Chrome(포트 9517, 새 �
 * **진짜 로그인**(가짜 세션으로만 확인), 실제 선생님 글·과제·읽은 글이 있는 상태(과제·읽은 글·댓글 탭은 빈 화면으로 확인).
 * 관리자 화면은 공용 컴포넌트가 깨지지 않았는지만 가짜 관리자 세션으로 훑어봄(대시보드·회원·학습·커뮤니티: 오류·빈 상태 판 정상).
 * 신고·삭제 확인창 등 대화상자 안쪽 모양(열어 보지 않음, 코드 변경 없음).
+
+---
+
+## Claude 후속 조치 (2026-09-24, review-12 반영)
+* "삭제된 앱"·"지도서" 두 기존 문제는 이 보고서 작성 뒤 Claude가 같은 커밋(`5cc6cf4`)에서 고쳤다: `src/lib/learning.ts`의 `appTitle()`이 과학 차시 앱(`findResponseApp`)도 찾고, 차시 상세의 "지도서 N차시" → "N차시".
+* review-12 중간(원자 아이콘 출처): Claude가 직접 `microsoft/fluentui-emoji`의 `assets/Atom symbol/3D/atom_symbol_3d.png`에서 받은 파일이다. Fluent의 원자 기호는 원래 보라 네모 배지 모양이라 다르게 보였을 뿐, 출처·라이선스 문제 없음.
+* review-12 낮음(preload 경고 7건): 홈 떠다니는 소품·반짝이 아이콘을 `loading="lazy"`로(첫 화면 안이라 곧바로 불러옴), `Geist_Mono`는 `preload: false`. 빌드 HTML의 이미지 preload 0건, 브라우저 콘솔 경고 0건, 홈 그림 28개 모두 로드 확인.
