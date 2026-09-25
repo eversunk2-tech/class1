@@ -360,10 +360,6 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
   .ss-exp-layout { grid-template-columns: 1fr; }
   .ss-exp-view-col { position: static; }
 }
-/* ── 전체 화면 보기(2026-09-25, 모든 앱 공통 — 학생이 장면 위 ⛶ 버튼으로 켜고 끄는 런타임 모드) ──
-   꺼짐(기본값)은 지금까지와 픽셀 단위로 같다. 켜지면 experiment.js가 .ss-exp-layout에 .is-full을 붙인다. */
-.ss-exp-layout.is-full { grid-template-columns: 1fr; }
-.ss-exp-layout.is-full .ss-exp-view-col { position: static; }
 /* 실험 화면 칸: 장식 없이(색 그림자·그라데이션 없음) 전과 같은 모서리·바탕 */
 .ss-exp-view {
   position: relative; height: min(62vh, 560px); min-height: 300px;
@@ -373,23 +369,6 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 @media (orientation: portrait) { .ss-exp-view { height: min(44vh, 520px); } }
 @media (max-width: 640px) { .ss-exp-view { height: 300px; min-height: 0; } }
 .ss-exp-view.is-2d { height: auto; min-height: 0; }
-/* 켜짐 전용 장면 높이(앱은 --ss-scene-h 한 줄로 덮어쓸 수 있다). 태블릿 세로에서 장면이 주인공이 되도록 가장 크고,
-   가로·큰 화면은 막대까지 한 화면에 들어오도록 조금 낮추고, 휴대폰은 더 낮춘다(가로는 최소 200px).
-   #experiment-root를 앞에 붙여 특이도를 높였다 — 앱이 자기 style.css에 .ss-exp-view 높이를 따로 정해 둔 경우에도
-   (앱 코드를 고치지 않고) 이 규칙이 이겨서 켜짐 모드가 모든 앱에서 그대로 동작한다. */
-#experiment-root .ss-exp-layout.is-full .ss-exp-view {
-  height: var(--ss-scene-h, min(46vh, 540px)); min-height: 140px; /* 기본(300px)을 낮춘다 — JS(fitSceneHeight)가 남는 세로 공간에 맞춰 정확히 계산하므로 */
-}
-@media (orientation: portrait) {
-  #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, min(52vh, 620px)); }
-}
-@media (max-width: 640px) and (orientation: portrait) {
-  #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, 35vh); min-height: 240px; }
-}
-@media (max-height: 480px) {
-  #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, min(30vh, 230px)); min-height: 140px; } /* 휴대폰 가로: JS가 화면 띠에 맞춘 높이(바닥 140px)를 막지 않게(review-B2 N2) */
-}
-#experiment-root .ss-exp-layout.is-full .ss-exp-view.is-2d { height: auto; min-height: 0; }
 .ss-view3d { position: absolute; inset: 0; }
 .ss-view2d { padding: 44px 10px 12px; }
 /* 2D 대체 화면: 장면 왼쪽 위 토글(위 46px + 높이 44px)이 2D 내용 윗줄을 덮지 않게 위 여백을 토글 아래까지(fix-A F11).
@@ -440,7 +419,7 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 /* 측정값(scenePanel)은 막대 윗줄 전체 폭, 실행·기록 버튼은 아랫줄(fix-A F8 — 값 4칸이 좁은 칸에서 잘리던 문제). 막대의 첫 칸이다. */
 .ss-exp-overlay-panel { flex: 1 1 100%; min-width: 0; font-size: 0.95rem; line-height: 1.35; color: var(--ss-text); }
 @media (max-width: 480px), (max-height: 420px) {
-  /* 좁은/낮은 화면: 막대에는 버튼 두 개만(글자가 너무 작아지지 않게). 같은 노드를 experiment.js가 장면 바로 아래 카드로 옮기므로
+  /* 좁은/낮은 화면: 막대에는 버튼 두 개만(글자가 너무 작아지지 않게). 같은 노드를 experiment.js가 조작 칸 맨 위 카드로 옮기므로
      이 규칙은 옮기기 전 잠깐 보이는 것을 막는 안전망일 뿐이다. */
   .ss-exp-overlay-panel { display: none; }
 }
@@ -454,6 +433,83 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 .ss-exp-view.has-bar:not(.is-2d) .ss-view-tip {
   bottom: calc(var(--ss-exp-overlay-h, 56px) + 6px);
 }
+
+/* ── 전체 화면 보기 = "한 화면 실험실"(2026-09-26 spec 개정 6, 모든 앱 공통 — 학생이 장면 위 ⛶ 버튼으로 켜고 끄는 런타임 모드) ──
+   꺼짐(기본값)은 지금까지와 픽셀 단위로 같다. 켜지면 experiment.js가 .ss-exp-layout에 .is-full을 붙인다:
+   실험 영역이 머리말 아래 ~ 아래 이동 막대 위 화면 전체에 고정되고(뒤 페이지는 스크롤되지 않음), 그 안에 장면 칼럼과 조작 칸(패널)이
+   겹치지 않게 나란히 온다 — 가로 화면은 조작 칸이 오른쪽, 세로 화면은 아래(장면 칼럼 약 60%). 조작 칸만 그 안에서 스크롤된다.
+   z-index는 머리말·아래 이동 막대(20)·알림(50)보다 아래. 머리말을 접으면 --ss-header-h(lesson.js가 잰다)를 따라 실험 영역이 커진다.
+   바탕은 페이지 바탕색이라 뒤 페이지(단계 제목 등)는 비치지 않는다. 장면 크기는 CSS가 정한다(JS 높이 계산 없음). */
+.ss-exp-layout.is-full {
+  position: fixed; z-index: 15; left: 0; right: 0;
+  top: var(--ss-header-h, 138px); bottom: var(--ss-footer-h, 68px);
+  margin: 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) 8px max(8px, env(safe-area-inset-left, 0px));
+  background: var(--ss-bg);
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 32vw, 420px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px; align-items: stretch;
+}
+@media (orientation: portrait) {
+  .ss-exp-layout.is-full { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
+}
+/* 휴대폰 가로(낮은 화면): 조작 칸은 오른쪽 약 280px, 틈은 조금 좁게 */
+@media (orientation: landscape) and (max-height: 480px) {
+  .ss-exp-layout.is-full { grid-template-columns: minmax(0, 1fr) clamp(240px, 34vw, 300px); gap: 8px; padding-top: 6px; padding-bottom: 6px; }
+}
+/* 크게 보기가 보이는 동안(실험하기 단계) 뒤 페이지는 스크롤되지 않는다 — 다른 단계로 가면(섹션 hidden) 저절로 풀린다 */
+html:has([data-stage]:not([hidden]) .ss-exp-layout.is-full) { overflow: hidden; }
+/* 장면 칼럼: 장면이 남는 자리를 채우고(앱 style.css의 .ss-exp-view 높이 규칙보다 우선 — #experiment-root로 특이도를 높였다),
+   보기 도구 줄·앱이 장면 아래에 둔 카드(시간 바 등)는 제 높이만. 넘치면(아주 낮은 화면) 칼럼 안에서만 스크롤되는 안전망. */
+.ss-exp-layout.is-full > .ss-exp-view-col {
+  position: static; min-height: 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+}
+.ss-exp-layout.is-full > .ss-exp-view-col > * { flex: none; margin-top: 0; margin-bottom: 0; }
+#experiment-root .ss-exp-layout.is-full > .ss-exp-view-col > .ss-exp-view { flex: 1 1 0; height: auto; min-height: 120px; }
+/* 보기 도구 줄은 장면 아래에 작게(늘리지 않는다, 누르는 곳은 44px 그대로) */
+.ss-exp-layout.is-full > .ss-exp-view-col > .ss-view-tools { gap: 8px; }
+.ss-exp-layout.is-full > .ss-exp-view-col > .ss-view-tools .ss-btn { flex: 0 1 auto; min-height: 44px; padding: 0 14px; font-size: 0.88rem; }
+/* 2D 대체 화면: 장면 칸 높이가 정해져 있으므로 2D 그림은 칸 안에서 스크롤되고(앱이 칸에 맞춰 줄인 그림은 그대로),
+   막대는 칸 맨 아래에 붙는다(칸 밖으로 밀리지 않게). 토글 아래까지의 위 여백(기본 화면 98px)은 줄어들 수 없는 padding 대신
+   그림과 함께 스크롤되는 빈 칸(12px + 86px)으로 둔다 — 장면 칸이 낮아도(휴대폰 가로 등) 막대·안내 글이 칸 안에 남는다.
+   (앱이 2D 그림을 칸 높이에 맞출 때는 이 빈 칸 86px을 빼고 잰다: 예) max-height: calc(100% - 86px)) */
+#experiment-root .ss-exp-layout.is-full .ss-exp-view.is-2d { display: flex; flex-direction: column; }
+#experiment-root .ss-exp-layout.is-full .ss-exp-view.is-2d > .ss-view2d { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+#experiment-root .ss-exp-layout.is-full .ss-exp-view.has-toggle.is-2d > .ss-view2d { padding-top: 12px; }
+#experiment-root .ss-exp-layout.is-full .ss-exp-view.has-toggle.is-2d > .ss-view2d::before { content: ""; display: block; height: 86px; }
+#experiment-root .ss-exp-layout.is-full .ss-exp-view.is-2d > :not(.ss-view2d) { flex: none; }
+.ss-exp-layout.is-full .ss-exp-view.is-2d .ss-exp-overlay { margin: 0; border-radius: 0; border-width: 1px 0 0; }
+/* 조작 칸: 기본 화면 오른쪽 패널 그대로(진행 막대·조건 카드·앱 카드·관찰 카드·기록 표) + 맨 위 '실험 방법 알아 두기'·안내 줄 +
+   맨 끝 모형 설명(좁은 화면은 보기 도구 줄도). 길면 이 칸 안에서만 스크롤된다(overscroll-behavior: contain — 끝에 닿아도 페이지로
+   넘어가지 않음). 테두리로 스크롤되는 칸임을 알린다. */
+.ss-exp-layout.is-full > .ss-exp-panel {
+  min-height: 0; min-width: 0;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+  padding: 10px; border-radius: 20px; border: 1px solid var(--ss-border);
+  background: color-mix(in srgb, var(--ss-primary) 4%, var(--ss-bg));
+}
+.ss-exp-layout.is-full > .ss-exp-panel > .ss-view-tools { margin: 0 0 14px; }
+.ss-exp-layout.is-full > .ss-exp-panel > .ss-model-note { margin: 0 4px 14px; }
+/* 조작 칸은 조금 촘촘하게(Review dock M1 — 세로 태블릿은 칸 높이가 약 300px라 첫 화면에 고르는 버튼까지 보이게).
+   '알아 두기'는 크게 보기에서 제목 줄만(experiment.js foldIntro)이라 접힌 카드는 제목 줄 높이만. 누르는 곳 44px은 그대로. */
+.ss-exp-layout.is-full > .ss-exp-panel { padding: 8px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-card { padding: 12px; margin-bottom: 10px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-intro:not([open]) { padding-top: 2px; padding-bottom: 2px; }
+.ss-exp-layout.is-full > .ss-exp-panel > .ss-lead { margin: 2px 4px 8px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-progress { gap: 3px; margin-bottom: 10px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-prow { font-size: 0.86rem; grid-template-columns: fit-content(55%) minmax(40px, 1fr) 3.2em; } /* 단계 이름이 두세 줄로 쪼개지지 않게 */
+/* 조작 칸(가로 화면은 폭 약 300~420px)은 기본 화면 패널보다 좁으므로 관찰 보기 버튼은 칸 폭에 맞춰 두세 칸으로(글자가 세 줄로 쪼개지지 않게) */
+.ss-exp-layout.is-full > .ss-exp-panel .ss-obs-grid { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+/* 좁은 화면의 드래그 안내 덧붙임("페이지를 위아래로 움직일 때는 3D 화면 바깥을 밀어요")은 크게 보기에서 뺀다 — 페이지가 움직이지 않는다 */
+.ss-exp-layout.is-full .ss-tip-page { display: none; }
+/* 낮은 가로 화면(휴대폰 가로)의 크게 보기: 3D 칸이 낮아(약 100px) 드래그 안내 글이 왼쪽 위 토글과 겹치지 않게 토글 오른쪽부터 한 줄로(넘치면 …) */
+@media (orientation: landscape) and (max-height: 480px) {
+  .ss-exp-layout.is-full .ss-exp-view:not(.is-2d) .ss-view-tip { left: 136px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+/* 페이지용 scroll-margin(머리말 높이)이 조작 칸 안(키보드 초점 이동 등)에서는 쓰이지 않게 */
+.ss-exp-layout.is-full > .ss-exp-panel :is(.ss-card, .ss-btn, .ss-row, .ss-feedback, .ss-check-node, .ss-observe, .ss-num-field) { scroll-margin: 8px; }
 
 .ss-step-card { padding: 14px; }
 .ss-step-h { margin: 0 0 10px; font-size: 1.08rem; font-weight: 700; }

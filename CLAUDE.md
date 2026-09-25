@@ -7,7 +7,7 @@
 * 블로그 본체: Next.js 16 (App Router) + Tailwind + shadcn/ui, 정적 export
 * 웹앱: HTML, CSS, JavaScript로 만든 독립 정적 앱 (`/public/apps/{앱이름}/`)
 * Supabase 기반 백엔드 데이터 서버 (글, 댓글, 좋아요, 조회수, 로그인, 웹앱 데이터)
-* 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`) + **Vercel**(프로젝트 `class1`, 같은 저장소 main에서 자동 배포, 주소 `https://<Vercel 주소>/class1/` — 첫 주소 `/`는 `vercel.json`이 `/class1/`로 넘김. `class1.vercel.app`은 다른 사람 주소라 실제 주소는 Vercel Settings → Domains에서 확인)
+* 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`) + **Vercel**(프로젝트 `class1`, 같은 저장소 main에서 자동 배포, 주소 **`https://class1-chi.vercel.app/class1/`** — 첫 주소 `/`는 `vercel.json`이 `/class1/`로 넘김)
 * 언어/디자인: 한국어 UI, 다크모드 지원. 디자인 체계는 `docs/design/redesign/spec.md`(2026-09-24 개편: 보라 주색, 본문 Pretendard·제목 G마켓 산스 Bold + 부드러운 그림자, Fluent 3D 아이콘, 부엉이 과학자 마스코트) — 아래 "디자인 규칙"
 * 메뉴: 홈 · 학습게임활동 · 과학수업 · 자유게시판 (수학수업은 삭제됨, `/math/` 없음)
 * 진행 현황·확정 결정은 `docs/STATUS.md`에 기록한다(위에서 함께 불러옴).
@@ -36,7 +36,9 @@
 * 학습 테이블: `member_directory`, `app_results`, `app_progress`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks`, `praise_presets` (설계: `docs/admin/spec.md`, `docs/admin/responses-spec.md`).
 * 관리 테이블: `site_settings`(로그인 잠금 스위치 한 줄, 읽기는 항상 공개), `password_reset_log`, `member_withdrawal_log`, `member_create_log`(감사 로그, 관리자만 조회, 쓰기는 service_role 함수로만) (설계: `docs/admin/admin-tools/spec.md`, `docs/admin/create-members/`).
 * 커뮤니티 테이블: `community_posts`(kind: board|game), `community_comments`, `community_likes`, `community_reports`, Storage 버킷 `game-uploads`(비공개) (설계: `docs/community/spec.md`).
-* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `check-answer`(Gemini, 비밀 `GEMINI_API_KEY`). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지). 함수의 허용 출처(CORS)는 GitHub Pages·localhost + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 주소, 예: Vercel) — 주소를 더할 때 코드는 고치지 않는다.
+* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `check-answer`(Gemini, 비밀 `GEMINI_API_KEY`). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지). 함수의 허용 출처(CORS)는 GitHub Pages·localhost + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 주소, 지금 `https://class1-chi.vercel.app`) — 주소를 더할 때 코드는 고치지 않고 Secret을 바꾼 뒤 함수 4개를 다시 배포한다.
+* 함수 배포·Secret 설정은 **사용자가 자기 Mac 터미널에서** 한다(Supabase CLI 로그인 되어 있음, 토큰은 macOS 키체인). "Access token not provided"가 나오면 `npx supabase login`부터(브라우저 승인 → 확인 코드). Claude는 토큰·암호·확인 코드를 묻거나 입력하지 않는다. `supabase/.temp/`는 커밋하지 않는다.
+* `check-answer`는 Gemini를 7초까지 기다리고 생각(thinking)을 끈다(`thinkingBudget:0` → 400이면 `thinkingLevel:"low"` → 설정 없음), 앱(`answer-check.js`)은 9초까지 기다린다 — **함수 대기 시간을 늘리면 앱 대기도 그보다 길게**. 대답을 못 받으면 차단하지 않고 그 질문을 "되짚음"으로 기록하지 않는다. 함수 로그에 켜질 때 모델 정보, 판정마다 `ms`·`modelVersion`이 남는다 — 느리거나 모델이 바뀌면 코드 대신 Secret `GEMINI_MODEL`을 바꾼다.
 * 외부 AI API 키 등 비밀값은 Supabase Secrets에만 두고 코드·저장소·로그·브라우저에 절대 넣지 않는다. 외부로 보내는 학생 데이터는 답 글·질문·모범 답안뿐(이름·학번·user id·이메일 금지).
 * 웹앱 전용 테이블은 `app_{앱이름}_` 접두사를 붙인다.
 * 스키마 변경은 `supabase/migrations/`에 SQL 파일로 남긴다.
@@ -56,7 +58,7 @@
 * 가입 정책: Supabase 가입 허용 유지(OAuth 방문자는 첫 로그인 시 일반 사용자로 자동 가입), Confirm email 켬.
 * 계정은 관리자 대시보드 **회원 관리 > 회원 추가**(한 명 / 엑셀 일괄: 아이디·비밀번호·역할)로 만든다. 역할은 학생=`user`, 교사=`admin`(새 역할 없음), 이메일은 `아이디@class1.local`, 첫 로그인 때 비밀번호 변경 강제. 로컬 스크립트(`scripts/import-users.mjs`)는 예비용.
 * **강제 탈퇴는 완전 탈퇴**: `auth.users`를 삭제(복구 없음)하되 학습 기록은 남기고 "탈퇴한 학생"으로 표시한다. 관리자 대상은 불가. 기록을 지울 수 있는 외래키가 생기면 안 된다(`withdrawal_blocking_fks()`가 막음).
-* redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`, Vercel 주소 `/**`를 등록한다(Supabase Authentication → URL Configuration).
+* redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`, `https://class1-chi.vercel.app/class1/**`(Vercel)를 등록한다(Supabase Authentication → URL Configuration — 아이디·비밀번호 로그인에는 필요 없고 GitHub·Google 로그인이 그 주소로 돌아오게 할 때 필요).
 
 
 ## 작업 사이클
@@ -70,8 +72,9 @@
 
 ### 커밋·배포
 * 검증(lint·build·필요한 브라우저 확인)을 마친 뒤 커밋한다. 커밋 메시지는 영어, 끝에 Co-Authored-By 줄.
-* **push(배포)는 사용자가 확인·요청한 뒤에만** 한다. push 후 GitHub Actions 결과와 배포 사이트 응답을 확인해 보고한다.
-* 앱의 저장 구조를 바꾸면 저장 키 버전(`:vN`)을 올리고, 학생 진행 기록이 처음부터 다시 시작된다는 점을 사용자에게 알린다.
+* **push(배포)는 사용자가 확인·요청한 뒤에만** 한다. push 후 GitHub Actions 결과와 **두 배포 사이트(GitHub Pages·Vercel)**가 새 코드를 주는지 확인해 보고한다.
+* 사용자가 어떤 단계에 대해 "검토 끝나면 바로 커밋·푸시해줘"라고 미리 허락하면(09-25~26 단계 B·C·크게 보기 개편), **그 단계에 한해** Review에서 막히는 문제가 없거나 고친 뒤 확인 없이 커밋·push한다. 허락은 다음 단계로 넘어가지 않는다 — 새 단계는 시작할 때 다시 묻는다.
+* 앱의 저장 구조를 바꾸면 저장 키 버전(`:vN`)을 올리고, 학생 진행 기록이 처음부터 다시 시작된다는 점을 사용자에게 알린다. 올릴 때 앱 시작 시 **그 앱의 예전 판 로컬 키만** 지운다(남겨 두면 로그아웃·동기화 때 새 판 기록을 덮을 수 있음 — 단계 C Review M1).
 
 
 ## 서브에이전트 규칙
@@ -83,7 +86,10 @@
 * 서브에이전트는 git commit/push와 실 DB 쓰기를 하지 않는다. 커밋은 Claude가 검증 후 한다.
 * 브라우저는 공유되므로 서브에이전트는 **자기 탭(tabs_create) 또는 자기 전용 headless 브라우저(겹치지 않는 포트)**만 쓰고, 다른 탭·프로세스를 건드리지 않으며, `localStorage.clear()`를 쓰지 않는다(자기 앱 키만 삭제). 띄운 서버는 끝날 때 종료한다.
 * 임시 파일은 스크래치 디렉터리에만 두고 끝나면 지운다.
-* 테스트할 때 **실제 Supabase 주소는 첫 페이지 로드부터 막고**(요청 가로채기) 가짜 세션·가짜 응답만 쓴다. 실제 Gemini도 부르지 않는다.
+* 테스트할 때 **실제 Supabase 주소는 첫 페이지 로드부터 막고**(요청 가로채기) 가짜 세션·가짜 응답만 쓴다. 실제 Gemini도 부르지 않는다. 검증된 방법: 자기 headless Chrome에 `--host-resolver-rules="MAP *.supabase.co 127.0.0.1:9, MAP supabase.co 127.0.0.1:9"` + CDP `Fetch.enable`(`*supabase.co*`)로 가짜 응답, 3D는 `--use-angle=swiftshader --enable-unsafe-swiftshader`, CDP는 Node 24 내장 `WebSocket`(설치 없이).
+* 앱 테스트는 dev 서버(`blog-dev`) 대신 **자기 정적 서버로 저장소 `public/`을 직접 서빙**한다(`python3 -m http.server <겹치지 않는 포트> --bind 127.0.0.1 --directory public` → `http://127.0.0.1:<포트>/apps/<앱>/index.html`) — 데스크톱 앱이 미리보기 dev 서버를 멈출 때가 있다. 비교용 예전 판은 `git archive <커밋> public`을 스크래치에 풀어 다른 포트로.
+* 서브에이전트는 **아무것도 내려받거나 설치하지 않는다**(npm 패키지·브라우저·CDN 파일 저장 금지 — 테스트 페이지가 CDN을 불러오는 것만 허용). 필요하면 Claude에게 보고하고, Claude가 사용자 허락을 받는다.
+* Review 에이전트는 코드를 고치지 않고 보고서(`review-*.md`: 심각도별 표, 재현, 제안, 끝에 "배포해도 됨 / 고친 뒤 배포")만 쓴다. 사용자에게 보여 줄 대표 스크린숏이 필요하면 지침에서 `showcase/`로 요구한다.
 * 사용량 한도로 서브에이전트가 멈추면 같은 에이전트에 SendMessage로 이어서 하게 한다(작업 트리의 부분 결과를 먼저 확인).
 
 
@@ -114,7 +120,7 @@
 * **활동 시간: 앱 전체를 학생이 7분 안에 마칠 분량**으로 구성한다. `spec.md`에 단계별 예상 소요 시간표를 적고(합계 7분 이하), Review에서 실제로 진행해 확인한다. 단, 아래 측정 규칙(실험관찰의 조건은 모두 측정)을 줄여서 시간을 맞추지 않는다 — 읽기·질문·연출을 줄이고, 그래도 넘으면 예상 시간을 사용자에게 알린다.
 * **예상하기: 탐구형 질문 1개만.** 답을 절대 미리 제시하지 않고, 학생이 직접 짧게 타이핑한다. 힌트 버튼을 둔다(힌트도 답을 알려주지 않는다).
 * **실험하기**: 지도서의 핵심 실험을 3D 장면으로 보여주고 드래그로 방향을 바꿀 수 있게 한다(three.js CDN, 터치 드래그). 측정 조건은 **실험관찰(교과서)에 제시된 상황을 모두** 측정하게 한다(아래 측정 규칙). 가능하면 정해진 조건 사이의 연속 구간도 슬라이더 등으로 자유롭게 살펴볼 수 있게 한다. 실시간 연출은 짧게 하고, 기다림이 길면 "빨리 감기(모형)"로 줄인다. 측정값은 **기록** 버튼으로 저장한다.
-* **실험 화면 배치(2026-09-25·26 사용자 결정 — `docs/science/sim-redesign/spec.md` 개정 4·6)**: **기본은 지금 구조**(가로 화면: 장면 왼쪽·조작 오른쪽, 세로: 위아래). 장면 한쪽의 **"⛶ 전체 화면 보기"**(공통 틀)를 누르면 **한 화면 실험실** — 실험 영역이 머리말과 아래 이동 막대 사이 화면 전체를 채우고, 그 안에 **장면 + 한쪽의 조작 칸**(가로 화면은 오른쪽, 세로는 아래쪽; 조건 고르기·슬라이더·관찰 카드·기록 표 등 전부, 장면을 가리지 않음, 길면 칸 안에서만 스크롤) — **페이지 위아래 스크롤 없이** 한눈에 조작. 실행·기록하기·측정값은 장면 안 막대. **태블릿 세로에서는 크게 보기가 기본**, 선택은 방향별로 기억. 상단의 계정 줄과 단계 메뉴는 **접었다 펼 수 있다**(접으면 제목 줄만).
+* **실험 화면 배치(2026-09-25·26 사용자 결정 — `docs/science/sim-redesign/spec.md` 개정 4·6)**: **기본은 지금 구조**(가로 화면: 장면 왼쪽·조작 오른쪽, 세로: 위아래). 장면 한쪽의 **"⛶ 전체 화면 보기"**(공통 틀)를 누르면 **한 화면 실험실** — 실험 영역이 머리말과 아래 이동 막대 사이 화면 전체를 채우고, 그 안에 **장면 + 한쪽의 조작 칸**(가로 화면은 오른쪽, 세로는 아래쪽; 조건 고르기·슬라이더·관찰 카드·기록 표 등 전부, 장면을 가리지 않음, 길면 칸 안에서만 스크롤) — **페이지 위아래 스크롤 없이** 한눈에 조작. 실행·기록하기·측정값은 장면 안 막대. 조작 칸 첫 화면에 고르는 버튼이 보이게 '알아 두기'는 크게 보기에서 제목 줄만(학생 선택으로 저장하지 않고 끄면 원래대로 — 09-26 Review dock M1), 조작 칸은 촘촘하게. **태블릿 세로에서는 크게 보기가 기본**, 선택은 방향별로 기억. 상단의 계정 줄과 단계 메뉴는 **접었다 펼 수 있다**(접으면 제목 줄만).
 * **직접 조작하는 느낌**: 학생이 장면의 물체를 직접 끌거나 누르는 조작을 우선한다(예: 태양·손전등 끌기, 물체를 눌러 고르기 — 버튼 조작은 대안으로 남김). 단 **복잡해지거나 시간이 늘면 안 된다**(조작 단계를 더하지 않고 기존 고르기를 대신할 뿐, 연출은 1초 안쪽).
 * **답을 먼저 알려 주지 않는다**: 실험하기 단계와 **기록하는 순간**(알림·관찰 카드 안내·이름표·참고 팝업)에는 **측정값·관찰 사실만** 말한다. "~할수록 ~해요", "그래서 ~이다", 원인 단정, 정답 보기와 같은 문구 금지. 분석·정리하기에서 학생이 고르거나 쓴 **뒤**의 피드백·모범 답안은 괜찮다.
 * **장면 속 글자**: 바뀌는 값(측정값·각도 등)은 3D 이름표로 띄우지 않고 **값 패널**에 둔다(이름표가 측정 지점·다른 이름표를 가리지 않게). 3D에는 안 바뀌는 이름표만. 태양·빛줄기·그림자처럼 서로 맞아야 하는 그림은 **한 상태값에서 함께 계산**한다(따로 계산해 어긋나지 않게). 알림은 장면을 가리지 않는 곳에.
@@ -126,7 +132,7 @@
 * **마치기 조건**: 정리하기 답이 통과 불가면 '학습 마치기'를 거부하고 까닭을 안내한다. 버튼 위에 "'학습 마치기'를 눌러야 선생님에게 제출돼요"를 항상 보인다.
 * 실험은 언제든 다시 할 수 있고, 앞 단계로 돌아갈 수 있다. 진행 중 입력은 localStorage 임시 사본과 `app_progress` DB에 저장해 새로고침·다른 기기에서도 이어서 할 수 있게 한다.
 * 조사 도우미 앱도 같은 원칙(7분 이내, 도입 질문 1개, 정리 질문 1개, 조사 기록은 꼭 필요한 칸만)을 따른다.
-* 이 기준은 2026-09-22부터 적용한다. 이미 만든 앱 중 1학기 2단원 탐구 1·2·6(수업에 사용 안 함)은 **문항·내용**을 이전 기준 그대로 둔다. **1학기 1단원 6개 앱은 2026-09-25 사용자 결정으로 현재 기준에 맞게 간략화한다**(예상 1개·분석 1~2개·정리 1개·발전 질문 삭제, 관찰·분류 활동과 측정값은 그대로 — 이미 마친 결과는 `app_results`에 그대로 남고, 응답 매핑에 새 변형을 추가해 예전·새 기록을 모두 보인다. 저장 키 버전을 올리므로 진행 중이던 기록만 처음부터). 공통 틀 개선(동작·겉모양·되짚기·마치기 조건·화면 배치)은 사용자 승인에 따라 23개 앱 **전부**에 적용한다 — 저장 키·저장 구조·문항은 그대로여서 학생 기록이 유지된다.
+* 이 기준은 2026-09-22부터 적용한다. 이미 만든 앱 중 1학기 2단원 탐구 1·2·6(수업에 사용 안 함)은 **문항·내용**을 이전 기준 그대로 둔다. **1학기 1단원 6개 앱은 현재 기준에 맞게 간략화했다**(2026-09-25 사용자 결정, 09-26 배포: 예상 1개·분석 1~2개·정리 1개·발전 질문 삭제, '더 탐구하고 싶은 점'은 정리 단계 안. 관찰·분류 활동과 측정값은 그대로 — 사용자: "하나하나 측정해야 하니 이대로", 6-1-1-1 거품 5초는 형식상 빨리 감기, 조사 앱은 정리 틀을 줄임·6-1-1-6 출처는 고르기. 그래도 7분을 넘는 것은 사용자가 받아들임. 이미 마친 결과는 `app_results`에 그대로 남고 응답 매핑 v1 "간략화 전"으로, 새 기록은 `detail.questionSet: 2`·v2 변형. 저장 키 버전을 올려 예전 판 로컬 사본은 앱 시작 때 지운다). 공통 틀 개선(동작·겉모양·되짚기·마치기 조건·화면 배치)은 사용자 승인에 따라 23개 앱 **전부**에 적용한다 — 저장 키·저장 구조·문항은 그대로여서 학생 기록이 유지된다.
 
 ### 공통
 * **반드시 과학적 사실에 맞게** 만든다. 시뮬레이션의 수치·현상·용어는 지도서와 교과서 표기를 따르고, 단순화한 부분은 화면에 "모형" 등으로 밝힌다. Review 단계에서 과학적 정확성을 별도 항목으로 검증한다.
@@ -140,6 +146,7 @@
 * 이미 만든 앱의 `detail` 모양을 바꾸면 `src/data/app-responses/{앱}.ts` 응답 매핑도 같이 고친다.
 * 여러 차시 앱이 같은 틀을 쓰므로, 공통 코드는 정본(`scripts/templates/science-sim/` 실험용, `scripts/templates/science-guide/` 조사용, `scripts/templates/class1-record.js` 저장)을 두고 앱 폴더로 복사해 쓴다(앱은 자체 완결 유지).
 * 정본을 고치면 **하위 호환**을 지키고, 모든 앱 사본에 다시 복사한 뒤 `diff -r`로 일치를 확인하고 앱을 실험 단계까지 열어 점검한다.
+* 공통 틀의 도우미(크게 보기 `SciSim.Experiment.enlarge()`·`sceneBar`, 끌기 `v.draggable()`, 기록 버튼 훅 `exp.recordButton`·`exp.revealRecord()`, 화면 설정 `SciSim.uiPref`) 사용법은 정본 `scripts/templates/science-sim/README.md`(맨 뒤 "추가 기능(2026-09-25 Phase A …)" 절)를 따른다. 크게 보기는 버튼·패널을 복제하지 않고 **옮기므로**, 앱이 공통 실행·기록 버튼을 찾을 때는 고정 훅(`exp.runButton`·`exp.recordButton`)을 쓰고 `.ss-observe .ss-btn-primary` 같은 자리 기반 선택자를 쓰지 않는다.
 * 학생 화면에 "지도서"라는 말을 쓰지 않는다(교사용 자료, "지도서 N차시"도 "N차시"로). 출처는 "교과서·실험관찰"로 적는다.
 * 과학 앱 글꼴은 `persist.js`가 `<link>`를 **비차단**으로 붙인다: 본문 Pretendard는 jsDelivr CDN(버전 고정+SRI), 제목 G마켓 산스는 사이트의 `public/fonts/gmarket-sans/gmarket-sans.css`를 상대경로 `../../fonts/…`로(사이트와 같은 파일·같은 캐시 — 앱 폴더 밖을 참조하는 유일한 예외, 못 받으면 기기 글꼴). CSS `@import`로 불러오지 않는다(학교 망이 느리면 첫 화면이 멈춘다).
 * 과학 앱에서 새 기능을 넣을 때도 3D 장면·그래프 계열 색은 과학적 의미가 있으므로 디자인 개편 대상에서 뺀다.

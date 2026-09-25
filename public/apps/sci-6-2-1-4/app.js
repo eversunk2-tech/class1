@@ -147,6 +147,7 @@
     var det = el("details", { class: "ss-card ss-intro" }, [el("summary", { text: C.intro.title }), intro]);
     det.open = store.get("intro", true) !== false;
     det.addEventListener("toggle", function () {
+      if (S.Experiment.isQuietToggle(det)) return; // 크게 보기가 잠시 접고 편 것(학생 선택 아님)
       store.set("intro", det.open);
     });
     root.appendChild(det);

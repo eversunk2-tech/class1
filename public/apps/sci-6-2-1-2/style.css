@@ -99,6 +99,12 @@
   .tb-tick { width: 52px; }
   .tb-tick:nth-child(even) { top: 52px; }
 }
+/* 크게 보기(한 화면 실험실, 2026-09-26): 가로 화면에서는 시간 바가 폭이 좁은 조작 칸(오른쪽) 안에 있으므로 좁은 화면과 같이 두 줄로 엇갈린다 */
+@media (orientation: landscape) {
+  .ss-exp-layout.is-full .ss-exp-panel .tb-ticks { height: 104px; }
+  .ss-exp-layout.is-full .ss-exp-panel .tb-tick { width: 52px; }
+  .ss-exp-layout.is-full .ss-exp-panel .tb-tick:nth-child(even) { top: 52px; }
+}
 
 /* 값 패널: 아이콘 + 이름 + 값(색만으로 구분하지 않는다) */
 .vp { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
@@ -130,6 +136,11 @@
 .ss-exp-overlay-panel .vals-rec { margin-top: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ss-exp-overlay-panel .vals-rec .ss-btn-big { width: auto; flex: 0 1 auto; }
 .ss-exp-overlay-panel .tb-msg { flex: 1 1 200px; margin: 0; font-size: 0.85rem; line-height: 1.35; }
+/* 크게 보기 + 낮은 가로 화면(휴대폰 가로, 2026-09-26): 측정값이 폭 약 280px의 조작 칸 맨 위 카드(.ss-scene-panel-card)로 가므로
+   값 4칸을 두 줄로(숫자·이름이 잘리지 않게) */
+@media (orientation: landscape) {
+  .ss-exp-layout.is-full .ss-scene-panel-card .vp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* 실험 패널의 내 기록 표 */
 .my-records .ss-table-wrap { max-height: none; }
@@ -215,10 +226,11 @@
 @media (min-width: 901px) and (orientation: landscape) {
   .d2-sky { max-height: 14vh; }
   .d2-dev { max-height: 23vh; }
-  /* 크게 보기(막대가 2D 그림 바로 아래에 온다): 그림을 조금 더 낮춰 장면+막대가 한 화면에 들어오게 */
-  .ss-exp-layout.is-full .d2-sky { max-height: 12vh; }
-  .ss-exp-layout.is-full .d2-dev { max-height: 20vh; }
 }
+/* 크게 보기(한 화면 실험실, 2026-09-26): 장면 칸 높이가 정해져 있으므로 2D 그림 두 장(하늘·옆모습)을 칸 안에 35 : 65로 나눠 담는다
+   (막대는 칸 맨 아래 — 예전의 화면 높이(vh) 기준 크게 보기 규칙은 없앴다) */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: calc(100% - 86px); min-height: 150px; grid-template-rows: minmax(0, 35fr) minmax(0, 65fr); } /* 86px = 공통 틀의 토글 아래 빈 칸 */
+#experiment-root .ss-exp-layout.is-full .ss-view2d > .d2-wrap > .d2-svg { height: 100%; max-height: none; }
 @media (max-width: 640px) {
   .d2-sky { max-height: none; }
   .d2-dev { max-height: none; }

@@ -41,6 +41,13 @@
 @media (min-width: 561px) and (max-width: 900px), (min-width: 561px) and (orientation: portrait) {
   .month-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+/* 크게 보기 + 낮은 가로 화면(휴대폰 가로, 2026-09-26): 조작 칸 폭이 약 280px이라 계절 두 개를 한 줄에 두면 달 버튼(44px)이 칸 밖으로
+   밀린다 → 계절마다 한 줄(계절 이름 + 3달) */
+@media (orientation: landscape) and (max-height: 480px) {
+  .ss-exp-layout.is-full .month-bar { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ss-exp-layout.is-full .season-group { display: grid; grid-template-columns: 3.6em minmax(0, 1fr); align-items: center; gap: 4px; padding: 3px 4px; }
+  .ss-exp-layout.is-full .season-head { padding: 0; font-size: 0.8rem; }
+}
 
 /* ── 궤적 보기(이번 달만 · 계절 대표 3개) ── */
 .path-mode-group { flex: 1 1 auto; display: flex; gap: 6px; margin: 0; }
@@ -59,6 +66,9 @@
 /* ── 값 패널 ── */
 .obs-card .ss-help-inline { font-weight: 500; color: var(--ss-muted); font-size: 0.82rem; }
 .value-card { margin-top: 12px; padding: 12px 0 0 12px; border-top: 1px solid var(--ss-border); border-left: 6px solid var(--season, var(--ss-border)); }
+/* 크게 보기(한 화면 실험실, 2026-09-26): 값 패널·기록하기는 장면 안 막대(좁은 화면은 조작 칸 맨 위 카드)로 옮겨 가 이 틀에는 기록 안내
+   글만 남는다 — 빈 틀(윗줄·왼쪽 색 띠)이 조작 칸에 남지 않게 틀을 뺀다 */
+.ss-exp-layout.is-full .value-card { margin-top: 6px; padding: 0; border: 0; }
 .value-card .ss-step-h { margin-bottom: 6px; }
 @media (orientation: portrait) and (min-width: 561px) { .ss-exp-view.sky-view { height: min(36vh, 420px); } }
 .value-head { font-weight: 800; }
@@ -104,14 +114,9 @@
   .sky-view:not(.is-2d) > .ss-view3d { bottom: calc(var(--tip-h, 40px) + 12px); }
   .sky-view.has-bar:not(.is-2d) > .ss-view3d { bottom: calc(var(--ss-exp-overlay-h, 64px) + var(--tip-h, 40px) + 12px); }
 }
-/* 2D + 크게 보기: 2D 그림이 가로 전체로 커져 막대(기록하기)가 화면 밖으로 밀리던 것(fix-B1 L2) — 그림 높이를 화면 띠에 맞춰 줄인다
-   (가로는 가운데에 작게 놓인다). 2-1-2와 같은 방식 */
-@media (orientation: landscape) {
-  .ss-exp-layout.is-full .sky2d { max-height: max(180px, calc(100vh - var(--ss-header-h, 150px) - var(--ss-footer-h, 68px) - 300px)); }
-}
-@media (orientation: portrait) {
-  .ss-exp-layout.is-full .sky2d { max-height: max(200px, calc(100vh - var(--ss-header-h, 180px) - var(--ss-footer-h, 68px) - 330px)); }
-}
+/* 2D + 크게 보기(한 화면 실험실, 2026-09-26): 장면 칸 높이가 정해져 있으므로 2D 하늘 그림을 칸 안에 맞춘다(칸 높이까지 줄고 가로는
+   가운데) — 막대(기록하기)는 칸 맨 아래(예전의 화면 높이(vh) 기준 규칙은 없앴다, fix-B1 L2) */
+.ss-exp-layout.is-full .ss-view2d > .sky2d { max-height: max(120px, calc(100% - 86px)); } /* 86px = 공통 틀의 토글 아래 빈 칸 */
 
 /* ── 분석 그래프 ── */
 .chart-grid { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 760px; margin: 0 auto; }

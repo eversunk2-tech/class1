@@ -1328,20 +1328,24 @@
       note,
       live,
     ]);
-    // 가로 화면(좌우 배치): 오른쪽 패널의 조건 고르기 아래(실행 버튼 위) / 세로·좁은 화면: 실험 화면 바로 아래
+    // 가로 화면(좌우 배치)·크게 보기(조작 칸): 조건 고르기 아래(실행 버튼 위) / 세로·좁은 기본 화면: 실험 화면 바로 아래
+    // (크게 보기는 한 화면 실험실 — 장면 칼럼이 장면으로 차도록 이 카드도 조작 칸으로, 2026-09-26 spec 개정 6)
     var viewCol = viewBox.parentNode;
+    var layoutEl = viewCol.parentNode;
     var panel = $("experiment-root").querySelector(".ss-exp-panel");
     var runCard = panel.querySelector(".ss-run-card");
     var twoCol = window.matchMedia ? window.matchMedia("(min-width: 901px) and (orientation: landscape)") : null;
     function placeCard() {
-      if (twoCol && twoCol.matches) panel.insertBefore(card, runCard);
-      else viewCol.insertBefore(card, viewBox.nextSibling);
+      if ((twoCol && twoCol.matches) || layoutEl.classList.contains("is-full")) {
+        if (card.parentNode !== panel || card.nextSibling !== runCard) panel.insertBefore(card, runCard);
+      } else if (viewBox.nextSibling !== card) viewCol.insertBefore(card, viewBox.nextSibling);
     }
     placeCard();
     if (twoCol) {
       if (twoCol.addEventListener) twoCol.addEventListener("change", placeCard);
       else if (twoCol.addListener) twoCol.addListener(placeCard);
     }
+    if ("MutationObserver" in window) new MutationObserver(placeCard).observe(layoutEl, { attributes: true, attributeFilter: ["class"] });
 
     function target() {
       return curSel.sub || null;

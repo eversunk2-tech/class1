@@ -42,6 +42,10 @@
 .hud-ff[hidden] { display: none; }
 .ss-exp-view.is-2d .ss-view2d { padding-top: 70px; }
 .ss-exp-view.is-2d .hud-ff { bottom: auto; top: 44px; }
+/* 크게 보기(한 화면 실험실, 2026-09-26): 장면 안 막대(실행·기록하기)가 보이면 "⏩ 빨리 감기(모형)" 표시를 막대 위로 올려 겹치지 않게
+   (.has-bar는 크게 보기에서만 붙는다 — 기본 화면은 그대로). 휴대폰(폭 520px 이하)은 아래 규칙대로 왼쪽 위 — 크게 보기에서는
+   "전체 화면 보기" 토글 아래로. */
+.ss-exp-view.has-bar:not(.is-2d) .hud-ff { bottom: calc(40px + var(--ss-exp-overlay-h, 0px)); }
 
 /* ── 시간 바(실험해요 1) ── */
 .tb-card { margin: 8px 0; padding: 6px 12px 8px; }
@@ -197,4 +201,5 @@
 }
 @media (max-width: 520px) {
   .ss-view3d ~ .hud-ff, .hud-ff { bottom: auto; top: 40px; left: 10px; transform: none; }
+  .ss-exp-layout.is-full .ss-exp-view:not(.is-2d) .hud-ff { top: 96px; bottom: auto; }
 }

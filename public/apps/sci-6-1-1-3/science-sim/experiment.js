@@ -73,7 +73,7 @@
  *     onChange: function () {},                             // 진행 상황이 바뀔 때(단계 이동 막대 갱신 등)
  *     can3D: true,                                          // false면 처음부터 2D(주소에 ?no3d=1이면 자동 false)
  *     scenePanel: node,                                     // 선택(2026-09-25): 지금 값을 보여 주는 노드(예: 시각·측정값 패널). 전체 화면 모드일 때
- *                                                           //   장면 안 막대의 윗줄(넓은 화면) 또는 장면 바로 아래 카드(좁은 화면)로 틀이 자동으로 옮긴다. 안 주면 막대에는 실행·기록 버튼만 나온다.
+ *                                                           //   장면 안 막대의 윗줄(넓은 화면) 또는 조작 칸 맨 위 카드(좁은 화면)로 틀이 자동으로 옮긴다. 안 주면 막대에는 실행·기록 버튼만 나온다.
  *     sceneBar: true,                                       // 선택(fix-A): false면 크게 보기에서도 실행·기록 버튼을 막대로 옮기지 않는다(앱이 자기 버튼으로
  *                                                           //   측정·기록하는 경우). factors가 []이면 자동으로 false처럼 동작한다. 이때 막대에는 scenePanel만, 없으면 막대를 숨긴다.
  *   });
@@ -84,25 +84,30 @@
  *   exp.runButton / exp.recordButton → 공통 실행·기록 버튼 엘리먼트(클래스 ss-run-btn / ss-record-btn). 앱이 기록 버튼을 찾을 때는
  *                               이것을 쓴다 — '관찰 카드 안' 선택자(.ss-observe .ss-btn-primary 등)로 찾지 않는다(크게 보기에서는 막대에 있다).
  *   exp.revealRecord()        → '기록하기'가 켜져 있고 화면에 안 보이면 최소로 스크롤해 보이게 한다(꺼져 있으면 아무것도 안 함,
- *                               크게 보기에서는 막대와 관찰 카드가 함께 보이게, 함께 안 들어가면 막대 우선). 앱의 '가리면 스크롤' 도우미는 이것을 부른다.
+ *                               크게 보기에서 막대에 있으면 늘 보이므로 아무것도 안 함, 막대가 없으면 조작 칸 안에서만). 앱의 '가리면 스크롤' 도우미는 이것을 부른다.
  *
  * 저장 키: "scene"(실험 화면에 남아 있는 결과), "view2d"(2D 보기 선택), "intro"(알아 두기 접힘)
- * 실행 버튼을 누르면 실험 화면이 보이도록 먼저 스크롤한 뒤(세로 화면·휴대폰) 애니메이션을 시작한다.
+ * 실행 버튼을 누르면 실험 화면이 보이도록 먼저 스크롤한 뒤(세로 화면·휴대폰) 애니메이션을 시작한다(크게 보기는 장면이 늘 보여 스크롤하지 않는다).
  *
- * ▶ 전체 화면 보기(2026-09-25 추가, 모든 앱에 자동 적용 — 앱 코드를 바꿀 필요 없다):
+ * ▶ 전체 화면 보기 = "한 화면 실험실"(2026-09-26 spec 개정 6, 모든 앱에 자동 적용 — 앱 코드를 바꿀 필요 없다):
  *   장면 왼쪽 위(모형 배지 바로 아래)에 "⛶ 전체 화면 보기" 토글 버튼이 늘 있다. 글자가 할 일을 말한다
  *   ("⛶ 전체 화면 보기" ↔ "↙ 기본 화면", 켜짐 모양은 클래스 is-on — aria-pressed는 쓰지 않는다). DOM에서 막대보다 앞(Tab 순서 = 보이는 순서).
- *   켜면: 장면이 화면 폭 전체로 커지고(가로 화면은 뷰포트 높이 기준으로 장면+막대가 스크롤 없이 다 보이도록 계산),
- *         실행·기록 버튼과 scenePanel(있으면, 막대 윗줄)이 장면 아래쪽 막대로 옮겨 가고(3D 칸은 막대 위에서 끝난다 — 막대가
- *         장면을 가리지 않게), 관찰 카드는 장면 바로 아래(패널 맨 앞), 조건 고르기 카드는 그 아래로 온다.
+ *   켜면: 실험 영역(.ss-exp-layout.is-full)이 머리말 아래 ~ 아래 이동 막대 위 화면 전체에 고정되고(페이지는 스크롤되지 않는다),
+ *         그 안에 장면 + 조작 칸(기본 화면 오른쪽 패널 그대로 — 가로 화면은 오른쪽, 세로 화면은 아래)이 겹치지 않게 나란히 온다.
+ *         조작 칸 내용이 길면 그 칸 안에서만 스크롤된다. 실행·기록 버튼과 scenePanel(있으면, 막대 윗줄)은 장면 안 아래쪽 막대로
+ *         옮겨 가고(3D 칸은 막대 위에서 끝난다), '실험 방법 알아 두기'·안내 줄 등 장면 위에 있던 것은 조작 칸 맨 위로('알아 두기'는
+ *         제목 줄만 — 첫 화면에 고르는 버튼이 보이게, 학생 선택으로 저장하지 않고 끄면 원래대로),
+ *         모형 설명은 조작 칸 맨 끝으로 옮긴다(좁은/낮은 화면은 보기 도구 줄도 조작 칸 끝으로). 관찰 카드는 조작 칸 안 원래 순서
+ *         (조건 카드 다음)에 있고, 실행 뒤에는 조작 칸 안에서만 관찰 카드가 보이게 스크롤한다.
  *   끄면: 지금까지와 같은 배치(가로 화면은 장면·패널 좌우 분할, 세로/좁은 화면은 위아래). 옮긴 것은 모두 원래 자리로.
  *   기본값: 세로 태블릿(portrait, 폭 600px 이상)은 켜짐, 그 밖(가로·휴대폰)은 꺼짐 — 방향이 바뀌면 그 방향에서
  *   학생이 직접 고른 적이 없을 때만 다시 기본값을 적용한다. 학생이 누른 선택은 방향별로 기억한다(localStorage,
- *   "sci6" 접두사 아님 — 로그아웃 정리 대상이 아닌 기기 UI 설정이라서).
+ *   "sci6" 접두사 아님 — 로그아웃 정리 대상이 아닌 기기 UI 설정이라서). 켜져 있을 때 Esc 키를 누르면 기본 화면으로 돌아간다.
  *   앱이 .ss-exp-view 높이를 직접 재정의해 둔 스타일이 있어도(예: 가로 화면 전용 규칙) 전체 화면 모드의 템플릿
  *   규칙이 더 구체적인 선택자(#experiment-root 포함)로 이긴다 — 앱 코드를 고치지 않아도 된다.
  *   공통 create()를 안 쓰고 같은 .ss-exp-layout·.ss-exp-view 구조를 직접 만드는 앱은 SciSim.Experiment.enlarge(opts)로
- *   같은 기능(토글·기본값·기억·장면 높이·막대·scenePanel·관찰 카드 옮기기)을 붙인다 — 아래 enlarge() 주석.
+ *   같은 기능(토글·기본값·기억·한 화면 배치·막대·scenePanel·알아 두기 옮기기)을 붙인다 — 아래 enlarge() 주석.
+ *   SciSim.Experiment.scrollIntoView(node)도 크게 보기를 안다: 조작 칸 안의 노드는 그 칸만 스크롤하고, 장면 칼럼(늘 보임)은 움직이지 않는다.
  *
  * ▶ 실제 시간 카운트다운(초시계) — view.run 안에서 쓴다(예: 5초 간격으로 두 번 사진 찍기)
  *   await SciSim.Countdown.run(container, 5, {
@@ -158,17 +163,15 @@
     var vh = window.innerHeight || document.documentElement.clientHeight;
     return { top: header ? header.getBoundingClientRect().height : 0, bottom: vh - (footer ? footer.getBoundingClientRect().height : 0) };
   }
-  /* 뷰포트 좌표 [top, bottom] 범위를 화면 띠 안(위아래 8px 틈)에 **최소로** 움직여 넣는다. 이미 들어 있으면 가만히.
-     다 안 들어가면: keep({top, bottom} — 꼭 보여야 하는 부분, 예: 장면 안 막대)이 있으면 keep이 띠 안에 남는 데까지만
-     아래쪽을 더 보이고(keep이 띠 밖이면 keep이 보이게), 없으면 위쪽부터 맞춘다. */
-  function revealRange(top, bottom, keep) {
+  /* 뷰포트 좌표 [top, bottom] 범위를 화면 띠 안(위아래 8px 틈)에 **최소로** 움직여 넣는다(기본 화면 — 페이지 스크롤).
+     이미 들어 있으면 가만히, 다 안 들어가면 위쪽부터 맞춘다. 크게 보기의 조작 칸은 revealInDock(아래)을 쓴다. */
+  function revealRange(top, bottom) {
     var b = bandOf();
     var bt = b.top + 8;
     var bb = b.bottom - 8;
     if (top >= bt - 1 && bottom <= bb + 1) return Promise.resolve(false);
     var d;
     if (bottom - top <= bb - bt) d = bottom > bb ? bottom - bb : top - bt;
-    else if (keep) d = Math.min(bottom - bb, keep.top - bt);
     else d = top - bt;
     if (Math.abs(d) < 1) return Promise.resolve(false);
     return scrollToY(window.scrollY + d);
@@ -215,23 +218,104 @@
     if (mq.addEventListener) mq.addEventListener("change", fn);
     else if (mq.addListener) mq.addListener(fn);
   }
+  /* 프로그램이 <details>를 접거나 펼 때(학생 선택이 아님 — 크게 보기의 '알아 두기' 접기). 그때 오는 toggle 이벤트는
+     isQuietToggle(d)이 true라 저장하지 않는다. 표시는 그 이벤트의 모든 리스너가 같은 답을 보도록 이벤트가 끝난 뒤(setTimeout 0) 지운다. */
+  function setOpenQuietly(d, open) {
+    if (!d || d.open === open) return;
+    d.__ssQuiet = open;
+    d.open = open;
+  }
+  function isQuietToggle(d) {
+    if (!d || d.__ssQuiet === undefined || d.__ssQuiet === null || d.__ssQuiet !== d.open) return false;
+    if (!d.__ssQuietClear) {
+      d.__ssQuietClear = setTimeout(function () {
+        d.__ssQuiet = null;
+        d.__ssQuietClear = null;
+      }, 0);
+    }
+    return true;
+  }
+
+  /* ── 크게 보기의 조작 칸 안에서만 스크롤하기(2026-09-26 spec 개정 6) ── 크게 보기는 실험 영역이 화면에 고정되어 페이지가 움직이지
+     않는다. 조작 칸(.ss-exp-layout.is-full > .ss-exp-panel) 안의 노드는 그 칸의 scrollTop만 바꿔 보이게 한다(페이지·고정 영역은 그대로).
+     element.scrollIntoView()는 쓰지 않는다 — 조상 스크롤(페이지)까지 움직일 수 있고, 페이지용 scroll-margin(머리말 높이)이 칸 안에도 적용된다. */
+  function dockOf(node) {
+    return node && node.closest ? node.closest(".ss-exp-layout.is-full > .ss-exp-panel") : null;
+  }
+  function scrollBoxTo(box, target) {
+    target = Math.max(0, Math.min(target, box.scrollHeight - box.clientHeight));
+    if (Math.abs(target - box.scrollTop) < 1) return Promise.resolve(false);
+    try {
+      box.scrollTo({ top: target, behavior: reduceMotion() ? "auto" : "smooth" });
+    } catch (e) {
+      box.scrollTop = target;
+    }
+    return new Promise(function (resolve) {
+      if (document.hidden) {
+        resolve(true);
+        return;
+      }
+      var last = -1;
+      var still = 0;
+      var t0 = Date.now();
+      (function tick() {
+        var y = box.scrollTop;
+        still = Math.abs(y - last) < 0.5 ? still + 1 : 0;
+        last = y;
+        if (still >= 4 || Date.now() - t0 > 1200 || document.hidden) resolve(true);
+        else setTimeout(tick, 16);
+      })();
+    });
+  }
+  // 조작 칸 안의 [top, bottom](뷰포트 좌표) 범위를 칸 안(위아래 8px 틈)에 **최소로** 넣는다. 이미 보이면 가만히, 다 안 들어가면 위쪽을 맞춘다.
+  function revealInDock(dock, top, bottom) {
+    if (!dock || !(bottom > top)) return Promise.resolve(false);
+    var d = dock.getBoundingClientRect();
+    if (!(d.height > 0)) return Promise.resolve(false);
+    var bt = d.top + dock.clientTop + 8;
+    var bb = d.top + dock.clientTop + dock.clientHeight - 8;
+    if (top >= bt - 1 && bottom <= bb + 1) return Promise.resolve(false);
+    var delta = bottom - top <= bb - bt && bottom > bb ? bottom - bb : top - bt;
+    if (Math.abs(delta) < 1) return Promise.resolve(false);
+    return scrollBoxTo(dock, dock.scrollTop + delta);
+  }
+  function revealNodeInDock(node) {
+    var dock = dockOf(node);
+    if (!dock) return Promise.resolve(false);
+    var r = node.getBoundingClientRect();
+    if (!(r.height > 0)) return Promise.resolve(false);
+    return revealInDock(dock, r.top, r.bottom);
+  }
+  /* SciSim.Experiment.scrollIntoView(node, opts) — 크게 보기(화면에 고정된 한 화면 실험실) 안의 노드면 조작 칸만 움직이고
+     (장면 칼럼은 늘 보이므로 가만히), 그 밖(기본 화면)은 예전처럼 페이지를 스크롤한다. 앱이 부르는 공개 함수라 규칙을 한 곳에 둔다. */
+  function scrollIntoViewAware(node, opts) {
+    if (node && node.closest && node.closest(".ss-exp-layout.is-full")) return revealNodeInDock(node);
+    return scrollIntoViewSafe(node, opts);
+  }
 
   /* ── 크게 보기(전체 화면 보기) 도우미 — create()가 이것을 쓰고, 공통 create()를 안 쓰고 같은 구조(.ss-exp-layout > .ss-exp-view-col >
    *    .ss-exp-view + .ss-exp-panel, #experiment-root 안)를 직접 만드는 앱도 부를 수 있다(fix-A F9, 예: sci-6-2-1-3·sci-6-2-1-4 단계 B).
    *   var enl = SciSim.Experiment.enlarge({
-   *     layout: layoutEl,          // .ss-exp-layout — 켜면 .is-full(1열). #experiment-root 안에 있어야 템플릿 장면 높이 규칙이 적용된다
+   *     layout: layoutEl,          // .ss-exp-layout — 켜면 .is-full(한 화면 실험실). #experiment-root 안에 있어야 템플릿 규칙이 적용된다
    *     viewBox: viewBoxEl,        // .ss-exp-view(장면 칸) — 토글 버튼과 막대가 이 안(맨 뒤)에 붙는다
-   *     panel: panelEl,            // 선택: .ss-exp-panel — 관찰 카드·scenePanel 카드가 이 맨 앞으로 온다
+   *     panel: panelEl,            // 선택: .ss-exp-panel — 켜면 조작 칸(가로 화면은 장면 오른쪽, 세로 화면은 장면 아래)이 된다
    *     run: btn, record: btn,     // 선택: 켜면 막대로 옮길 실행·기록 버튼(끄면 원래 자리로 — 복제가 아니라 같은 엘리먼트 이동)
    *     runCard: node,             // 선택: run을 막대로 옮긴 동안 숨길 카드
-   *     observe: node,             // 선택: 켜면 패널 맨 앞(scenePanel 카드가 있으면 그 다음)으로 옮길 관찰 카드(끄면 원래 자리로)
    *     scenePanel: node,          // 선택: 지금 값 노드 — 켜짐+넓은 화면은 막대 윗줄 전체, 켜짐+좁은/낮은 화면(폭 480px·높이 420px 이하)은
-   *                                //   장면 바로 아래 카드, 끄면 원래 자리(넘기기 전에 어디에도 안 붙였으면 그 카드)
+   *                                //   조작 칸 맨 위 카드, 끄면 원래 자리(넘기기 전에 어디에도 안 붙였으면 그 카드)
    *     onChange: function (on) {} // 선택: 켜고 끌 때마다(관찰 카드 번호 바꾸기 등)
    *   });
-   *   → { isOn(), set(on)(앱이 켜고 끔 — 학생 선택으로 기억하지 않음), refresh()(자리·높이 다시 맞춤), fit()(장면 높이만), bar, toggle }
+   *   → { isOn(), set(on)(앱이 켜고 끔 — 학생 선택으로 기억하지 않음), refresh()(자리 다시 맞춤), fit()(예전 API — 지금은 할 일 없음), bar, toggle }
+   *   켜면(2026-09-26 spec 개정 6): 레이아웃이 머리말 아래 ~ 아래 이동 막대 위 화면에 고정되고(style-common.css — 페이지는 스크롤되지
+   *   않는다), 장면 칼럼과 조작 칸(패널)이 겹치지 않게 나란히 온다. 조작 칸만 그 안에서 스크롤된다.
+   *   장면 위에 있던 것(단계 섹션의 안내 카드 + 레이아웃 앞의 '실험 방법 알아 두기'·안내 줄)은 조작 칸 맨 위로('알아 두기'는 제목 줄만 —
+   *   학생 선택으로 저장하지 않고, 학생이 크게 보기에서 직접 펴거나 접지 않았으면 끌 때 원래대로 편다),
+   *   장면 칼럼의 모형 설명(.ss-model-note)은 조작 칸 맨 끝으로, 좁은/낮은 화면에서는 보기 도구 줄(.ss-view-tools)도 조작 칸 끝으로
+   *   옮긴다(장면 칼럼이 장면으로 차게) — 끄면 모두 원래 자리로. 앱이 장면 칼럼에 넣은 카드(시간 바 등)는 옮기지 않는다(장면 아래 그대로).
+   *   예전 observe 옵션(켜면 관찰 카드를 패널 맨 앞으로)은 받아도 무시한다 — 관찰 카드는 조작 칸 안 원래 순서(조건 카드 다음)에 둔다.
    *   막대에 넣을 것이 없으면(run·record 없고 scenePanel도 없거나 좁은 화면) 막대를 숨긴다(빈 막대 없음). 막대가 보이는 3D 장면은
-   *   .ss-view3d가 막대 위에서 끝난다(.has-bar) — 3D 칸 안의 안내 글·이름표·카메라 맞춤이 막대에 가리지 않는다. */
+   *   .ss-view3d가 막대 위에서 끝난다(.has-bar) — 3D 칸 안의 안내 글·이름표·카메라 맞춤이 막대에 가리지 않는다.
+   *   켜져 있을 때 Esc 키 = 기본 화면(팝업이 떠 있거나 이미 처리된 Esc는 건드리지 않는다). */
   function enlarge(e) {
     var layout = e.layout;
     var viewBox = e.viewBox;
@@ -239,17 +323,24 @@
     var run = e.run || null;
     var record = e.record || null;
     var runCard = e.runCard || null;
-    var observe = e.observe || null;
     var scenePanel = e.scenePanel || null;
     var on = false;
     var runHome = homeOf(run);
     var recordHome = homeOf(record);
-    var observeHome = homeOf(observe);
     var panelHome = homeOf(scenePanel); // 앱이 넘기기 전에 이미 자기 DOM에 붙여 둔 자리(기본 화면에서 되돌아갈 곳)
+    var viewCol = viewBox.parentNode; // .ss-exp-view-col
+    var root = layout.parentNode; // #experiment-root
+    var stage = layout.closest ? layout.closest("[data-stage]") : null; // 실험하기 단계 섹션
+    var toolsRow = null; // 보기 도구 줄(좁은/낮은 화면의 크게 보기에서는 조작 칸 끝으로)
+    if (viewCol) {
+      for (var k = viewCol.firstElementChild; k; k = k.nextElementSibling) if (k.classList && k.classList.contains("ss-view-tools")) toolsRow = k;
+    }
+    var panelRole = panel ? panel.getAttribute("role") : null;
+    var panelLabel = panel ? panel.getAttribute("aria-label") : null;
 
     var toggle = el("button", { type: "button", class: "ss-scene-toggle" });
     var bar = el("div", { class: "ss-exp-overlay", role: "group", "aria-label": run ? "실행하고 기록하기" : record ? "기록하기" : "지금 측정값", hidden: true });
-    viewBox.appendChild(toggle); // 토글이 막대보다 앞 — Tab 순서 = 보이는 순서(왼쪽 위 토글 → 아래쪽 막대)
+    viewBox.appendChild(toggle); // 토글이 막대보다 앞 — Tab 순서 = 보이는 순서(왼쪽 위 토글 → 아래쪽 막대 → 조작 칸)
     viewBox.appendChild(bar);
     viewBox.classList.add("has-toggle"); // 2D 대체 화면의 위 여백을 토글 아래까지(style-common.css)
     var barPanel = null;
@@ -257,7 +348,7 @@
     if (scenePanel) {
       barPanel = el("div", { class: "ss-exp-overlay-panel", hidden: true }); // 막대 윗줄(켜짐 + 넓은 화면) — 막대의 첫 칸
       bar.appendChild(barPanel);
-      panelCard = el("div", { class: "ss-card ss-scene-panel-card", hidden: true }); // 장면 바로 아래 카드
+      panelCard = el("div", { class: "ss-card ss-scene-panel-card", hidden: true }); // 패널(조작 칸) 맨 위 카드
       if (panel) panel.insertBefore(panelCard, panel.firstChild);
       else viewBox.parentNode.insertBefore(panelCard, viewBox.nextSibling);
     }
@@ -271,8 +362,6 @@
       return window.matchMedia ? window.matchMedia(q) : null;
     };
     var compactMq = mm("(max-width: 480px), (max-height: 420px)");
-    // 가로 화면이면(태블릿·PC뿐 아니라 휴대폰 가로 812×375도) 켜짐일 때 장면 높이를 화면 띠에 맞춘다(Review B L7 — 휴대폰 가로에서 막대가 아래 이동 막대와 겹치던 것)
-    var wideLandscapeMq = mm("(orientation: landscape)");
     var portraitMq = mm("(orientation: portrait)");
 
     function setToggleText() {
@@ -280,6 +369,106 @@
       toggle.appendChild(el("span", { "aria-hidden": "true", text: on ? "↙ " : "⛶ " }));
       toggle.appendChild(document.createTextNode(on ? "기본 화면" : "전체 화면 보기"));
       toggle.classList.toggle("is-on", on);
+    }
+
+    /* 조작 칸으로 옮겨 둔 노드와 원래 자리. 되돌릴 때는 옮긴 순서의 반대로(앞뒤 형제 기준 자리가 어긋나지 않게). */
+    var parked = []; // [{ node, home }]
+    var headsParked = []; // 조작 칸 맨 위에 옮긴 순서
+    var notesParked = []; // 조작 칸 맨 끝에 옮긴 모형 설명
+    var introsSeen = []; // 이번 크게 보기에서 다룬 '알아 두기'(details.ss-intro)
+    /* 크게 보기에서는 '알아 두기'를 제목 줄만 남긴다(Review dock M1 — 펼쳐져 있으면 조작 칸 첫 화면이 그것으로 차서 고르는 버튼이
+       안 보였다). 학생 선택으로 저장하지 않고, 학생이 크게 보기에서 직접 펴거나 접지 않았으면 끌 때 원래대로 편다.
+       한 번 켠 동안 같은 카드는 한 번만 접는다(학생이 편 것을 화면 크기 변화 등으로 다시 접지 않게). */
+    function foldIntro(n) {
+      if (!n || n.tagName !== "DETAILS" || !n.classList.contains("ss-intro") || introsSeen.indexOf(n) >= 0) return;
+      introsSeen.push(n);
+      n.__ssDockFolded = n.open;
+      if (!n.__ssDockWatch) {
+        n.__ssDockWatch = true;
+        n.addEventListener("toggle", function () {
+          if (!isQuietToggle(n)) n.__ssDockFolded = false; // 학생이 직접 폄·접음 → 끌 때 그대로 둔다
+        });
+      }
+      setOpenQuietly(n, false);
+    }
+    function unfoldIntros() {
+      introsSeen.forEach(function (n) {
+        if (n.__ssDockFolded) setOpenQuietly(n, true);
+        n.__ssDockFolded = false;
+      });
+      introsSeen = [];
+    }
+    function isParked(node) {
+      for (var i = 0; i < parked.length; i++) if (parked[i].node === node) return true;
+      return false;
+    }
+    function park(node, parent, ref) {
+      if (!isParked(node)) parked.push({ node: node, home: homeOf(node) });
+      if (node.parentNode === parent && node.nextSibling === ref) return; // 이미 그 자리
+      parent.insertBefore(node, ref);
+    }
+    function unpark(node) {
+      for (var i = parked.length - 1; i >= 0; i--) {
+        if (parked[i].node === node) {
+          goHome(node, parked.splice(i, 1)[0].home);
+          return;
+        }
+      }
+    }
+    // 장면 위에 있던 것: 단계 섹션에서 제목·실험 루트를 뺀 앞쪽 요소(안전 안내 등) + 루트 안에서 레이아웃 앞의 요소(알아 두기·안내 줄)
+    function headNodes() {
+      var out = [];
+      var n;
+      if (stage && root && root.parentNode === stage) {
+        for (n = stage.firstElementChild; n && n !== root; n = n.nextElementSibling) if (!n.classList.contains("ss-stage-title")) out.push(n);
+      }
+      if (root) for (n = root.firstElementChild; n && n !== layout; n = n.nextElementSibling) if (!n.classList.contains("ss-stage-title")) out.push(n);
+      return out;
+    }
+    function placeDock(compact) {
+      if (!panel) return;
+      // 1) 장면 위에 있던 것 → 조작 칸 맨 위(원래 순서대로). 앱이 나중에 더 붙인 것은 이미 옮긴 것 다음에.
+      headNodes().forEach(function (n) {
+        var last = headsParked.length ? headsParked[headsParked.length - 1] : null;
+        park(n, panel, last && last.parentNode === panel ? last.nextSibling : panel.firstChild);
+        headsParked.push(n);
+      });
+      headsParked.forEach(foldIntro); // '알아 두기'는 제목 줄만(위 foldIntro)
+      // 2) 모형 설명 → 조작 칸 맨 끝
+      if (viewCol) {
+        for (var c = viewCol.firstElementChild; c; ) {
+          var nx = c.nextElementSibling;
+          if (c.classList && c.classList.contains("ss-model-note")) {
+            park(c, panel, null);
+            notesParked.push(c);
+          }
+          c = nx;
+        }
+      }
+      // 3) 보기 도구 줄: 좁은/낮은 화면은 조작 칸 끝(모형 설명 앞) — 장면 칼럼이 장면만으로 차게. 넓은 화면은 장면 아래 제자리.
+      if (toolsRow) {
+        if (compact) {
+          var firstNote = notesParked.length && notesParked[0].parentNode === panel ? notesParked[0] : null;
+          park(toolsRow, panel, firstNote);
+        } else unpark(toolsRow);
+      }
+      // 4) 접근성: 조작 칸 = 이름 있는 영역
+      panel.setAttribute("role", "region");
+      panel.setAttribute("aria-label", "실험 조작");
+    }
+    function leaveDock() {
+      unfoldIntros();
+      while (parked.length) {
+        var p = parked.pop();
+        goHome(p.node, p.home);
+      }
+      headsParked = [];
+      notesParked = [];
+      if (!panel) return;
+      if (panelRole === null) panel.removeAttribute("role");
+      else panel.setAttribute("role", panelRole);
+      if (panelLabel === null) panel.removeAttribute("aria-label");
+      else panel.setAttribute("aria-label", panelLabel);
     }
     // 켜짐/꺼짐·화면 크기에 맞게 옮길 것을 옮긴다(복제 아님 — 이벤트·disabled 상태가 하나로 유지된다)
     function place() {
@@ -310,93 +499,28 @@
           panelCard.hidden = true;
         }
       }
-      if (observe && panel) {
-        if (on) {
-          var ref = panelCard && panelCard.parentNode === panel ? panelCard.nextSibling : panel.firstChild;
-          if (observe !== ref) panel.insertBefore(observe, ref);
-        } else goHome(observe, observeHome);
-      }
+      if (on) placeDock(compact);
+      else leaveDock();
       bar.hidden = !(on && (run || record || (scenePanel && !compact)));
       viewBox.classList.toggle("has-bar", !bar.hidden);
     }
-
-    /* 가로 화면(태블릿·PC·휴대폰 가로), 켜짐일 때만: 장면을 머리말 바로 아래에 맞춰 두었을 때 장면 전체
-       (안의 막대 포함)가 아래 이동 막대 위까지 꽉 차게 --ss-scene-h를 계산한다(= 창 높이 − 머리말 − 아래 막대 − 위아래 틈).
-       조건 고르기 줄은 장면 아래로 스크롤해서 본다 — 조건 줄까지 한 화면에 넣으려고 장면을 줄이면 "크게 보기"가 아니게 된다
-       (2026-09-25 Claude 수정: 조건 줄을 넣으려다 장면이 160px 띠가 되던 문제). 세로·좁은 화면이거나 꺼짐이면 CSS의 vh 기본값.
-       mode(fix-A F5): true = 학생이 머리말을 접거나 폈거나 창 크기(방향)를 바꿔 다시 잴 때 — 장면이 화면 띠의 절반 이상 보이고
-       있었으면 장면을 다시 머리말 아래에 맞추고(접은 직후 막대가 아래 이동 막대 뒤로 숨던 문제), 장면을 지나 조건 카드 쪽을 보고
-       있었으면 끌어올리지 않고 보던 곳이 튀지 않게 한다. "keep" = 그 밖의 머리말·아래 막대 크기 변화(불러오는 중 계정 줄·글꼴 등) —
-       보던 곳만 지키고 장면으로 맞춤 이동은 하지 않는다(실험하기에 들어올 때 맞춤은 L1, 이번에 안 함). */
-    var MIN_SCENE_H = 140; // 창이 아주 낮을 때의 바닥값 — 휴대폰 가로(머리말 펼침)는 쓸 수 있는 높이가 180px 남짓이라 240이면 막대가 아래 막대 밑으로 들어갔다(review-B2 N2)
-    var SCENE_GAP = 8; // 머리말·아래 막대와 장면 사이 틈(scrollIntoViewSafe가 머리말 아래 8px에 맞춘다)
-    function sceneShare() {
-      var b = bandOf();
-      var r = viewBox.getBoundingClientRect();
-      var bh = b.bottom - b.top;
-      if (!(r.height > 0) || !(bh > 0)) return 0;
-      return Math.max(0, Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top)) / bh;
-    }
-    function fit(mode) {
-      if (!on || !wideLandscapeMq || !wideLandscapeMq.matches) {
-        viewBox.style.removeProperty("--ss-scene-h"); // 꺼짐·세로·좁은 화면: CSS 기본값(vh)으로
-        return;
-      }
-      if (viewBox.classList.contains("is-2d")) return; // 2D는 height:auto라 계산 대상이 아님
-      var wasShown = mode === true && sceneShare() >= 0.5; // 새 높이를 넣기 전(지금 자리) 기준
-      var b = bandOf();
-      // 장면을 지나 그 아래(조건 카드 쪽)를 보고 있었으면, 장면 높이가 바뀌어도 보던 곳이 튀지 않게 아래 패널 자리를 재서 되돌린다
-      var below = mode && !wasShown && panel && viewBox.getBoundingClientRect().top < b.top ? panel.getBoundingClientRect().top : null;
-      viewBox.style.setProperty("--ss-scene-h", Math.max(MIN_SCENE_H, Math.round(b.bottom - b.top - 2 * SCENE_GAP)) + "px");
-      if (wasShown) scrollIntoViewSafe(viewBox); // 이미 맞으면 움직이지 않는다. 움직임 줄이기면 즉시 이동
-      else if (below !== null) {
-        var d = panel.getBoundingClientRect().top - below;
-        if (Math.abs(d) >= 1) window.scrollBy(0, d);
-      }
-    }
-    // 창 크기 변화: 폭이나 방향이 바뀌었을 때만 장면으로 다시 맞춘다. 높이만 바뀐 것(휴대기기 주소 막대가 스크롤 중에 숨고 나타남,
-    // 화면 키보드 등)은 높이만 다시 재고 보던 곳을 지킨다 — 학생이 스크롤하는 중에 장면으로 끌려 올라가지 않게(Review A2 N2).
-    var lastW = window.innerWidth || 0;
-    var lastPortrait = !!(portraitMq && portraitMq.matches);
-    window.addEventListener("resize", function () {
-      var w = window.innerWidth || 0;
-      var p = !!(portraitMq && portraitMq.matches);
-      var widthOrTurn = w !== lastW || p !== lastPortrait;
-      lastW = w;
-      lastPortrait = p;
-      fit(widthOrTurn ? true : "keep");
-    });
-    listenMq(wideLandscapeMq, function () {
-      fit(true);
-    });
     listenMq(compactMq, function () {
       place();
     });
-    // 머리말을 접고 펴거나(계정 줄·단계 메뉴) 아래 막대 높이가 바뀌면 다시 잰다(처음 알림은 맞춤 이동 없이).
-    // 장면으로 다시 맞추는 것은 학생이 머리말을 접거나 폈을 때만(.is-collapsed가 바뀜) — 불러오는 중 계정 줄·글꼴로 높이가 바뀔 때는 아님
-    if ("ResizeObserver" in window) {
-      var hdr = document.querySelector(".ss-header");
-      var ftr = document.querySelector(".ss-footer-nav");
-      var lastBars = null;
-      var lastCollapsed = null;
-      var barsRo = new ResizeObserver(function () {
-        var now = (hdr ? Math.round(hdr.getBoundingClientRect().height) : 0) + "|" + (ftr ? Math.round(ftr.getBoundingClientRect().height) : 0);
-        var collapsed = !!(hdr && hdr.classList.contains("is-collapsed"));
-        var changed = lastBars !== null && lastBars !== now;
-        var toggled = lastCollapsed !== null && collapsed !== lastCollapsed;
-        lastBars = now;
-        lastCollapsed = collapsed;
-        fit(changed ? (toggled ? true : "keep") : false);
+    // 앱이 나중에 장면 위(단계 섹션·루트)에 안내를 더 붙여도 켜져 있으면 조작 칸 맨 위로(우리 자신의 옮기기로는 새로 옮길 것이 없어 멈춘다)
+    if (panel && "MutationObserver" in window) {
+      var headMo = new MutationObserver(function () {
+        if (on) placeDock(!!(compactMq && compactMq.matches));
       });
-      if (hdr) barsRo.observe(hdr);
-      if (ftr) barsRo.observe(ftr);
+      if (stage) headMo.observe(stage, { childList: true });
+      if (root && root !== stage) headMo.observe(root, { childList: true });
     }
 
     function prefKey() {
       return "sceneMode:" + (portraitMq && portraitMq.matches ? "portrait" : "landscape");
     }
     // 태블릿 세로(세로 방향·폭 600px 이상)는 켜짐이 기본 — 단 막대에 넣을 것(실행·기록 버튼이나 측정값)이 없는 앱은 끔이 기본
-    // (크게 보기가 장면만 키워 앱 자신의 기록 버튼을 화면 밖으로 밀어내지 않게, Review A2 N1 — 예: sci-6-2-1-2). 학생이 누른 선택은 그대로 기억한다.
+    // (Review A2 N1 — 예: 막대가 비는 앱). 학생이 누른 선택은 그대로 기억한다.
     function defaultOn() {
       var w = window.innerWidth || document.documentElement.clientWidth || 0;
       return !!(portraitMq && portraitMq.matches && w >= 600 && (run || record || scenePanel));
@@ -404,7 +528,6 @@
     function set(v, opts) {
       on = !!v;
       place();
-      fit(false);
       if (!(opts && opts.silent) && SciSim.uiPref) SciSim.uiPref.set(prefKey(), on);
       if (e.onChange) e.onChange(on);
     }
@@ -412,10 +535,35 @@
       var pref = SciSim.uiPref ? SciSim.uiPref.get(prefKey()) : null;
       set(pref === null || pref === undefined ? defaultOn() : pref, { silent: true });
     }
-    toggle.addEventListener("click", function () {
-      set(!on);
-      // 바뀐 배치에서 장면이 화면에 다 보이게(가로 크게 보기는 장면을 머리말 바로 아래에 맞추면 아래 막대 위까지 꽉 찬다)
+    // 기본 화면으로 돌아오면 장면이 화면에 보이게 한다(크게 보기는 화면에 고정되어 따로 맞출 것이 없다)
+    function turnOffByUser() {
+      var hadFocus = layout.contains(document.activeElement);
+      set(false);
       scrollIntoViewSafe(viewBox);
+      // 조작 칸 맨 위로 옮겼던 것(알아 두기 등)에 초점이 있었으면 되돌리며 초점을 잃는다 → 토글로
+      if (hadFocus && (!document.activeElement || document.activeElement === document.body)) {
+        try {
+          toggle.focus({ preventScroll: true });
+        } catch (err) {
+          toggle.focus();
+        }
+      }
+    }
+    toggle.addEventListener("click", function () {
+      if (on) turnOffByUser();
+      else set(true);
+    });
+    // 화면에 떠 있는 팝업(aria-modal — 숨겨 둔 로그인 안내 가림막 등은 빼고)
+    function modalOpen() {
+      var ms = document.querySelectorAll('[aria-modal="true"]');
+      for (var i = 0; i < ms.length; i++) if (ms[i].getClientRects().length) return true;
+      return false;
+    }
+    document.addEventListener("keydown", function (ev) {
+      if (!on || ev.key !== "Escape" || ev.defaultPrevented || ev.isComposing) return;
+      if (!layout.getClientRects().length) return; // 실험하기 단계가 안 보일 때
+      if (modalOpen()) return; // 팝업이 떠 있으면 팝업 몫
+      turnOffByUser();
     });
     listenMq(portraitMq, applyForOrientation);
     applyForOrientation();
@@ -429,11 +577,9 @@
       },
       refresh: function () {
         place();
-        fit(false);
       },
-      fit: function () {
-        fit(false);
-      },
+      // 예전 API(장면 높이 다시 재기) — 한 화면 실험실은 CSS가 크기를 정하므로 할 일이 없다(3D↔2D 뒤에 불러도 된다)
+      fit: function () {},
       bar: bar,
       toggle: toggle,
     };
@@ -551,6 +697,7 @@
       var det = el("details", { class: "ss-card ss-intro" }, [el("summary", { text: o.introTitle || "🔎 실험 전에 알아 두기" }), o.intro]);
       det.open = introOpen;
       det.addEventListener("toggle", function () {
+        if (isQuietToggle(det)) return; // 크게 보기가 잠시 접고 편 것(학생 선택 아님)
         store.set("intro", det.open);
       });
       o.root.appendChild(det);
@@ -598,7 +745,7 @@
       R.factorNotes[f.id] = note;
       panel.appendChild(el("div", { class: "ss-card ss-step-card" }, [el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: CIRCLED[fi] }), " " + f.title]), grid, note]));
     });
-    // 크게 보기에서는 관찰 카드가 장면 바로 아래(조건 카드 위)에 와서 번호 대신 👀로 보인다(enlarge onChange)
+    // 크게 보기에서는 실행 카드가 숨고(실행 버튼은 장면 안 막대) 관찰 카드는 번호 대신 👀로 보인다(enlarge onChange)
     var nRunDefault = CIRCLED[o.factors.length];
     var nObsDefault = CIRCLED[o.factors.length + 1];
     // ss-run-btn / ss-record-btn: 앱이 버튼을 찾는 고정 훅(크게 보기에서는 관찰 카드가 아니라 장면 안 막대에 있다) — exp.runButton / exp.recordButton
@@ -637,10 +784,11 @@
     var layoutEl = el("div", { class: "ss-exp-layout" }, [viewCol, panel]);
     o.root.appendChild(layoutEl);
 
-    /* ── 전체 화면 보기(2026-09-25, 모든 앱에 자동 — 토글, 옵트인 아님) ── 공통 도우미 enlarge()가 맡는다.
-       기본 배치(꺼짐)는 지금까지와 같다. 켜면: 장면이 전체 폭으로 커지고, 실행·기록 버튼(+scenePanel)이 장면 아래쪽 막대로,
-       관찰 카드가 장면 바로 아래(패널 맨 앞)로 옮겨 간다(복제 아님 — 이벤트·disabled 상태 유지). 조건 고르기는 그 아래.
-       조건이 없거나(factors: []) sceneBar:false면 실행·기록 버튼과 관찰 카드는 옮기지 않는다(앱이 자기 버튼으로 기록하는 경우 —
+    /* ── 전체 화면 보기(모든 앱에 자동 — 토글, 옵트인 아님) ── 공통 도우미 enlarge()가 맡는다.
+       기본 배치(꺼짐)는 지금까지와 같다. 켜면(2026-09-26 spec 개정 6 "한 화면 실험실"): 실험 영역이 머리말~아래 이동 막대 사이 화면에
+       고정되고, 장면 + 조작 칸(이 패널 — 가로 화면은 오른쪽, 세로 화면은 아래)이 나란히 온다. 실행·기록 버튼(+scenePanel)은 장면 안
+       아래쪽 막대로 옮겨 간다(복제 아님 — 이벤트·disabled 상태 유지). 관찰 카드는 조작 칸 안 원래 자리(조건 카드 다음)에 그대로 있다.
+       조건이 없거나(factors: []) sceneBar:false면 실행·기록 버튼은 옮기지 않는다(앱이 자기 버튼으로 기록하는 경우 —
        앱이 숨겨 둔 실행 카드가 막대에 가짜 버튼으로 나오지 않게, fix-A F1). */
     var useBar = o.sceneBar !== false && o.factors.length > 0;
     R.enl = enlarge({
@@ -650,19 +798,22 @@
       run: useBar ? R.run : null,
       record: useBar ? R.record : null,
       runCard: useBar ? R.runCard : null,
-      observe: useBar ? R.observe : null,
       scenePanel: o.scenePanel || null,
       onChange: function (on) {
-        // 크게 보기에서는 관찰 카드가 조건 카드(①②…)보다 위(장면 바로 아래)에 오므로 번호 대신 👀로 표시한다(Review A2 N6)
+        // 크게 보기에서는 실행 카드(번호 ③ 등)가 숨고 실행 버튼이 장면 안 막대에 있으므로, 관찰 카드는 번호 대신 👀로 표시한다
+        // (조건 카드 ①② 다음에 바로 👀 — 번호가 건너뛰어 보이지 않게, Review A2 N6)
         R.obsStepN.textContent = on && useBar ? "👀" : nObsDefault;
       },
     });
     R.overlay = R.enl.bar;
     R.enlargeBtn = R.enl.toggle;
-    R.fitSceneHeight = R.enl.fit; // finish()(3D/2D 전환 뒤)·activate()에서도 다시 잰다
-    // 실행·기록 버튼이 막대에 있는 크게 보기인가(관찰 카드도 장면 바로 아래에 있다)
+    // 실행·기록 버튼이 장면 안 막대에 있는 크게 보기인가(기록 버튼이 늘 보인다)
     function barMode() {
       return useBar && R.enl.isOn() && !R.overlay.hidden;
+    }
+    // 크게 보기의 조작 칸(켜져 있을 때만, 아니면 null) — 스크롤은 이 칸 안에서만 한다
+    function dock() {
+      return R.enl.isOn() ? dockOf(R.observe) : null;
     }
     // 방금 누른 곳(조건 버튼·미니 표 칸 등) — 크게 보기에서 관찰 카드를 숨길 때 그 자리가 튀지 않게 한다(afterSelect)
     var touched = null;
@@ -718,12 +869,14 @@
       });
     }
     function afterSelect() {
-      // 크게 보기: 관찰 카드가 조건 카드 위(장면 바로 아래)에 있어서, 카드를 숨기면 아래의 조건 버튼이 위로 튄다 →
-      // 숨기기 전·후 방금 누른 곳(의 카드)의 자리를 재서 차이만큼 되돌린다. 브라우저 스크롤 앵커링이 이미 맞췄으면 차이가 0이라
-      // 두 번 보정되지 않는다(iPad Safari는 앵커링이 없을 수 있다). 장면·막대에서 고른 경우(3D 누르기 등)는 그 자리가 안 움직이므로 그대로.
+      // 크게 보기: 관찰 카드를 숨기면 조작 칸 내용이 짧아져(칸 아래쪽을 보고 있었으면) 칸의 스크롤이 줄며 방금 누른 조건 버튼이
+      // 튈 수 있다 → 숨기기 전·후 방금 누른 곳(의 카드)의 자리를 재서 차이만큼 **조작 칸만** 되돌린다(페이지는 움직이지 않는다).
+      // 브라우저 스크롤 앵커링이 이미 맞췄으면 차이가 0이라 두 번 보정되지 않는다(iPad Safari는 앵커링이 없을 수 있다).
+      // 장면·막대에서 고른 경우(3D 누르기 등)는 조작 칸 밖이라 그대로. 기본 화면은 예전처럼 보정하지 않는다.
       var anchor = null;
       var before = 0;
-      if (barMode() && !R.observe.hidden && touched && touched.isConnected && !R.observe.contains(touched) && R.observe.compareDocumentPosition(touched) & 4 /* 뒤에 있음 */) {
+      var box = dock();
+      if (box && !R.observe.hidden && touched && touched.isConnected && box.contains(touched) && !R.observe.contains(touched)) {
         anchor = (touched.closest && touched.closest(".ss-card")) || touched;
         before = anchor.getBoundingClientRect().top;
       }
@@ -732,10 +885,10 @@
       R.record.disabled = true; // 기록 버튼이 관찰 카드 밖(장면 안 막대)에 있어도 진행 중인 관찰이 없으면 늘 비활성
       draw();
       if (view) view.highlight(Object.assign({}, sel));
-      if (anchor && anchor.isConnected) {
+      if (anchor && anchor.isConnected && box.contains(anchor)) {
         var ar = anchor.getBoundingClientRect();
         var d = ar.top - before;
-        if (ar.height > 0 && Math.abs(d) >= 1) window.scrollBy(0, d);
+        if (ar.height > 0 && Math.abs(d) >= 1) box.scrollTop += d;
       }
     }
 
@@ -899,8 +1052,8 @@
       R.record.disabled = true;
       var v = view;
       try {
-        // 세로 화면·휴대폰: 버튼이 실험 화면 아래에 있으므로 먼저 실험 화면을 보이게 한다
-        await scrollIntoViewSafe(R.viewBox);
+        // 세로 화면·휴대폰: 버튼이 실험 화면 아래에 있으므로 먼저 실험 화면을 보이게 한다(크게 보기는 장면이 화면에 고정되어 늘 보인다)
+        if (!R.enl.isOn()) await scrollIntoViewSafe(R.viewBox);
         if (v.whenVisible) await v.whenVisible(900);
         await v.run(s);
       } catch (e) {
@@ -1027,12 +1180,10 @@
       R.observe.hidden = false;
       setTimeout(function () {
         if (R.observe.hidden) return;
-        if (barMode()) {
-          // 크게 보기: 관찰 카드가 장면(막대) 바로 아래 — 막대가 화면에 남는 데까지만 최소로 내려 관찰 카드를 보인다
-          var br = R.overlay.getBoundingClientRect();
-          var or = R.observe.getBoundingClientRect();
-          revealRange(Math.min(br.top, or.top), Math.max(br.bottom, or.bottom), br);
-        } else scrollIntoViewSafe(R.observe, { align: "nearest" });
+        // 크게 보기: 관찰 카드는 조작 칸 안 원래 자리(조건 카드 다음) — **조작 칸 안에서만** 최소로 스크롤해 보인다
+        // (칸보다 길면 카드 위쪽을 맞춘다). 장면·막대·페이지는 움직이지 않는다.
+        if (dock()) revealNodeInDock(R.observe);
+        else scrollIntoViewSafe(R.observe, { align: "nearest" });
       }, 60);
     }
     function checkNumeric() {
@@ -1093,24 +1244,27 @@
       revealCheck();
     }
     /* '기록하기'가 켜져 있고 안 보이면 보이게 한다(fix-A F4). 꺼져 있으면 아무것도 안 한다(확인 전에 막대까지 끌어올려
-       '확인하기'를 화면 밖으로 밀어내지 않게). 크게 보기: 막대와 관찰 카드(방금 바뀐 곳까지)가 이미 보이면 가만히, 아니면 함께
-       보이게 최소로(함께 안 들어가면 막대 우선). 기본 화면: 예전처럼 기록 버튼(관찰 카드 맨 아래)이 가리면 보이게.
-       앱의 '가리면 스크롤' 도우미도 exp.revealRecord()로 부른다(규칙을 한 곳에). */
+       '확인하기'를 화면 밖으로 밀어내지 않게). 크게 보기(2026-09-26): 기록 버튼이 장면 안 막대에 있으면 늘 보이므로 페이지·조작 칸을
+       움직이지 않는다 — 다만 방금 나온 확인 피드백(⭕ 맞아요 등)이 조작 칸 밖에 있으면 **조작 칸 안에서만** 최소로 보인다.
+       막대가 없는 앱(sceneBar:false·factors:[])은 관찰 카드 안의 기록 버튼을 조작 칸 안에서만 보이게 한다.
+       기본 화면: 예전처럼 기록 버튼(관찰 카드 맨 아래)이 가리면 보이게. 앱의 '가리면 스크롤' 도우미도 exp.revealRecord()로 부른다(규칙을 한 곳에). */
     function revealRecord() {
       setTimeout(function () {
         if (R.observe.hidden || R.record.disabled) return;
-        if (barMode()) {
-          // 막대(위)부터 관찰 카드에서 방금 바뀐 곳(확인 피드백·덧붙인 노드, 없으면 보기 칸)까지 — 이미 다 보이면 가만히,
-          // 안 들어가면 막대가 띠 안에 남는 데까지만
-          var br = R.overlay.getBoundingClientRect();
-          var bottom = 0;
-          [R.checkNode, R.checkFb, R.obsChoices].forEach(function (n) {
-            if (bottom || n.hidden) return;
-            var q = n.getBoundingClientRect();
-            if (q.height > 0) bottom = q.bottom;
-          });
-          if (!bottom) bottom = R.observe.getBoundingClientRect().bottom;
-          revealRange(Math.min(br.top, R.observe.getBoundingClientRect().top), Math.max(br.bottom, bottom), br);
+        var box = dock();
+        if (box) {
+          if (barMode()) {
+            var top = 0;
+            var bottom = 0;
+            [R.checkFb, R.checkNode].forEach(function (n) {
+              if (n.hidden) return;
+              var q = n.getBoundingClientRect();
+              if (!(q.height > 0)) return;
+              if (!top) top = q.top;
+              bottom = Math.max(bottom, q.bottom);
+            });
+            if (bottom) revealInDock(box, top, bottom);
+          } else revealNodeInDock(R.record);
           return;
         }
         var f = document.querySelector(".ss-footer-nav");
@@ -1121,6 +1275,7 @@
       }, 60);
     }
     // '기록하기'가 꺼져 있고 '확인하기'가 필요할 때: '확인하기' 줄과 그 아래 피드백·덧붙인 노드가 가리면 최소로 보이게
+    // (크게 보기는 조작 칸 안에서만 — 페이지는 움직이지 않는다)
     function revealCheck() {
       setTimeout(function () {
         if (R.observe.hidden || !R.record.disabled || R.checkRow.hidden) return;
@@ -1132,7 +1287,9 @@
           var q = n.getBoundingClientRect();
           if (q.height > 0) bottom = Math.max(bottom, q.bottom);
         });
-        revealRange(top, bottom, null);
+        var box = dock();
+        if (box) revealInDock(box, top, bottom);
+        else revealRange(top, bottom);
       }, 60);
     }
     function runCheck() {
@@ -1359,11 +1516,9 @@
       R.loading.hidden = true;
       R.viewBox.classList.toggle("is-2d", kind === "2d");
       var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
-      R.tip.textContent =
-        kind === "3d"
-          ? (o.view.tip3D || "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향") +
-            (narrow ? " · 페이지를 위아래로 움직일 때는 3D 화면 바깥을 밀어요" : "")
-          : o.view.tip2D || "2D 화면(모형)이에요. 눌러서 고를 수 있어요.";
+      R.tip.textContent = kind === "3d" ? o.view.tip3D || "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향" : o.view.tip2D || "2D 화면(모형)이에요. 눌러서 고를 수 있어요.";
+      // 좁은 화면 기본 화면용 덧붙임(페이지를 움직이는 법) — 크게 보기는 페이지가 움직이지 않으므로 CSS가 숨긴다(.ss-tip-page)
+      if (kind === "3d" && narrow) R.tip.appendChild(el("span", { class: "ss-tip-page", text: " · 페이지를 위아래로 움직일 때는 3D 화면 바깥을 밀어요" }));
       R.btnReset.hidden = kind !== "3d";
       Object.keys(scene).forEach(function (k) {
         var s = scene[k];
@@ -1371,7 +1526,6 @@
       });
       v.highlight(Object.assign({}, sel));
       drawToggle();
-      if (R.fitSceneHeight) R.fitSceneHeight(); // 전체 화면 모드: 2D↔3D를 바꾸면 장면 높이 계산을 다시 한다(2D는 계산 안 함)
     }
 
     var activated = false;
@@ -1385,9 +1539,6 @@
           mount(can3D && !store.get("view2d", false) ? "3d" : "2d");
         }
         draw();
-        // 전체 화면 모드: 이 단계가 화면에 보이자마자 한 번 재서(3D 로딩이 끝나 finish()가 불리기 전이라도) 너무 크게
-        // 잡혀 있던 값(장면이 숨어 있던 동안 잰 값)이 오래 보이지 않게 한다.
-        if (R.fitSceneHeight) R.fitSceneHeight();
       },
       select: select,
       refresh: draw,
@@ -1430,7 +1581,7 @@
     };
   }
 
-  SciSim.Experiment = { create: create, enlarge: enlarge, scrollIntoView: scrollIntoViewSafe, sleep: sleep };
+  SciSim.Experiment = { create: create, enlarge: enlarge, scrollIntoView: scrollIntoViewAware, sleep: sleep, isQuietToggle: isQuietToggle };
 
   /* ── 실제 시간 카운트다운(초시계) ── */
   function countdown(container, seconds, opts) {

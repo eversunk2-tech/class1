@@ -1484,14 +1484,25 @@
 
     var box = el("div", { class: "ss-card tb-card" }, [track, tickRow]);
     viewBox.parentNode.insertBefore(box, viewBox.nextSibling);
-    /* 측정값 카드 자리(기본 화면): 가로 좌우 배치면 오른쪽 패널 맨 위, 그 밖(세로·좁은 화면·크게 보기)은 시간 바 바로 아래.
+    /* 시간 바·측정값 카드 자리.
+       기본 화면: 시간 바는 장면 바로 아래, 측정값 카드는 가로 좌우 배치면 오른쪽 패널 맨 위, 그 밖(세로·좁은 화면)은 시간 바 바로 아래.
+       크게 보기(한 화면 실험실, 2026-09-26 spec 개정 6): 시간 바와 측정값 카드(출처 줄·남중 안내)를 조작 칸의 진행 막대 앞
+       (알아 두기·안내 줄 다음)으로 옮긴다 — 장면 칼럼은 장면(+막대의 측정값·기록하기)으로 차서 3D가 옆에서 본 모습 칸을 띄울 만큼 커진다.
        카드 안의 scenePanel은 공통 틀이 크게 보기에서 막대로 옮기고 되돌린다 — 앱은 카드만 옮긴다(scenePanel 노드는 건드리지 않음). */
     var twoColMq = window.matchMedia ? window.matchMedia("(min-width: 901px) and (orientation: landscape)") : null;
+    var progEl = panel.querySelector(".ss-progress");
     function placeVals() {
-      var twoCol = !!(twoColMq && twoColMq.matches) && !layoutEl.classList.contains("is-full");
-      if (twoCol) {
-        if (panel.firstChild !== valsCard) panel.insertBefore(valsCard, panel.firstChild);
-      } else if (box.nextSibling !== valsCard) box.parentNode.insertBefore(valsCard, box.nextSibling);
+      if (layoutEl.classList.contains("is-full")) {
+        var ref = progEl && progEl.parentNode === panel ? progEl : null;
+        if (valsCard.parentNode !== panel || valsCard.nextSibling !== ref) panel.insertBefore(valsCard, ref);
+        if (box.parentNode !== panel || box.nextSibling !== valsCard) panel.insertBefore(box, valsCard);
+      } else {
+        if (viewBox.nextSibling !== box) viewBox.parentNode.insertBefore(box, viewBox.nextSibling);
+        var twoCol = !!(twoColMq && twoColMq.matches);
+        if (twoCol) {
+          if (panel.firstChild !== valsCard) panel.insertBefore(valsCard, panel.firstChild);
+        } else if (box.nextSibling !== valsCard) box.parentNode.insertBefore(valsCard, box.nextSibling);
+      }
       valsCard.classList.toggle("is-away", scenePanel.parentNode !== valsCard);
     }
     placeVals();

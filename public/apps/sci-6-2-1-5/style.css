@@ -80,21 +80,16 @@
 .val-num { font-size: 2.3rem; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 .val-unit { font-size: 1.1rem; font-weight: 700; }
 .ruler-fig { margin: 10px 0 0; }
-/* 크게 보기(넓은 화면): 값은 장면 안 막대의 측정값 패널에, 확대 그림은 장면 안 확대 칸에 있으므로 관찰 카드에서는 같은
-   값 패널·눈금 그림을 빼 카드가 짧아지게 한다(장면·막대·관찰 카드가 스크롤 없이 함께 보이게). */
+/* 크게 보기(넓은 화면): 값은 장면 안 막대의 측정값 패널에, 확대 그림은 장면 안 확대 칸에 있으므로 조작 칸의 관찰 카드에서는 같은
+   값 패널·눈금 그림을 빼 카드가 짧아지게 한다(조작 칸 안에서 스크롤이 줄게). */
 @media (min-width: 481px) and (min-height: 421px) {
   #experiment-root .ss-exp-layout.is-full .ss-observe .val-panel,
   #experiment-root .ss-exp-layout.is-full .ss-observe .ruler-fig { display: none; }
 }
-/* 크게 보기(좁은·낮은 화면): 값은 바로 위 장면 아래 카드에 있으니 값 패널만 뺀다. 장면이 화면 밖으로 밀리기 쉬우므로 눈금 그림은 둔다 */
+/* 크게 보기(좁은·낮은 화면): 값은 조작 칸 맨 위 카드에 있으니 값 패널만 뺀다. 3D 칸이 낮아 확대 칸이 빠지기 쉬우므로 눈금 그림은 둔다.
+   (2026-09-26 한 화면 실험실: 관찰 카드는 조작 칸 안에 있어 장면을 밀지 않으므로, 가로 크게 보기에서 관찰 카드를 통째로 빼던 규칙은 없앴다) */
 @media (max-width: 480px), (max-height: 420px) {
   #experiment-root .ss-exp-layout.is-full .ss-observe .val-panel { display: none; }
-}
-/* 가로 크게 보기(막대 윗줄에 측정값이 있는 넓은 화면): 장면이 화면 높이를 꽉 채우므로, 입력할 것이 없는 이 앱의 관찰 카드
-   (안내 한 줄뿐)까지 보이려고 공통 틀이 장면 윗부분(측정기·확대 칸)을 화면 밖으로 밀지 않게 관찰 카드를 뺀다.
-   측정값·기록하기는 장면 안 막대에 있다. 세로 크게 보기는 짧아진 관찰 카드가 장면과 함께 들어가므로 그대로 둔다. */
-@media (orientation: landscape) and (min-width: 481px) and (min-height: 421px) {
-  #experiment-root .ss-exp-layout.is-full .ss-observe { display: none; }
 }
 .ruler-svg { display: block; width: 100%; height: auto; }
 .rl-plate { fill: #f7f7f2; stroke: #b9c0ca; stroke-width: 1.5; }
@@ -116,14 +111,11 @@
 .o2-wrap .inset { position: static; margin: 8px auto 0; width: 176px; height: auto; aspect-ratio: auto; box-shadow: none; }
 .o2-wrap .inset-svg { flex: none; height: auto; }
 .orbit-svg { display: block; width: 100%; height: auto; max-height: 440px; background: var(--ss-surface-2); border-radius: 14px; }
-/* fix-B2 L2(review-B): 크게 보기(장면이 가로 전체 폭)에서는 440px 고정 상한이 넓은 화면에서 너무 커져(가로: 높이
-   769~938px대) 장면 안 막대가 아래 이동 막대보다 한참 아래로 밀린다 — 화면 높이에 비례해 더 낮춘다(2-1-2 style.css와 같은 패턴). */
-@media (min-width: 901px) and (orientation: landscape) {
-  .ss-exp-layout.is-full .orbit-svg { max-height: 30vh; }
-}
-@media (orientation: portrait) {
-  .ss-exp-layout.is-full .orbit-svg { max-height: 40vh; }
-}
+/* 크게 보기(한 화면 실험실, 2026-09-26): 장면 칸 높이가 정해져 있으므로 궤도 그림이 칸의 남는 높이를 채우고(가로는 가운데),
+   설명 글·확대 칸은 그 아래 제 높이만 — 막대는 칸 맨 아래(예전의 화면 높이(vh) 기준 크게 보기 규칙은 없앴다, fix-B2 L2) */
+.ss-exp-layout.is-full .ss-view2d > .o2-wrap { height: calc(100% - 86px); min-height: 160px; display: flex; flex-direction: column; } /* 86px = 공통 틀의 토글 아래 빈 칸 */
+.ss-exp-layout.is-full .o2-wrap > * { flex: none; }
+.ss-exp-layout.is-full .o2-wrap > .orbit-svg { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
 .o2-orbit { fill: none; stroke: #7c8797; stroke-width: 2.5; stroke-dasharray: 8 6; }
 .o2-arrow { fill: #2f6fd6; }
 .o2-small { font: 600 14px system-ui, sans-serif; fill: var(--ss-muted); }

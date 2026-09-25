@@ -170,6 +170,7 @@
     var det = el("details", { class: "ss-card ss-intro" }, [el("summary", { text: "🔎 실험 방법 알아 두기" }), introBox]);
     det.open = store.get("intro", true) !== false;
     det.addEventListener("toggle", function () {
+      if (S.Experiment.isQuietToggle(det)) return; // 크게 보기가 잠시 접고 편 것(학생 선택 아님)
       store.set("intro", det.open);
     });
     root.appendChild(det);
@@ -1014,9 +1015,9 @@
     if (enl) enl.fit(); // 3D↔2D 전환 뒤 크게 보기 장면 높이를 다시 잰다(science-sim/README "enlarge()" 안내)
     var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
     R.tip.textContent =
-      kind === "3d"
-        ? "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향" + (narrow ? " · 페이지를 움직일 때는 3D 화면 바깥을 밀어요" : "")
-        : "2D 화면(남쪽 하늘을 바라본 모형)이에요. 가로는 방위, 세로는 태양 고도예요.";
+      kind === "3d" ? "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향" : "2D 화면(남쪽 하늘을 바라본 모형)이에요. 가로는 방위, 세로는 태양 고도예요.";
+    // 좁은 화면 기본 화면용 덧붙임 — 크게 보기(한 화면 실험실)는 페이지가 움직이지 않으므로 공통 CSS(.ss-tip-page)가 숨긴다
+    if (kind === "3d" && narrow) R.tip.appendChild(el("span", { class: "ss-tip-page", text: " · 페이지를 움직일 때는 3D 화면 바깥을 밀어요" }));
     R.btnReset.hidden = kind !== "3d";
     R.btnToggle.textContent = kind === "3d" ? "2D로 보기" : can3D ? "3D로 보기" : /[?&]no3d=1/.test(location.search) ? "2D 화면으로 고정됨" : "3D를 쓸 수 없는 기기예요";
     var shown = Number(store.get("shown", 0)) || null;

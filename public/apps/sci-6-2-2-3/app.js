@@ -1234,6 +1234,23 @@
     var plateNote = el("p", { class: "plate-note", role: "note", hidden: true, text: C.plateSafety });
     viewBox.parentNode.insertBefore(barCard, viewBox.nextSibling);
     viewBox.parentNode.insertBefore(plateNote, barCard.nextSibling);
+    // 크게 보기(한 화면 실험실, 2026-09-26 spec 개정 6): 시간 바·안전 안내를 조작 칸의 조건 고르기 아래(실행 카드 앞)로 옮겨
+    // 장면 칼럼이 장면으로 차게 한다. 기본 화면(꺼짐)은 예전처럼 장면 바로 아래.
+    var viewCol = viewBox.parentNode;
+    var layoutEl = viewCol.parentNode;
+    var expPanel = layoutEl.querySelector(".ss-exp-panel");
+    var runCardEl = expPanel ? expPanel.querySelector(".ss-run-card") : null;
+    function placeBar() {
+      if (expPanel && layoutEl.classList.contains("is-full")) {
+        if (barCard.parentNode !== expPanel || barCard.nextSibling !== plateNote) expPanel.insertBefore(barCard, runCardEl);
+        if (plateNote.parentNode !== expPanel || plateNote.previousSibling !== barCard) expPanel.insertBefore(plateNote, barCard.nextSibling);
+      } else {
+        if (viewBox.nextSibling !== barCard) viewCol.insertBefore(barCard, viewBox.nextSibling);
+        if (barCard.nextSibling !== plateNote) viewCol.insertBefore(plateNote, barCard.nextSibling);
+      }
+    }
+    placeBar();
+    if ("MutationObserver" in window) new MutationObserver(placeBar).observe(layoutEl, { attributes: true, attributeFilter: ["class"] });
     outMark.style.left = T_OUT * 100 + "%";
     rail.insertBefore(outMarkB, thumb);
     outMarkB.style.left = TB_OUT * 100 + "%";
@@ -1395,19 +1412,24 @@
         if (on) {
           live.textContent = "두 촛불을 덮었어요. 시간 바를 오른쪽 끝까지 끌어 두 촛불을 비교해요.";
           setTimeout(function () {
-            // 장면과 시간 바가 함께 보이게: 장면 위쪽을 머리말 바로 아래에 맞추고, 다 안 들어가면 시간 바 아래쪽을 아래 단계 버튼 위에 맞춘다
-            var hd = document.querySelector(".ss-header");
-            var ft = document.querySelector(".ss-footer-nav");
-            var top = hd ? hd.getBoundingClientRect().height : 0;
-            var bottom = (window.innerHeight || 0) - (ft ? ft.getBoundingClientRect().height : 0);
-            var vTop = viewBox.getBoundingClientRect().top;
-            var bBot = barCard.getBoundingClientRect().bottom;
-            var y = window.scrollY + vTop - top - 6;
-            if (bBot - vTop > bottom - top - 8) y = window.scrollY + bBot - bottom + 6;
-            try {
-              window.scrollTo({ top: Math.max(0, y), behavior: reduceMotion() ? "auto" : "smooth" });
-            } catch (e) {
-              window.scrollTo(0, Math.max(0, y));
+            if (layoutEl.classList.contains("is-full")) {
+              // 크게 보기: 장면은 화면에 고정되어 늘 보인다 — 조작 칸 안에서만 시간 바가 보이게(페이지는 움직이지 않는다)
+              S.Experiment.scrollIntoView(barCard);
+            } else {
+              // 장면과 시간 바가 함께 보이게: 장면 위쪽을 머리말 바로 아래에 맞추고, 다 안 들어가면 시간 바 아래쪽을 아래 단계 버튼 위에 맞춘다
+              var hd = document.querySelector(".ss-header");
+              var ft = document.querySelector(".ss-footer-nav");
+              var top = hd ? hd.getBoundingClientRect().height : 0;
+              var bottom = (window.innerHeight || 0) - (ft ? ft.getBoundingClientRect().height : 0);
+              var vTop = viewBox.getBoundingClientRect().top;
+              var bBot = barCard.getBoundingClientRect().bottom;
+              var y = window.scrollY + vTop - top - 6;
+              if (bBot - vTop > bottom - top - 8) y = window.scrollY + bBot - bottom + 6;
+              try {
+                window.scrollTo({ top: Math.max(0, y), behavior: reduceMotion() ? "auto" : "smooth" });
+              } catch (e) {
+                window.scrollTo(0, Math.max(0, y));
+              }
             }
             try {
               track.focus({ preventScroll: true });
