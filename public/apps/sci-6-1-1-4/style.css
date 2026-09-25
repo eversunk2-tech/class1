@@ -101,6 +101,9 @@
 .restart-line { text-align: center; }
 #login-hint a { font-weight: 700; }
 
+/* '더 탐구하고 싶은 점': 한 줄 입력(2026-09-25 간략화 — 새 기준 앱과 같게) */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .ss-main { padding: 12px 12px 96px; }
@@ -109,6 +112,11 @@
   .swatch-chip { width: 48px; height: 48px; }
   .drop-counter { font-size: 0.76rem; padding: 4px 10px; top: 8px; max-width: calc(100% - 64px); }
   .trend-chip { width: 26px; height: 26px; }
+}
+/* 휴대폰(좁은 화면): 방울 수 세기를 오른쪽 위로 — 왼쪽 위의 모형 배지·"⛶ 전체 화면 보기" 버튼(2026-09-25 공통 틀)과 겹치지 않게 */
+@media (max-width: 520px) {
+  .drop-counter, .plate2d-wrap .drop-counter { left: auto; right: 8px; transform: none; max-width: calc(100% - 150px); }
+  .plate2d-wrap .drop-counter { top: -52px; } /* 2D: 두 줄이 되어도 홈판 위 빈 자리(토글 버튼 오른쪽)에 들어가게 */
 }
 
 /* 결과 표: 긴 줄 이름은 줄바꿈, 칸은 색 칩 위·글자 아래 */

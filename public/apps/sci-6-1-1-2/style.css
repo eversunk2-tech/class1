@@ -69,6 +69,9 @@
 /* ── 분석 / 마치기 ── */
 .recheck { background: var(--ss-warn-bg); font-weight: 600; }
 .finish-card { text-align: center; }
+.finish-card .wide { width: 100%; }
+/* 정리하기 안의 '더 탐구하고 싶은 점': 한 줄 입력(새 기준 앱과 같은 모양) */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 .done-card h3 { margin: 0 0 8px; }
 .done-card { border: 2px solid var(--ss-good); }
 .restart-line { text-align: center; }

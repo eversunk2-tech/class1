@@ -3,12 +3,15 @@
 .sub-h { font-size: 1.1rem; margin: 18px 0 8px; }
 .sg-topic-card p { margin: 0; font-size: 1.05rem; }
 
-/* ── 마치기 ── */
+/* ── 마치기(정리 질문 단계 안, 결론 제출 뒤 — 새 기준 앱과 같은 모양) ── */
 .finish-card { text-align: center; }
+.finish-card .wide { width: 100%; }
 .done-card h3 { margin: 0 0 8px; }
 .done-card { border: 2px solid var(--ss-good); }
 .restart-line { text-align: center; }
 #login-hint a { font-weight: 700; }
+/* '더 탐구하고 싶은 점' 한 줄 입력 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 
 @media (max-width: 640px) {
   body { font-size: 16px; }

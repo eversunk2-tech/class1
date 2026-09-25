@@ -52,24 +52,21 @@
         <div id="share-root"></div>
       </section>
 
-      <!-- 4. 정리 질문 -->
+      <!-- 4. 정리 질문 (+ 더 탐구하고 싶은 점 · 학습 마치기 — 2026-09-25 간략화로 따로 있던 5단계를 이 안으로) -->
       <section data-stage="wrapup" aria-labelledby="h-wrapup" hidden>
         <h2 id="h-wrapup" class="ss-stage-title">4. 정리 질문</h2>
-        <p class="ss-lead">보기를 골라 확인하고, 이어서 내 생각을 적어 제출하면 모범 답안이 나와요.</p>
+        <p class="ss-lead">보기를 골라 확인하고, 이어서 내 생각을 적어 제출하면 모범 답안이 나와요. 끝으로 더 탐구하고 싶은 점을 한 줄 적고 학습을 마쳐요.</p>
         <div id="quiz-root"></div>
         <h3 class="sub-h">내 말로 정리하기</h3>
         <p class="ss-card ss-help" id="conclude-locked">🔒 위의 문제를 모두 확인하면 정리하기 질문이 나와요.</p>
         <div id="conclude-root" hidden></div>
-      </section>
-
-      <!-- 5. 더 탐구하고 싶은 점 -->
-      <section data-stage="curiosity" aria-labelledby="h-curiosity" hidden>
-        <h2 id="h-curiosity" class="ss-stage-title">5. 더 탐구하고 싶은 점</h2>
-        <div id="curiosity-root"></div>
-        <div class="ss-card finish-card">
-          <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
-          <p class="ss-help" id="finish-msg" aria-live="polite"></p>
-          <p class="ss-help" id="login-hint" hidden></p>
+        <div id="finish-wrap" hidden>
+          <div id="curiosity-root"></div>
+          <div class="ss-card finish-card">
+            <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
+            <p class="ss-help" id="finish-msg" aria-live="polite"></p>
+            <p class="ss-help" id="login-hint" hidden></p>
+          </div>
         </div>
         <div class="ss-card done-card" id="done-card" hidden></div>
         <p class="restart-line">

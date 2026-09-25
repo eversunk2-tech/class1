@@ -1,7 +1,7 @@
 /*
  * app.js — sci-6-1-1-4 "산성 용액과 염기성 용액을 섞으면 어떻게 될까?" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·실험 패널·기록·저장을 맡고, 이 파일은
- *   ① 3D/2D 장면(24홈판 첫째·넷째 줄, 점적병, 붉은 양배추 용액)  ② 관찰 카드(색 견본 + 색깔 변화표)
+ *   ① 3D/2D 장면(24홈판 첫째·넷째 줄, 점적병, 붉은 양배추 용액)  ② 관찰 카드(색 견본 + 색 구별 도우미 '색 띠')
  *   ③ 분석 표·색깔 변화표·퀴즈 연결  만 만든다.
  * 칸의 색은 모두 LessonConfig.phases[].pos(색깔 변화표 위의 자리, 지도서 144쪽 결과 예시를 본뜬 모형)에서만 가져온다.
  */
@@ -14,6 +14,24 @@
     return document.getElementById(id);
   };
 
+  // 간략화 전(예전 판) 저장 키의 이 기기 사본을 지운다(2026-09-26, review-C M1) — 남겨 두면 로그아웃할 때 사이트가 예전 판 사본을
+  // 올리려다 "다른 기기에서 저장한 기록과 달라요" 창을 띄우고, '확인'을 누르면 새 판 진행 기록이 예전 것으로 덮인다.
+  // 예전 판은 새 판에서 쓰지 않는다(저장 키 버전을 올림). 이 앱의 예전 키만 지운다(localStorage.clear() 금지).
+  (function () {
+    var OLD = ["sci6114sim:v1", "sci6114sim:v2"];
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        for (var j = 0; j < OLD.length; j++) if (k && (k === OLD[j] || k.indexOf(OLD[j] + ":") === 0)) drop.push(k);
+      }
+      drop.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      /* 저장소를 못 쓰면 지울 것도 없다 */
+    }
+  })();
   var store = S.createStore(C.storageKey);
   if (!store.available) $("storage-warning").hidden = false;
   var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
@@ -107,15 +125,44 @@
     },
   });
 
-  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리(결론 + '더 탐구하고 싶은 점' 한 줄) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    lesson.refresh();
+    showFinish();
+  });
   var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+  // '더 탐구하고 싶은 점'은 한 줄 입력(2026-09-25 간략화, 새 기준 앱과 같게): 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다.
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 결론을 제출한 뒤에 '더 탐구하고 싶은 점'과 '학습 마치기'가 보인다
+  function showFinish() {
+    $("finish-wrap").hidden = !conclude.isDone();
+  }
+  showFinish();
 
-  /* ───────── 색깔 변화표(모형) — 표시 자리(▲)를 글자로도 보여 준다(색만으로 전달하지 않기) ───────── */
+  /* ───────── 색깔 변화표(모형) — 표시 자리(▲)를 글자로도 보여 준다(색만으로 전달하지 않기) ─────────
+   * o.ends === "color": 관찰 카드(기록하는 순간)의 '색 구별' 도우미용 — 양 끝과 자리를 **색 이름**(붉은색 쪽·노란색 쪽)으로만 말한다.
+   *   산성·염기성 이름은 분석 단계의 색깔 변화표에서만 쓴다(CLAUDE.md "기록하는 순간에는 관찰 사실만" — 2026-09-25 간략화 때 고침,
+   *   예전에는 관찰 카드에서 "넣은 뒤는 염기성이 강한 쪽"처럼 분석 질문의 답을 먼저 알려 주었다). 띠의 색·자리 값은 그대로다. */
   function chartNode(o) {
     o = o || {};
+    var byColor = o.ends === "color";
+    var endL = byColor ? "◀ 붉은색 쪽" : "◀ 산성이 강함";
+    var endR = byColor ? "노란색 쪽 ▶" : "염기성이 강함 ▶";
+    function where(pos) {
+      if (byColor) return pos < 0.34 ? "붉은색 쪽" : pos > 0.66 ? "노란색 쪽" : "가운데쯤";
+      return pos < 0.34 ? "산성이 강한 쪽" : pos > 0.66 ? "염기성이 강한 쪽" : "가운데쯤";
+    }
     var grad =
       "linear-gradient(to right, " +
       C.chart
@@ -138,15 +185,15 @@
     var box = el("figure", { class: "cc" + (o.markers && o.markers.length ? " has-marks" : "") }, [
       o.title === false ? null : el("figcaption", { class: "cc-title", text: o.title || "붉은 양배추 용액의 색깔 변화표 (모형)" }),
       el("div", { class: "cc-track" }, [bar, marks]),
-      el("div", { class: "cc-ends" }, [el("span", { class: "cc-end cc-acid", text: "◀ 산성이 강함" }), el("span", { class: "cc-end cc-base", text: "염기성이 강함 ▶" })]),
+      el("div", { class: "cc-ends" }, [el("span", { class: "cc-end cc-acid", text: endL }), el("span", { class: "cc-end cc-base", text: endR })]),
     ]);
     if (o.markers && o.markers.length) {
       box.setAttribute(
         "aria-label",
-        "색깔 변화표: " +
+        (byColor ? "색 띠: " : "색깔 변화표: ") +
           o.markers
             .map(function (m) {
-              return S.josa(m.label, "은", "는") + " " + (m.pos < 0.34 ? "산성이 강한 쪽" : m.pos > 0.66 ? "염기성이 강한 쪽" : "가운데쯤");
+              return S.josa(m.label, "은", "는") + " " + where(m.pos);
             })
             .join(", ")
       );
@@ -292,14 +339,15 @@
             { pos: posAt(ph, 0), label: "처음" },
             { pos: posAt(ph, n), label: "넣은 뒤" },
           ];
-    var help = el("div", { class: "cc-help", hidden: true }, [chartNode({ markers: markers })]);
+    // 기록하는 순간이라 색 이름으로만(산성·염기성 이름은 분석 단계의 색깔 변화표에서) — chartNode 주석
+    var help = el("div", { class: "cc-help", hidden: true }, [chartNode({ markers: markers, ends: "color", title: "색 띠 (모형)" })]);
     var btn = el("button", { type: "button", class: "ss-btn ss-btn-ghost small-btn", text: "🎨 색 구별이 어려우면 눌러요", "aria-pressed": "false", "aria-expanded": "false" });
     btn.addEventListener("click", function () {
       var on = help.hidden;
       help.hidden = !on;
       btn.setAttribute("aria-pressed", String(on));
       btn.setAttribute("aria-expanded", String(on));
-      btn.textContent = on ? "🎨 색깔 변화표 숨기기" : "🎨 색 구별이 어려우면 눌러요";
+      btn.textContent = on ? "🎨 색 띠 숨기기" : "🎨 색 구별이 어려우면 눌러요";
     });
     body.appendChild(el("div", { class: "swatch-tools" }, [btn]));
     body.appendChild(help);
@@ -927,7 +975,10 @@
     card.appendChild(mini);
   }
 
-  /* ───────── 5. 마치기(결과 저장) ───────── */
+  /* ───────── 4. 정리하기 — 마치기(결과 저장) ───────── */
+  // detail(2026-09-25 간략화 뒤, questionSet: 2): predict{q2}, records, analysis{inferA,q1}, conclusion, curiosity.
+  //   뺀 문항(predict.q1, analysis.readA·q2·q3, extension)의 키는 아예 만들지 않는다 — 관리자 "학생 응답" 매핑이
+  //   questionSet으로 간략화 전·후 기록을 가른다(src/data/app-responses/sci-6-1-1-4.ts). detail.qa는 넣지 않는다(spec §1.3).
   function buildDetail() {
     var q = quiz.result();
     var analysis = {};
@@ -944,26 +995,27 @@
         tries: r.tries,
       };
     });
-    var cv = conclude.values();
     return {
+      questionSet: 2,
       predict: predict.values(),
       records: records.list().map(function (r) {
         return { phase: r.phase, drops: r.drops, colorFamily: r.colorFamily, recordedAt: r.recordedAt };
       }),
       analysis: analysis,
-      conclusion: cv.conclusion,
-      extension: { q1: cv.ext1, q2: cv.ext2 },
+      conclusion: conclude.values().conclusion,
       curiosity: curiosity.value(),
     };
   }
 
   lesson.finish({
+    stage: "conclude", // 마치기 카드가 정리하기 안에 있다(공통 틀 기본값은 "curiosity" 단계)
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
+    // '더 탐구하고 싶은 점'이 비었는지·무의미한지는 공통 틀(lesson.js)이 마칠 때 본다(필수, 느슨 판정)
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      return conclude.isDone() || "결론을 먼저 적고 제출해 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -984,7 +1036,7 @@
     nextBtn: $("btn-next"),
     gates: {
       experiment: function () {
-        return predict.isDone() || "예상하기의 두 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
+        return predict.isDone() || "예상하기 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
       },
       analyze: function () {
         var p = exp.progress();
@@ -993,17 +1045,13 @@
       conclude: function () {
         return quiz.isDone() || "분석 질문 " + C.quiz.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
       },
-      curiosity: function () {
-        return conclude.isDone() || "결론과 발전 질문 2개를 모두 제출해 주세요.";
-      },
     },
     done: {
       predict: predict.isDone,
       experiment: exp.allDone,
       analyze: quiz.isDone,
-      conclude: conclude.isDone,
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+      conclude: function () {
+        return conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {

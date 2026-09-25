@@ -3,6 +3,9 @@
  * 공통 틀(science-guide/)이 단계 이동·주제 고르기·조사 팁·정리 틀·참고 자료·공유 준비·퀴즈·정리·저장을 맡고,
  * 이 파일은 config를 각 모듈에 넘기고 단계 조건과 저장 detail만 정한다. 화면의 사실은 모두 data/lesson-config.js에서 온다.
  * 학생 입력은 공통 틀이 textContent로만 넣는다(innerHTML 없음).
+ * 2026-09-25 간략화: 4단계(조사 준비 → 조사하기 → 공유 준비하기 → 정리하기). 조사 준비 질문 1개(q2), 정리하기는 보기 고르기 2개 + 결론.
+ * 빈칸 채우기(따로 쓰던 하위 저장 storageKey + ":fill")·서술형·발전 질문은 뺐다. '더 탐구하고 싶은 점'(필수 한 줄)과 '학습 마치기'는
+ * 정리하기 단계 안, 결론을 제출한 뒤에 나온다(새 기준 앱 sci-6-2-1-4와 같은 모양). 저장 detail은 questionSet: 2.
  */
 (function () {
   "use strict";
@@ -13,9 +16,25 @@
     return document.getElementById(id);
   };
 
+  // 간략화 전(예전 판) 저장 키의 이 기기 사본을 지운다(2026-09-26, review-C M1) — 남겨 두면 로그아웃할 때 사이트가 예전 판 사본을
+  // 올리려다 "다른 기기에서 저장한 기록과 달라요" 창을 띄우고, '확인'을 누르면 새 판 진행 기록이 예전 것으로 덮인다.
+  // 예전 판은 새 판에서 쓰지 않는다(저장 키 버전을 올림). 이 앱의 예전 키만 지운다(localStorage.clear() 금지).
+  (function () {
+    var OLD = ["sci611guide6:v1"];
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        for (var j = 0; j < OLD.length; j++) if (k && (k === OLD[j] || k.indexOf(OLD[j] + ":") === 0)) drop.push(k);
+      }
+      drop.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      /* 저장소를 못 쓰면 지울 것도 없다 */
+    }
+  })();
   var store = S.createStore(C.storageKey);
-  // 빈칸 채우기는 Conclude 모듈을 하나 더 쓰므로 저장 키가 겹치지 않게 하위 접두사를 쓴다(처음부터 다시 하기에서 함께 지워진다).
-  var fillStore = S.createStore(C.storageKey + ":fill");
   if (!store.available) $("storage-warning").hidden = false;
   var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
   var refresh = function () {
@@ -56,13 +75,13 @@
       choices: C.intro.topicChoices,
       confirmChange: "주제를 바꾸면 조사하기와 공유 준비하기에 적은 내용이 지워져요. 바꿀까요?",
       locked: function () {
-        return (predict.isDone() && introSubmitted()) || "먼저 두 질문에 내 생각을 적고 '생각 다 적었어요'를 눌러요.";
+        return (predict.isDone() && introSubmitted()) || "먼저 질문에 내 생각을 적고 '생각 다 적었어요'를 눌러요.";
       },
     },
     store,
     function (id, prev) {
       if (prev) {
-        // 주제가 달라지면 조사 기록·공유 대본이 맞지 않으므로 지운다(정리하기·궁금한 점은 주제와 관계없어 남긴다).
+        // 주제가 달라지면 조사 기록·공유 대본이 맞지 않으므로 지운다(정리하기와 그 안의 '더 탐구하고 싶은 점'은 주제와 관계없어 남긴다).
         ["research", "refOpen", "share"].forEach(function (k) {
           store.remove(k);
         });
@@ -92,11 +111,17 @@
     refresh();
     lesson.toast("내 생각을 기록했어요. 이제 '산성화'의 뜻을 읽고 조사할 주제를 골라요.");
   });
+  // 조사 준비 질문 id 목록(간략화 뒤에는 ["q2"]) — 처음 생각·고친 생각 비교와 저장 detail에 쓴다
+  var introIds = C.intro.questions.map(function (q) {
+    return q.id;
+  });
   function introRevised() {
     var snap = store.get("introSnapshot", null);
     if (!snap) return false;
     var cur = predict.values();
-    return cur.q1 !== snap.q1 || cur.q2 !== snap.q2;
+    return introIds.some(function (id) {
+      return cur[id] !== snap[id];
+    });
   }
   function drawIntroGate() {
     var ready = predict.isDone();
@@ -105,8 +130,8 @@
     $("concept-locked").hidden = open;
     introBtn.disabled = !ready;
     $("concept-locked-msg").textContent = ready
-      ? "🔒 두 질문에 내 생각을 다 적었으면 아래 버튼을 눌러요. '산성화'가 무엇인지 알려 주는 카드와 조사 주제 고르기가 나와요."
-      : "🔒 두 질문에 내 생각을 " + predict.minLength + "글자 이상 적으면 '산성화'가 무엇인지 알려 주는 카드와 조사 주제 고르기가 나와요.";
+      ? "🔒 질문에 내 생각을 다 적었으면 아래 버튼을 눌러요. '산성화'가 무엇인지 알려 주는 카드와 조사 주제 고르기가 나와요."
+      : "🔒 질문에 내 생각을 " + predict.minLength + "글자 이상 적으면 '산성화'가 무엇인지 알려 주는 카드와 조사 주제 고르기가 나와요.";
     $("intro-revised").hidden = !(open && introRevised());
     topic.refresh();
   }
@@ -158,14 +183,14 @@
       $("worksheet-root"),
       {
         title: "📝 조사 결과 정리하기",
-        lead: "조사한 내용을 **내 말로** 적어요. 네 칸을 모두 채우면 아래의 '참고 자료 속 사실'이 열려 내 조사와 비교할 수 있어요.",
+        lead: "조사한 내용을 **내 말로** 적어요. 원인·피해·대책 세 칸을 적고 출처를 고르면 아래의 '참고 자료 속 사실'이 열려 내 조사와 비교할 수 있어요.",
         rowLabel: T ? T.label : "조사",
         fields: C.worksheet.fields,
         fixed: true,
         startRows: 1,
         minRows: 1,
-        incompleteText: "원인·피해·대책은 5글자 이상, 출처는 2글자 이상 모두 적어 주세요.",
-        doneText: "✔ 네 칸을 모두 채웠어요. 아래에서 참고 자료 속 사실과 비교해 보세요.",
+        incompleteText: "원인·피해·대책은 5글자 이상 적고, 출처는 하나 골라 주세요.",
+        doneText: "✔ 정리 틀을 모두 채웠어요. 아래에서 참고 자료 속 사실과 비교해 보세요.",
       },
       store,
       function () {
@@ -196,7 +221,7 @@
         open: true,
         groups: groups,
         locked: function () {
-          return ws.isDone() || "정리 틀의 네 칸을 먼저 채우면 열려요.";
+          return ws.isDone() || "정리 틀(세 칸 + 출처 고르기)을 먼저 채우면 열려요.";
         },
       },
       store,
@@ -247,12 +272,7 @@
     }
   );
 
-  /* ───────── 4. 정리하기 ───────── */
-  var fill = S.Conclude.render($("fill-root"), [C.fill], fillStore, function () {
-    drawWrapGate();
-    refresh();
-  }, { minLength: 2 });
-
+  /* ───────── 4. 정리하기(보기 고르기 2개 → 결론) ───────── */
   var quizItems = C.quiz.map(function (q) {
     var idOf = function (label) {
       return "o" + (q.options.indexOf(label) + 1);
@@ -277,17 +297,36 @@
     drawWrapGate();
     refresh();
   }, { numLabel: "문제", key: "quiz" });
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, refresh, { minLength: 10 });
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    refresh();
+    showFinish();
+  }, { minLength: 10 });
   function drawWrapGate() {
-    $("quiz-area").hidden = !fill.isDone();
-    var open = fill.isDone() && quiz.isDone();
+    var open = quiz.isDone();
     $("conclude-root").hidden = !open;
     $("conclude-locked").hidden = open;
+    showFinish();
+  }
+  $("conclude-locked").textContent = "🔒 위의 문제 " + quizItems.length + "개를 모두 확인하면 정리하기 질문이 나와요.";
+
+  /* ───────── 4-2. 더 탐구하고 싶은 점(필수 한 줄) + 마치기 — 결론을 제출하면 나온다 ───────── */
+  var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, refresh);
+  // 새 기준 앱처럼 한 줄 입력: 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다(최대 200자).
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 문제를 모두 확인하고 결론을 제출한 뒤에만 보인다(앞으로 돌아가 문제 답을 바꾸면 다시 숨는다)
+  function showFinish() {
+    $("finish-wrap").hidden = !(quiz.isDone() && conclude.isDone());
   }
   drawWrapGate();
-
-  /* ───────── 5. 궁금한 점 + 마치기 ───────── */
-  var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, refresh);
 
   function buildDetail() {
     var q = quiz.result();
@@ -308,35 +347,47 @@
     var pv = predict.values();
     var cv = conclude.values();
     var sv = share.values();
+    // 간략화 후(questionSet: 2): 뺀 문항의 키(intro.q1·revised.q1, fill, why, extension)는 아예 만들지 않는다.
+    // 남긴 키의 이름·모양은 예전과 같다(관리자 "학생 응답" 매핑 src/data/app-responses/sci-6-1-1-6.ts의 v2 변형이 이 모양을 읽는다).
     return {
       kind: "guide",
+      questionSet: 2,
       topic: topic.label(),
       // 처음 생각(개념 카드를 보기 전)과, 그 뒤에 고쳤다면 고친 생각을 따로 남긴다
       intro: (function () {
         var snap = store.get("introSnapshot", null) || pv;
-        var o = { q1: snap.q1, q2: snap.q2, hintsOpened: predict.hintsOpened() };
-        if (introRevised()) o.revised = { q1: pv.q1, q2: pv.q2 };
+        var o = {};
+        introIds.forEach(function (id) {
+          o[id] = snap[id];
+        });
+        o.hintsOpened = predict.hintsOpened();
+        if (introRevised()) {
+          o.revised = {};
+          introIds.forEach(function (id) {
+            o.revised[id] = pv[id];
+          });
+        }
         return o;
       })(),
       research: ws.rows()[0] || research(),
       openedFacts: !!store.get("refOpen", false) && ws.isDone(),
       share: { script: sv.script, checked: sv.checked, reflect: sv.reflect },
-      fill: fill.values().fill,
       quiz: analysis,
-      why: cv.why,
-      extension: cv.ext1,
       conclusion: cv.conclusion,
       curiosity: curiosity.value(),
     };
   }
 
   lesson.finish({
+    stage: "wrapup", // 마치기 화면이 있는 단계(공통 틀 기본값 "curiosity"는 이 앱에 없다)
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
+    // '더 탐구하고 싶은 점'이 비었는지·무의미한지는 공통 틀(lesson.js)이 마칠 때 본다(필수, 느슨 판정)
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      if (!quiz.isDone()) return "정리하기의 문제 " + quizItems.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
+      return conclude.isDone() || "결론을 먼저 적고 제출해 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -362,8 +413,8 @@
     nextBtn: $("btn-next"),
     gates: {
       research: function () {
-        if (!predict.isDone()) return "조사 준비의 두 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
-        if (!introSubmitted()) return "두 질문을 다 적었으면 '생각 다 적었어요' 버튼을 눌러 주세요.";
+        if (!predict.isDone()) return "조사 준비의 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
+        if (!introSubmitted()) return "질문에 내 생각을 다 적었으면 '생각 다 적었어요' 버튼을 눌러 주세요.";
         if (!topic.isDone()) return "조사할 주제를 하나 골라 주세요.";
         return true;
       },
@@ -375,11 +426,6 @@
         var s = share.status();
         return s === true ? true : "공유 준비하기: " + s;
       },
-      curiosity: function () {
-        if (!fill.isDone()) return "정리하기의 빈칸 채우기를 먼저 제출해 주세요.";
-        if (!quiz.isDone()) return "정리하기의 문제 " + quizItems.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
-        return conclude.isDone() || "서술형·발전 질문·결론을 모두 제출해 주세요.";
-      },
     },
     done: {
       intro: function () {
@@ -390,10 +436,7 @@
       },
       share: share.isDone,
       wrapup: function () {
-        return fill.isDone() && quiz.isDone() && conclude.isDone();
-      },
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+        return quiz.isDone() && conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {

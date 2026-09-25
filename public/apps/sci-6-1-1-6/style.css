@@ -7,15 +7,15 @@
 .concept-card p { margin: 0 0 6px; font-size: 1.05rem; }
 .concept-card p.ss-help { margin: 8px 0 0; font-size: 0.9rem; }
 
-/* ── 정리하기: 빈칸 채우기는 짧은 답이라 입력칸을 낮게 ── */
-#fill-root .ss-textarea { min-height: 3.2em; }
-
-/* ── 마치기 ── */
+/* ── 마치기(정리하기 단계 안, 결론 제출 뒤 — 새 기준 앱과 같은 모양) ── */
 .finish-card { text-align: center; }
+.finish-card .wide { width: 100%; }
 .done-card h3 { margin: 0 0 8px; }
 .done-card { border: 2px solid var(--ss-good); }
 .restart-line { text-align: center; }
 #login-hint a { font-weight: 700; }
+/* '더 탐구하고 싶은 점' 한 줄 입력 */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 
 @media (max-width: 640px) {
   body { font-size: 16px; }

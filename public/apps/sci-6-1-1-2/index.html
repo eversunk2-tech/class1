@@ -82,21 +82,18 @@
         </div>
       </section>
 
-      <!-- 4. 정리하기 -->
+      <!-- 4. 정리하기 (결론 → 제출하면 '더 탐구하고 싶은 점' 한 줄 + 학습 마치기) -->
       <section data-stage="conclude" aria-labelledby="h-conclude" hidden>
         <h2 id="h-conclude" class="ss-stage-title">4. 정리하기</h2>
         <p class="ss-lead">먼저 내 생각을 적고 제출하면 모범 답안이 나와요. 내 답과 비교해 보세요.</p>
         <div id="conclude-root"></div>
-      </section>
-
-      <!-- 5. 더 탐구하고 싶은 점 -->
-      <section data-stage="curiosity" aria-labelledby="h-curiosity" hidden>
-        <h2 id="h-curiosity" class="ss-stage-title">5. 더 탐구하고 싶은 점</h2>
-        <div id="curiosity-root"></div>
-        <div class="ss-card finish-card">
-          <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
-          <p class="ss-help" id="finish-msg" aria-live="polite"></p>
-          <p class="ss-help" id="login-hint" hidden></p>
+        <div id="finish-wrap" hidden>
+          <div id="curiosity-root"></div>
+          <div class="ss-card finish-card">
+            <button type="button" class="ss-btn ss-btn-primary ss-btn-big wide" id="btn-finish">🎉 학습 마치기</button>
+            <p class="ss-help" id="finish-msg" aria-live="polite"></p>
+            <p class="ss-help" id="login-hint" hidden></p>
+          </div>
         </div>
         <div class="ss-card done-card" id="done-card" hidden></div>
         <p class="restart-line">

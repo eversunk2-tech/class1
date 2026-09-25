@@ -14,6 +14,24 @@
     return document.getElementById(id);
   };
 
+  // 간략화 전(예전 판) 저장 키의 이 기기 사본을 지운다(2026-09-26, review-C M1) — 남겨 두면 로그아웃할 때 사이트가 예전 판 사본을
+  // 올리려다 "다른 기기에서 저장한 기록과 달라요" 창을 띄우고, '확인'을 누르면 새 판 진행 기록이 예전 것으로 덮인다.
+  // 예전 판은 새 판에서 쓰지 않는다(저장 키 버전을 올림). 이 앱의 예전 키만 지운다(localStorage.clear() 금지).
+  (function () {
+    var OLD = ["sci611sim1:v1"];
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        for (var j = 0; j < OLD.length; j++) if (k && (k === OLD[j] || k.indexOf(OLD[j] + ":") === 0)) drop.push(k);
+      }
+      drop.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      /* 저장소를 못 쓰면 지울 것도 없다 */
+    }
+  })();
   var store = S.createStore(C.storageKey);
   if (!store.available) $("storage-warning").hidden = false;
   var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
@@ -66,15 +84,35 @@
     },
   });
 
-  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리(결론 + '더 탐구하고 싶은 점' 한 줄) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
   var myCrit = renderMyCriterion($("mycrit-root"), C.myCriterion);
   prepareQuizFeedback();
   prepareClassifyFeedback();
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
   var sorter = S.Sorter.renderRounds($("classify-root"), C.classify, store, lesson.refresh);
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    lesson.refresh();
+    showFinish();
+  });
   var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+  // '더 탐구하고 싶은 점'은 정리하기 안의 한 줄 입력(2026-09-25 간략화 — 새 기준 앱과 같은 모양):
+  // 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다. 비우면 마칠 수 없다(공통 틀 lesson.js가 본다).
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 결론을 제출해야 '더 탐구하고 싶은 점'과 '학습 마치기'가 보인다
+  function showFinish() {
+    $("finish-wrap").hidden = !conclude.isDone();
+  }
+  showFinish();
 
   /* ───────── 3. 기록·분석하기 ⓪: 내 분류 기준 세우기(채점 없음, 저장 키 "mycriterion") ───────── */
   function renderMyCriterion(root, cfg) {
@@ -433,11 +471,12 @@
           await sleep(800);
           bottle.classList.remove("is-shaking");
           if (v !== "유지된다") foam.classList.add("is-fading"); // 금방 사라짐
+          // 5초 기다림은 형식상 5초 — 숫자만 빠르게 세고 넘어간다(빨리 감기·모형, 2026-09-26 사용자 결정)
+          caption.textContent = "⏩ 5초 빨리 감기(모형) — 거품을 지켜봐요";
           for (var i = 5; i >= 1; i--) {
             if (my !== token) return;
-            timer.textContent = "⏱ " + i;
-            caption.textContent = "5초 동안 거품을 지켜봐요… " + i;
-            await sleep(1000);
+            timer.textContent = "⏩ " + i;
+            await sleep(180);
           }
         } else {
           caption.textContent = "코를 대지 않고 손으로 바람을 일으켜 냄새를 맡아요…";
@@ -595,6 +634,24 @@
       overlay.appendChild(ovHand);
       overlay.appendChild(ovText);
       container.appendChild(overlay);
+      // 장면 아래쪽의 드래그 안내 글(.ss-view-tip, 공통 틀)은 좁은 화면(휴대폰)에서 두세 줄이 된다 —
+      // 안내 문장(ov-text)이 그 글을 덮지 않게 안내 글 높이만큼 올린다(2026-09-25, CSS --ov-bottom).
+      // 장면이 아주 낮으면(휴대폰 크게 보기) 왼쪽 위 '전체 화면 보기' 버튼(위에서 약 92px)을 덮지 않는 데까지만 올린다
+      // — 그때는 드래그 안내 글이 조금 가려질 수 있다(안내 문장은 어두운 바탕이라 읽힌다).
+      var tipEl = container.parentNode ? container.parentNode.querySelector(".ss-view-tip") : null;
+      var placeRO = null;
+      function placeText() {
+        var th = tipEl && tipEl.textContent ? tipEl.getBoundingClientRect().height : 0;
+        var want = Math.round(th) + 18;
+        var ch = container.clientHeight || 0;
+        var max = ch ? ch - 92 - (ovText.hidden ? 0 : ovText.offsetHeight) : want;
+        overlay.style.setProperty("--ov-bottom", Math.max(8, Math.min(want, max)) + "px");
+      }
+      if ("ResizeObserver" in window) {
+        placeRO = new ResizeObserver(placeText);
+        if (tipEl) placeRO.observe(tipEl);
+        placeRO.observe(container);
+      }
       function setOverlay(timer, hand, text) {
         ovTimer.textContent = timer || "";
         ovTimer.hidden = !timer;
@@ -602,6 +659,7 @@
         ovHand.classList.toggle("is-fanning", !!hand);
         ovText.textContent = text || "";
         ovText.hidden = !text;
+        placeText();
       }
       setOverlay();
 
@@ -696,7 +754,12 @@
             v.render();
             return;
           }
-          if (disp) homeAll();
+          if (disp) {
+            homeAll();
+            // 결과를 보던 가까운 시점(종이 앞·병 옆)에서 다른 칸을 고르면 처음 시점으로 돌아간다(2026-09-25) —
+            // 빈 종이만 보이는 화면이 남지 않고, 점적병이 다시 보여 3D에서 눌러 고를 수 있다. 방향은 처음 시점 그대로(앞쪽에서 봄).
+            v.flyHome(500);
+          }
           // 고른 점적병이 살짝 떠오른다
           Object.keys(bottles).forEach(function (id) {
             var o = bottles[id].obj;
@@ -742,18 +805,19 @@
             b.position.y = home[1] + 0.3;
             var fading = null;
             if (val !== "유지된다") {
-              // 거품이 1초 남짓 만에 사라진다
-              fading = v.tween(1200, function (t) {
+              // 거품이 빨리 감기(약 1초) 동안 사라진다
+              fading = v.tween(900, function (t) {
                 var s = Math.max(0.01, 1 - t);
                 bub.scale.set(s, s, s);
               }).then(function () {
                 removeBubbles(o);
               });
             }
+            // 5초 기다림은 형식상 5초 — 숫자만 빠르게 세고 넘어간다(빨리 감기·모형, 2026-09-26 사용자 결정)
             for (var i = 5; i >= 1; i--) {
               if (my !== runToken) return;
-              setOverlay("⏱ " + i, false, "5초 동안 거품을 지켜봐요");
-              await v.wait(1000);
+              setOverlay("⏩ " + i, false, "⏩ 5초 빨리 감기(모형) — 거품을 지켜봐요");
+              await v.wait(180);
             }
             if (fading) await fading;
           } else {
@@ -774,11 +838,13 @@
         clear: function () {
           runToken++;
           homeAll();
+          v.flyHome(500); // 실험대를 정리하면 시점도 처음으로
           v.render();
         },
         resetView: v.resetView,
         dispose: function () {
           runToken++;
+          if (placeRO) placeRO.disconnect();
           if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
           v.dispose();
         },
@@ -823,7 +889,10 @@
     note.textContent = flagged ? "🔎 다시 관찰해 보면 좋은 칸이 " + flagged + "개 있어요. 🔁 버튼을 누르면 그 관찰을 다시 해 볼 수 있어요." : "";
   }
 
-  /* ───────── 5. 마치기(결과 저장) ───────── */
+  /* ───────── 4. 마치기(결과 저장) ─────────
+   * detail 모양(2026-09-25 간략화, questionSet: 2): 뺀 문항(예상 q2, 발전 질문 extension)의 키는 아예 만들지 않는다.
+   * questionSet: 2는 새 모양 표시 — 관리자 "학생 응답" 매핑(src/data/app-responses/sci-6-1-1-1.ts)이 이것으로 버전을 가른다.
+   * 나머지 키 이름·모양은 예전과 같다. */
   function buildDetail() {
     var q = quiz.result();
     var analysis = {};
@@ -840,8 +909,8 @@
         tries: r.tries,
       };
     });
-    var cv = conclude.values();
     return {
+      questionSet: 2,
       predict: predict.values(),
       records: records.list().map(function (r) {
         return { solution: r.solution, method: r.method, result: r.result, recordedAt: r.recordedAt };
@@ -850,19 +919,20 @@
       myCriterion: myCrit.values(),
       analysis: analysis,
       classify: sorter.result(),
-      conclusion: cv.conclusion,
-      extension: { q1: cv.ext1, q2: cv.ext2 },
+      conclusion: conclude.values().conclusion,
       curiosity: curiosity.value(),
     };
   }
 
   lesson.finish({
+    stage: "conclude", // 마치기 칸이 정리하기 안에 있다(공통 틀 기본값 "curiosity"가 아니다)
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      // '더 탐구하고 싶은 점'이 비었는지·무의미한지는 공통 틀(lesson.js)이 마칠 때 본다(필수, 느슨한 판정)
+      return conclude.isDone() || "결론을 먼저 적고 제출해 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -888,7 +958,7 @@
     nextBtn: $("btn-next"),
     gates: {
       experiment: function () {
-        return predict.isDone() || "예상하기의 두 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
+        return predict.isDone() || "예상하기 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
       },
       analyze: function () {
         var p = exp.progress();
@@ -899,9 +969,6 @@
         if (!quiz.isDone()) return "기록·분석하기에서 분류 기준을 고르고 '확인하기'를 눌러 주세요.";
         return sorter.isDone() || "기록·분석하기에서 " + C.classify.rounds.length + "가지 기준으로 용액을 알맞게 분류해 주세요.";
       },
-      curiosity: function () {
-        return conclude.isDone() || "결론과 발전 질문 2개를 모두 제출해 주세요.";
-      },
     },
     done: {
       predict: predict.isDone,
@@ -909,9 +976,8 @@
       analyze: function () {
         return myCrit.isDone() && quiz.isDone() && sorter.isDone();
       },
-      conclude: conclude.isDone,
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+      conclude: function () {
+        return conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {

@@ -2,6 +2,8 @@
  * app.js — sci-6-1-1-5 "산성 용액과 염기성 용액을 이용하는 예를 찾아라!" (조사 도우미)
  * 공통 틀(science-guide/)이 단계 이동·참고 자료·조사 팁·정리 틀·발표 준비·퀴즈·정리·저장을 맡고,
  * 이 파일은 config를 각 모듈에 넘기고 단계 조건과 저장 detail만 정한다. 화면의 사실은 모두 data/lesson-config.js에서 온다.
+ * 2026-09-25 간략화: 4단계(조사 시작하기 → 조사하기 → 발표 준비하기 → 정리 질문). '더 탐구하고 싶은 점'(필수 한 줄)과
+ * '학습 마치기'는 정리 질문 단계 안, 결론을 제출한 뒤에 나온다(새 기준 앱 sci-6-2-1-4와 같은 모양). 저장 detail은 questionSet: 2.
  */
 (function () {
   "use strict";
@@ -12,6 +14,24 @@
     return document.getElementById(id);
   };
 
+  // 간략화 전(예전 판) 저장 키의 이 기기 사본을 지운다(2026-09-26, review-C M1) — 남겨 두면 로그아웃할 때 사이트가 예전 판 사본을
+  // 올리려다 "다른 기기에서 저장한 기록과 달라요" 창을 띄우고, '확인'을 누르면 새 판 진행 기록이 예전 것으로 덮인다.
+  // 예전 판은 새 판에서 쓰지 않는다(저장 키 버전을 올림). 이 앱의 예전 키만 지운다(localStorage.clear() 금지).
+  (function () {
+    var OLD = ["sci6115guide:v1"];
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        for (var j = 0; j < OLD.length; j++) if (k && (k === OLD[j] || k.indexOf(OLD[j] + ":") === 0)) drop.push(k);
+      }
+      drop.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      /* 저장소를 못 쓰면 지울 것도 없다 */
+    }
+  })();
   var store = S.createStore(C.storageKey);
   if (!store.available) $("storage-warning").hidden = false;
   var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
@@ -25,10 +45,7 @@
   var predict = S.Predict.render(
     $("predict-root"),
     {
-      questions: [
-        { id: "q1", text: C.intro.question, placeholder: C.intro.placeholder },
-        { id: "q2", text: C.intro.question2, placeholder: C.intro.placeholder2 },
-      ],
+      questions: [{ id: "q1", text: C.intro.question, placeholder: C.intro.placeholder }],
       hints: C.intro.hints,
       minLength: C.intro.minLength,
       lengthTip: "왜 그렇게 생각했는지도 함께 적어 보세요.",
@@ -146,17 +163,36 @@
     drawConcludeGate();
     refresh();
   }, { numLabel: "문제", key: "quiz" });
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, refresh, { minLength: 10 });
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    refresh();
+    showFinish();
+  }, { minLength: 10 });
   function drawConcludeGate() {
     var open = quiz.isDone();
     $("conclude-root").hidden = !open;
     $("conclude-locked").hidden = open;
+    showFinish();
   }
   $("conclude-locked").textContent = "🔒 위의 문제 " + quizItems.length + "개를 모두 확인하면 정리하기 질문이 나와요.";
-  drawConcludeGate();
 
-  /* ───────── 5. 궁금한 점 + 마치기 ───────── */
+  /* ───────── 4-2. 더 탐구하고 싶은 점(필수 한 줄) + 마치기 — 결론을 제출하면 나온다 ───────── */
   var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, refresh);
+  // 새 기준 앱처럼 한 줄 입력: 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다(최대 200자).
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 문제를 모두 확인하고 결론을 제출한 뒤에만 보인다(앞으로 돌아가 문제 답을 바꾸면 다시 숨는다)
+  function showFinish() {
+    $("finish-wrap").hidden = !(quiz.isDone() && conclude.isDone());
+  }
+  drawConcludeGate();
 
   function buildDetail() {
     var q = quiz.result();
@@ -176,27 +212,32 @@
     });
     var cv = conclude.values();
     var sv = share.values();
+    // 간략화 후(questionSet: 2): 뺀 문항의 키(intro.experience, quiz.q2·q4, extension)는 아예 만들지 않는다.
+    // 남긴 키의 이름·모양은 예전과 같다(관리자 "학생 응답" 매핑 src/data/app-responses/sci-6-1-1-5.ts의 v2 변형이 이 모양을 읽는다).
     return {
       kind: "guide",
-      intro: { answer: predict.values().q1, experience: predict.values().q2, hintsOpened: predict.hintsOpened() },
+      questionSet: 2,
+      intro: { answer: predict.values().q1, hintsOpened: predict.hintsOpened() },
       worksheet: ws.rows(),
       propertyDiffers: ws.mismatches(),
       comparedWithModel: ws.compareOpened(),
       share: { script: sv.script, reflect: sv.reflect },
       quiz: analysis,
       conclusion: cv.conclusion,
-      extension: { q1: cv.ext1, q2: cv.ext2 },
       curiosity: curiosity.value(),
     };
   }
 
   lesson.finish({
+    stage: "wrapup", // 마치기 화면이 있는 단계(공통 틀 기본값 "curiosity"는 이 앱에 없다)
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
+    // '더 탐구하고 싶은 점'이 비었는지·무의미한지는 공통 틀(lesson.js)이 마칠 때 본다(필수, 느슨 판정)
     canFinish: function () {
-      return curiosity.isDone() || "더 탐구하고 싶은 점(또는 궁금한 점)을 " + (C.curiosity.minLength || 2) + "글자 이상 먼저 적어 주세요.";
+      if (!quiz.isDone()) return "정리 질문의 문제 " + quizItems.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
+      return conclude.isDone() || "결론을 먼저 적고 제출해 주세요.";
     },
     detail: buildDetail,
     summary: function () {
@@ -234,7 +275,7 @@
     nextBtn: $("btn-next"),
     gates: {
       research: function () {
-        return predict.isDone() || "조사 시작하기의 질문 2개에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
+        return predict.isDone() || "조사 시작하기의 질문에 내 생각을 " + predict.minLength + "글자 이상 먼저 적어 주세요.";
       },
       share: function () {
         var s = ws.status();
@@ -244,20 +285,13 @@
         var s = share.status();
         return s === true ? true : "발표 준비하기: " + s;
       },
-      curiosity: function () {
-        if (!quiz.isDone()) return "정리 질문의 문제 " + quizItems.length + "개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
-        return conclude.isDone() || "결론과 발전 질문 2개를 모두 제출해 주세요.";
-      },
     },
     done: {
       intro: predict.isDone,
       research: ws.isDone,
       share: share.isDone,
       wrapup: function () {
-        return quiz.isDone() && conclude.isDone();
-      },
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+        return quiz.isDone() && conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {

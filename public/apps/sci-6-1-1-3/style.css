@@ -22,9 +22,11 @@
 .safety ul { margin: 8px 0 0; padding-left: 1.2em; }
 .melt-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--ss-warn-bg); font-weight: 600; line-height: 1.5; }
 
-/* ── 시간 빨리 감기 표시(실험 화면 위) ── */
+/* ── 시간 빨리 감기 표시(실험 화면 위) ──
+   오른쪽 위(모형 배지와 같은 줄)에 둔다 — 왼쪽 위의 "⛶ 전체 화면 보기" 버튼(2026-09-25 공통 틀)과 가운데(카메라가 다가간 관찰할 홈)를 가리지 않게.
+   좁은·낮은 화면(휴대폰)에서는 작게(예전 top 44px·폭 260px은 휴대폰에서 토글 버튼과 반응 중인 홈을 덮었다). */
 .ff-overlay {
-  position: absolute; top: 44px; right: 10px; z-index: 5; display: flex; flex-direction: column; gap: 6px;
+  position: absolute; top: 10px; right: 10px; z-index: 5; display: flex; flex-direction: column; gap: 6px;
   width: min(260px, calc(100% - 20px)); padding: 10px 12px; border-radius: 14px;
   background: rgba(31, 39, 51, 0.86); color: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
 }
@@ -32,6 +34,12 @@
 .ff-text { font-size: 0.88rem; }
 .ff-bar { display: block; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
 .ff-bar-fill { display: block; width: 0; height: 100%; background: #f2c46b; transition-property: width; transition-timing-function: linear; }
+@media (max-width: 520px), (max-height: 480px) {
+  .ff-overlay { top: 8px; right: 8px; width: min(200px, calc(100% - 150px)); gap: 4px; padding: 7px 10px; border-radius: 12px; }
+  .ff-title { font-size: 0.8rem; }
+  .ff-text { font-size: 0.78rem; }
+  .ff-bar { height: 6px; }
+}
 
 /* ── 2D 대체 화면: 재료 접시 + 6홈판 2개(위에서 본 모형) ── */
 .p3-wrap { color: #1f2733; }
@@ -112,6 +120,9 @@
 .done-card { border: 2px solid var(--ss-good); }
 .restart-line { text-align: center; }
 #login-hint a { font-weight: 700; }
+
+/* '더 탐구하고 싶은 점': 한 줄 입력(2026-09-25 간략화 — 새 기준 앱과 같게) */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 
 @media (max-width: 640px) {
   body { font-size: 16px; }

@@ -2,10 +2,13 @@ import { choiceItem, tableItem, textItem } from "./helpers";
 import type { ResponseSchema } from "./types";
 
 /**
- * sci-6-1-1-4 산성 용액과 염기성 용액을 섞으면 어떻게 될까? (sim · 이전 기준)
- * 출처: public/apps/sci-6-1-1-4/app.js buildDetail(), data/lesson-config.js
- * detail: predict{q1,q2}, records[{phase,drops,colorFamily,recordedAt}](colorFamily는 이미 보기 라벨),
- *         analysis{readA,inferA,q1,q2,q3}, conclusion, extension{q1,q2}, curiosity
+ * sci-6-1-1-4 산성 용액과 염기성 용액을 섞으면 어떻게 될까? (sim · 2026-09-25 간략화 뒤 새 기준)
+ * 출처: public/apps/sci-6-1-1-4/app.js buildDetail(), data/lesson-config.js (+ git 이력의 간략화 전 버전)
+ * 저장 모양이 한 번 바뀌었다(둘 다 detail.qa 없음 — 이 매핑으로만 보인다). 위에서부터 맞는 첫 변형을 쓴다.
+ *  - v2(간략화 후, 저장 키 sci6114sim:v3): questionSet: 2, predict{q2}, records[{phase,drops,colorFamily,recordedAt}](colorFamily는 이미 보기 라벨),
+ *        analysis{inferA,q1}, conclusion, curiosity('더 탐구하고 싶은 점' — 정리하기 안 한 줄, 필수)
+ *  - v1(간략화 전, 저장 키 sci6114sim:v2 — 그 전 :v1 기록도 여기로): predict{q1,q2}, records(같은 모양), analysis{readA,inferA,q1,q2,q3},
+ *        conclusion, extension{q1,q2}, curiosity(따로 떨어진 5단계 '궁금한 점' — 지금 stages에 없어 "궁금한 점" 제목으로 맨 뒤에 모인다)
  */
 
 const PHASES: Record<string, string> = {
@@ -21,13 +24,12 @@ const ADDED: Record<string, string> = {
 export const schema: ResponseSchema = {
   appId: "sci-6-1-1-4",
   kind: "sim",
-  standard: "legacy",
+  standard: "slim",
   stages: [
     { id: "predict", label: "예상하기" },
     { id: "experiment", label: "실험하기" },
     { id: "analyze", label: "기록·분석하기" },
     { id: "conclude", label: "정리하기" },
-    { id: "curiosity", label: "궁금한 점" },
   ],
   notes: [
     "정리하기 답은 '제출' 전 입력 중이던 글이 저장됐을 수 있어요(실험 앱 공통).",
@@ -35,8 +37,40 @@ export const schema: ResponseSchema = {
   ],
   variants: [
     {
+      id: "v2",
+      label: "간략화 후(2026-09-25~)",
+      match: (d) => d.questionSet === 2,
+      ignore: ["questionSet"],
+      items: [
+        textItem("predict", "q2", "predict.q2", "묽은 염산에 묽은 수산화 나트륨 용액을 아주 조금씩 계속 넣으면 묽은 염산의 성질은 어떻게 될까요? 반대로 묽은 수산화 나트륨 용액에 묽은 염산을 계속 넣으면 어떻게 될까요?", { label: "예상" }),
+        tableItem("experiment", "records", "records", "반대 용액을 넣은 방울 수에 따른 붉은 양배추 용액의 색깔 계열 기록", [
+          { key: "phase", label: "실험", map: PHASES },
+          {
+            key: "drops",
+            label: "넣은 방울 수",
+            format: (v, row) => {
+              const added = typeof row.phase === "string" ? ADDED[row.phase] : undefined;
+              if (typeof v !== "number") return v == null ? "—" : String(v);
+              return added ? `${added} ${v}방울` : `${v}방울`;
+            },
+          },
+          { key: "colorFamily", label: "색깔 계열" },
+        ], { label: "관찰 기록" }),
+        choiceItem("analyze", "inferA", "analysis.inferA", "실험 A의 색깔 변화를 색깔 변화표와 비교해 보세요. 묽은 염산에 묽은 수산화 나트륨 용액을 많이 넣을수록 용액의 성질은 어떻게 변했다고 할 수 있을까요?", {
+          label: "분석 1",
+          options: ["산성이 점점 강해졌다.", "산성이 약해지다가 염기성으로 변했다.", "성질은 변하지 않고 색만 변했다.", "5방울만 넣어도 곧바로 염기성으로 변했다."],
+        }),
+        choiceItem("analyze", "q1", "analysis.q1", "붉은 양배추 용액을 떨어뜨린 묽은 수산화 나트륨 용액에 묽은 염산을 계속 넣었더니 용액의 색깔이 노란색 계열에서 붉은색 계열로 변했어요. 이 실험에 대한 설명으로 옳은 것은 무엇일까요?", {
+          label: "분석 2",
+          options: ["용액의 성질은 변하지 않았다.", "염기성 용액의 성질이 점점 강해졌다.", "염기성 용액의 성질이 약해지다가 산성 용액이 되었다."],
+        }),
+        textItem("conclude", "conclusion", "conclusion", "산성 용액과 염기성 용액을 섞으면 용액의 성질이 어떻게 될까요? 실험 결과를 바탕으로 자신의 말로 정리해 보세요.", { label: "결론" }),
+        textItem("conclude", "curiosity", "curiosity", "이번 실험을 하고 나서 더 탐구하고 싶은 점이나 궁금한 점을 한 줄로 적어 보세요.", { label: "더 탐구하고 싶은 점" }),
+      ],
+    },
+    {
       id: "v1",
-      label: "현재 버전",
+      label: "간략화 전(~2026-09-25)",
       match: () => true,
       items: [
         textItem("predict", "q1", "predict.q1", "염기성 용액인 빨랫비누 물에 산성 용액인 식초를 섞으면 어떻게 될까요? 그렇게 생각한 까닭도 함께 적어 보세요.", { label: "질문 1" }),
