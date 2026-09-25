@@ -34,6 +34,23 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-flash-lite-latest";
+// 진단(2026-09-26): 함수가 켜질 때 한 번, 이 모델 이름이 실제로 가리키는 모델(버전·생각 기능)을 로그에 남긴다.
+// 판정을 기다리게 하지 않는다(따로 돈다). 키는 머리글로만 보내고 로그에는 남기지 않는다.
+{
+  const infoKey = Deno.env.get("GEMINI_API_KEY");
+  if (infoKey) {
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`, { headers: { "x-goog-api-key": infoKey } })
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (!r.ok) {
+          console.error("check-answer: Gemini 모델 정보 오류", JSON.stringify({ model: MODEL, status: r.status, message: String(j?.error?.message ?? "").slice(0, 160) }));
+          return;
+        }
+        console.log(JSON.stringify({ gemini_model: MODEL, version: j?.version ?? null, displayName: j?.displayName ?? null, thinking: j?.thinking ?? null }));
+      })
+      .catch(() => console.error("check-answer: Gemini 모델 정보를 받지 못했습니다(network)."));
+  }
+}
 const GEMINI_TIMEOUT_MS = 7000; // 클라이언트는 9초에 포기한다(2026-09-26: 3초로는 Gemini가 조금만 늦어도 "timeout"으로 판단을 놓쳤다)
 const MAX_QUESTION = 300;
 const MAX_ANSWER = 500;
@@ -205,22 +222,33 @@ export function buildPrompt(req: CheckRequest): string {
   ].join("\n");
 }
 
-export function geminiBody(prompt: string, verdicts: Verdict[] = ["ok", "rethink", "block"]): unknown {
+/**
+ * 생각(thinking) 설정 변형 — 2026-09-26: 3초·7초 안에 대답이 오지 않는 timeout이 이어졌다. "-latest" 모델 이름이 대답 전에
+ * 오래 생각하는 모델을 가리키게 되면 이렇게 된다. 판정은 짧은 분류라 생각이 필요 없으므로 먼저 생각을 끄고(budget0),
+ * 모델이 그 설정을 받지 않으면(400) 가장 낮은 생각 단계(levelLow), 그래도 안 되면 설정 없이(none) 보낸다.
+ */
+export type ThinkingVariant = "budget0" | "levelLow" | "none";
+export const THINKING_VARIANTS: ThinkingVariant[] = ["budget0", "levelLow", "none"];
+
+export function geminiBody(prompt: string, verdicts: Verdict[] = ["ok", "rethink", "block"], thinking: ThinkingVariant = "none"): unknown {
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0,
+    maxOutputTokens: 256,
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: "OBJECT",
+      properties: {
+        verdict: { type: "STRING", enum: verdicts },
+        message: { type: "STRING" },
+      },
+      required: ["verdict", "message"],
+    },
+  };
+  if (thinking === "budget0") generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  if (thinking === "levelLow") generationConfig.thinkingConfig = { thinkingLevel: "low" };
   return {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0,
-      maxOutputTokens: 256,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "OBJECT",
-        properties: {
-          verdict: { type: "STRING", enum: verdicts },
-          message: { type: "STRING" },
-        },
-        required: ["verdict", "message"],
-      },
-    },
+    generationConfig,
   };
 }
 
@@ -310,40 +338,62 @@ Deno.serve(async (req: Request) => {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-  let res: Response;
+  const started = Date.now();
+  const prompt = buildPrompt(parsed);
+  let res: Response | null = null;
+  let used: ThinkingVariant = "none";
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }, // 키는 헤더로만(주소·로그에 남지 않게)
-      body: JSON.stringify(geminiBody(buildPrompt(parsed), verdictsFor(parsed.stage))),
-      signal: controller.signal,
-    });
+    for (const variant of THINKING_VARIANTS) {
+      used = variant;
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }, // 키는 헤더로만(주소·로그에 남지 않게)
+        body: JSON.stringify(geminiBody(prompt, verdictsFor(parsed.stage), variant)),
+        signal: controller.signal,
+      });
+      // 400 = 이 모델이 이 생각 설정을 받지 않음(또는 요청 모양 문제) → 다음 변형으로. 마지막(설정 없음)의 400은 아래에서 오류로 남긴다.
+      if (res.status !== 400 || variant === "none") break;
+      const bad = await res.json().catch(() => null);
+      console.error("check-answer: Gemini 400, 다음 설정으로", JSON.stringify({ thinking: variant, message: String(bad?.error?.message ?? "").slice(0, 160) }));
+    }
   } catch (e) {
     const timeout = e instanceof Error && e.name === "AbortError";
     // 오류 메시지에 키가 들어갈 일은 없지만, 원문 대신 종류만 남긴다.
-    console.error("check-answer: Gemini 호출 실패", timeout ? "timeout" : "network");
+    console.error("check-answer: Gemini 호출 실패", timeout ? "timeout" : "network", JSON.stringify({ ms: Date.now() - started, model: MODEL, thinking: used }));
     return json({ ok: false, reason: timeout ? "timeout" : "upstream_error" }, 200, headers);
   } finally {
     clearTimeout(timer);
   }
+  if (!res) return json({ ok: false, reason: "upstream_error" }, 200, headers);
 
   if (res.status === 429) {
     console.error("check-answer: Gemini 한도 초과(429)");
     return json({ ok: false, reason: "rate_limited" }, 200, headers);
   }
   if (!res.ok) {
-    console.error("check-answer: Gemini 오류 응답", res.status);
+    const bad = await res.json().catch(() => null);
+    console.error("check-answer: Gemini 오류 응답", res.status, JSON.stringify({ model: MODEL, thinking: used, message: String(bad?.error?.message ?? "").slice(0, 160) }));
     return json({ ok: false, reason: "upstream_error" }, 200, headers);
   }
 
   const data = await res.json().catch(() => null);
   const verdict = parseVerdict(data, parsed);
   if (!verdict) {
-    console.error("check-answer: Gemini 응답을 읽지 못했습니다.");
+    console.error("check-answer: Gemini 응답을 읽지 못했습니다.", JSON.stringify({ thinking: used, finishReason: (data as { candidates?: { finishReason?: string }[] } | null)?.candidates?.[0]?.finishReason ?? null }));
     return json({ ok: false, reason: "upstream_error" }, 200, headers);
   }
 
-  // 오탐 점검용 로그 한 줄(학생 식별 정보·답 내용 없음)
-  console.log(JSON.stringify({ appId: parsed.appId, stage: parsed.stage, verdict: verdict.verdict, priorBlocks: parsed.priorBlocks }));
+  // 오탐 점검용 로그 한 줄(학생 식별 정보·답 내용 없음) + 걸린 시간·실제 모델 버전·생각 설정(진단용)
+  console.log(
+    JSON.stringify({
+      appId: parsed.appId,
+      stage: parsed.stage,
+      verdict: verdict.verdict,
+      priorBlocks: parsed.priorBlocks,
+      ms: Date.now() - started,
+      modelVersion: (data as { modelVersion?: string } | null)?.modelVersion ?? null,
+      thinking: used,
+    })
+  );
   return json({ ok: true, verdict: verdict.verdict, message: verdict.message }, 200, headers);
 });

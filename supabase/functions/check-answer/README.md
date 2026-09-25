@@ -14,6 +14,7 @@
 
 - **필요한 시크릿: `GEMINI_API_KEY` 하나.** (`SUPABASE_URL` 등은 이 함수가 쓰지 않습니다. 서비스 롤 키도 쓰지 않습니다.)
 - 선택 시크릿 `GEMINI_MODEL` — 기본값 `gemini-flash-lite-latest`. 모델 이름이 바뀌거나 다른 모델을 쓰고 싶을 때만 넣습니다.
+- 생각(thinking) 설정(2026-09-26): 판정은 짧은 분류라 먼저 생각을 끄고(`thinkingBudget: 0`), 모델이 받지 않으면 `thinkingLevel: "low"`, 그래도 안 되면 설정 없이 보냅니다. 판정 로그 한 줄에 걸린 시간(`ms`)·실제 모델 버전(`modelVersion`)·쓴 설정(`thinking`)이 남습니다(학생 답·식별 정보 없음).
 - 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000` + Supabase Secrets **`EXTRA_ALLOWED_ORIGINS`**(쉼표로 구분한 추가 출처, 예: Vercel 주소 `https://class1-xxxx.vercel.app` — 끝에 `/` 없이). 다른 도메인을 더 쓰게 되면 코드를 고치지 말고 이 Secret을 바꾼 뒤 함수를 다시 배포하세요.
 - **JWT 검증(Verify JWT)은 켠 채로 배포합니다**(`--no-verify-jwt`를 붙이지 마세요. `supabase/config.toml`에도 `verify_jwt = true`로 적어 두었습니다).
   게이트웨이는 "이 프로젝트 키로 서명된 토큰인지"만 봅니다 — **anon key 자체도 그런 토큰이라 게이트웨이만으로는 로그인 확인이 되지 않습니다.**
@@ -79,7 +80,8 @@ CLI 없이 하려면: 대시보드 → **Edge Functions** → **Deploy a new fun
 | 아무 답이나 다 통과함(카드가 안 뜸) | 함수가 배포되지 않았거나 `GEMINI_API_KEY`가 없습니다. Logs에서 `GEMINI_API_KEY 시크릿이 없습니다` 확인 → 2·3번 절차. |
 | Logs에 `Gemini 오류 응답 404` | 모델 이름이 바뀌었습니다. AI Studio에서 쓸 수 있는 Flash-Lite 이름을 확인해 시크릿 `GEMINI_MODEL`에 넣고 다시 배포합니다. |
 | Logs에 `Gemini 한도 초과(429)` | 무료 등급 분당 한도입니다. 이때는 차단하지 않고 넘어가므로 수업은 그대로 진행됩니다. |
-| Logs에 `timeout`이 자주 보임 | 7초(2026-09-26 전에는 3초) 안에 응답이 오지 않았습니다. 이때도 학생은 막히지 않습니다(앱은 9초까지 기다림). 계속 잦으면 더 가벼운 모델로 `GEMINI_MODEL`을 바꿔 보세요. |
+| Logs에 `timeout`이 자주 보임 | 7초(2026-09-26 전에는 3초) 안에 응답이 오지 않았습니다. 이때도 학생은 막히지 않습니다(앱은 9초까지 기다림). 로그의 `{"gemini_model":…,"thinking":…}` 줄(함수가 켜질 때 한 번)로 모델이 실제로 무엇인지 확인하고, 계속 잦으면 생각(thinking)이 없는 가벼운 모델로 `GEMINI_MODEL`을 바꿔 보세요. |
+| Logs에 `Gemini 400, 다음 설정으로` | 모델이 '생각 끄기' 설정을 받지 않아 다음 설정(가장 낮은 생각 단계 → 설정 없음)으로 다시 보낸 것입니다(2026-09-26). 판정 줄의 `thinking` 값이 실제로 쓴 설정입니다. |
 | 브라우저 콘솔에 CORS 오류 | 사이트 주소가 허용 출처에 없습니다. `index.ts`의 `ALLOWED_ORIGINS`를 고치고 다시 배포하세요. |
 | 로그인했는데도 카드가 전혀 안 뜸(401) | 세션이 만료됐을 수 있습니다. 다시 로그인해 보세요(이때도 학생은 막히지 않고 그냥 통과합니다). |
 | 맞는 답인데 자꾸 막힌다(오차단) | 완료 결과의 `detail.qa[].blockCount`·`teacherOverride`와 Logs의 verdict 분포를 함께 보고 프롬프트(`buildPrompt`)를 조정합니다. |
