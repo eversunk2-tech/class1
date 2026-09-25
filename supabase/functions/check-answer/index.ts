@@ -34,7 +34,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-flash-lite-latest";
-const GEMINI_TIMEOUT_MS = 3000; // 클라이언트는 3.5초에 포기한다(spec §2.3)
+const GEMINI_TIMEOUT_MS = 7000; // 클라이언트는 9초에 포기한다(2026-09-26: 3초로는 Gemini가 조금만 늦어도 "timeout"으로 판단을 놓쳤다)
 const MAX_QUESTION = 300;
 const MAX_ANSWER = 500;
 const MAX_MODEL = 600;
@@ -71,7 +71,7 @@ function json(data: unknown, status: number, headers: Record<string, string>): R
 /**
  * Authorization 헤더의 access token이 "로그인한 사용자"의 것인지 확인한다(review M1).
  * 서명 검증은 게이트웨이(Verify JWT)가 이미 했으므로 여기서는 주장(claims)만 본다 —
- * DB·service_role·추가 네트워크 왕복 없이 끝나서 3.5초 대기 한도를 늘리지 않는다.
+ * DB·service_role·추가 네트워크 왕복 없이 끝나서 클라이언트 대기 한도(9초)를 늘리지 않는다.
  * anon key(role "anon", sub 없음)와 service_role key(role "service_role")는 여기서 막힌다.
  * 토큰 문자열은 어디에도 기록하지 않는다.
  */

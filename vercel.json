@@ -1,3 +1,6 @@
 {
-  "redirects": [{ "source": "/", "destination": "/class1/", "permanent": false }]
+  "redirects": [
+    { "source": "/", "destination": "/class1/", "permanent": false },
+    { "source": "/class1/:path*/index.html", "destination": "/class1/:path*/", "permanent": false }
+  ]
 }
