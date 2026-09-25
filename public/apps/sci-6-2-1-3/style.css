@@ -42,14 +42,24 @@
   .month-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* ── 궤적 보기(이번 달만 · 계절 대표 3개) ── */
+.path-mode-group { flex: 1 1 auto; display: flex; gap: 6px; margin: 0; }
+.path-mode-group .ss-btn { flex: 1 1 auto; }
+/* 보기 도구 줄(처음 방향으로 · 이번 달만 · 계절 대표 3개 · 2D로 보기): 가로 태블릿 기본 화면의 왼쪽 칸(약 560px)에서도 한 줄로
+   (fix-B1 L8 — 예전에는 두 궤적 버튼이 세로로 쌓여 줄이 102px가 되고 sticky 장면 칸이 화면 띠보다 길어졌다). 높이 48px 그대로 */
+.sky-tools .ss-btn { padding: 0 11px; white-space: nowrap; }
+/* 범례(선 모양 + 이름) — "계절 대표 3개"일 때만 값 패널 옆에 보인다. 지금 보는 달 = 계절 색 실선, 계절 대표 = 점선.
+   색만으로 구분하지 않도록 이름을 늘 함께 쓴다. 어두움에서는 3D 대표 선과 같은 밝은 색(--cd) */
+.path-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 0.85rem; font-weight: 700; }
+.path-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.path-legend-line { flex: 0 0 auto; width: 24px; height: 0; border-top: 4px dashed var(--c, #5b6676); }
+.path-legend-line.is-cur { border-top-style: solid; border-top-width: 6px; border-radius: 3px; }
+@media (prefers-color-scheme: dark) { .path-legend-line:not(.is-cur) { border-top-color: var(--cd, var(--c)); } }
+
 /* ── 값 패널 ── */
 .obs-card .ss-help-inline { font-weight: 500; color: var(--ss-muted); font-size: 0.82rem; }
 .value-card { margin-top: 12px; padding: 12px 0 0 12px; border-top: 1px solid var(--ss-border); border-left: 6px solid var(--season, var(--ss-border)); }
 .value-card .ss-step-h { margin-bottom: 6px; }
-.ov-values {
-  position: absolute; left: 10px; top: 42px; z-index: 3; max-width: calc(100% - 20px); padding: 5px 10px; border-radius: 10px;
-  background: rgba(255, 248, 230, 0.94); color: #5a2d05; border: 2px solid #e0802b; font-weight: 800; font-size: 0.9rem; pointer-events: none;
-}
 @media (orientation: portrait) and (min-width: 561px) { .ss-exp-view.sky-view { height: min(36vh, 420px); } }
 .value-head { font-weight: 800; }
 .value-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
@@ -57,6 +67,16 @@
 .value-item dt { font-size: 0.85rem; font-weight: 700; color: var(--ss-muted); }
 .value-item dd { margin: 2px 0 0; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .value-item dd.is-wait { font-size: 0.9rem; font-weight: 600; color: var(--ss-muted); }
+/* 크게 보기 막대 윗줄(scenePanel): 머리말(👀 달·계절)과 값 두 칸을 한 줄에, 범례는 그 아래 — 막대를 낮춰 3D를 크게(fix-B1 L11,
+   예전 1280×800에서 머리말+값+기록 버튼 186px) */
+.ss-exp-overlay-panel .value-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; }
+.ss-exp-overlay-panel .value-h { margin: 0; font-size: 0.95rem; white-space: nowrap; }
+.ss-exp-overlay-panel .value-grid { margin: 0; gap: 6px; }
+.ss-exp-overlay-panel .value-item { padding: 2px 10px; }
+.ss-exp-overlay-panel .value-item dt { font-size: 0.78rem; }
+.ss-exp-overlay-panel .value-item dd { margin: 0; font-size: 1.12rem; }
+.ss-exp-overlay-panel .value-item dd.is-wait { font-size: 0.82rem; }
+.ss-exp-overlay-panel .path-legend { grid-column: 1 / -1; margin-top: 0; }
 .safety-line { margin-top: 10px; }
 
 /* ── 하늘 모형 ── */
@@ -76,11 +96,22 @@
 .sky2d-path { stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .sky2d-sun { fill: #ffc93a; stroke: #b7791f; stroke-width: 2.5; }
 .sky2d-noon { stroke: #e0802b; stroke-width: 3; stroke-dasharray: 7 5; }
-.sky2d-noon-bg { fill: rgba(255, 248, 230, 0.95); stroke: #e0802b; stroke-width: 2; }
-.sky2d-noon-txt { font: 800 16px system-ui, sans-serif; fill: #7a3c07; }
-.sky2d-glabel { font: 700 13px system-ui, sans-serif; fill: #1f2733; paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 3px; }
 .ss-exp-view.is-2d.sky-view { background: #b9cfa9; }
 .ss-view2d { padding: 40px 6px 6px; }
+/* 좁은 화면(휴대폰): 안내 글이 두 줄이라 3D 칸을 안내 글 위에서 끝낸다(안내 글이 장면 아래 가운데 '북' 이름표를 가리지 않게,
+   fix-B1 L11). 안내 글 높이(--tip-h)는 app.js가 잰다. 크게 보기 막대가 있으면 막대 위에서 */
+@media (max-width: 480px) {
+  .sky-view:not(.is-2d) > .ss-view3d { bottom: calc(var(--tip-h, 40px) + 12px); }
+  .sky-view.has-bar:not(.is-2d) > .ss-view3d { bottom: calc(var(--ss-exp-overlay-h, 64px) + var(--tip-h, 40px) + 12px); }
+}
+/* 2D + 크게 보기: 2D 그림이 가로 전체로 커져 막대(기록하기)가 화면 밖으로 밀리던 것(fix-B1 L2) — 그림 높이를 화면 띠에 맞춰 줄인다
+   (가로는 가운데에 작게 놓인다). 2-1-2와 같은 방식 */
+@media (orientation: landscape) {
+  .ss-exp-layout.is-full .sky2d { max-height: max(180px, calc(100vh - var(--ss-header-h, 150px) - var(--ss-footer-h, 68px) - 300px)); }
+}
+@media (orientation: portrait) {
+  .ss-exp-layout.is-full .sky2d { max-height: max(200px, calc(100vh - var(--ss-header-h, 180px) - var(--ss-footer-h, 68px) - 330px)); }
+}
 
 /* ── 분석 그래프 ── */
 .chart-grid { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 760px; margin: 0 auto; }

@@ -10,22 +10,64 @@
 .ti-globe { fill: #3f86d1; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1.5; }
 .ti-axis { stroke: var(--ss-text); stroke-width: 2.5; stroke-linecap: round; }
 
-/* ── 실험 화면 상태 표시(3D·2D 공통) ── */
-.hud {
-  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 12px; border-radius: 12px;
-  background: rgba(20, 30, 45, 0.86); color: #fff; font-weight: 700; font-size: 0.92rem; pointer-events: none;
+/* ── 측정값 패널(vp): 기본 화면은 .vp-home(좌우 두 칸이면 조작 패널 맨 위, 한 칸이면 장면 바로 아래), 크게 보기는 공통 틀이
+   장면 안 막대 윗줄·장면 아래 카드로 옮긴다 ──
+   (바뀌는 값은 장면 위에 띄우지 않는다 — 개편 단계 B. 예전 장면 오른쪽 위 HUD를 대신한다) */
+.vp {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; font-weight: 700; line-height: 1.35;
   font-variant-numeric: tabular-nums;
 }
-.hud:empty { display: none; }
-.hud-val { color: #ffd166; font-size: 1.05rem; }
-.hud-val[hidden] { display: none; }
+.vp-cond { color: var(--ss-text); }
+.vp-val { color: var(--ss-text); }
+.vp-num { font-size: 1.3em; font-weight: 800; }
+.vp-next { flex-basis: 100%; font-size: 0.9em; color: var(--ss-primary); }
+.vp-next[hidden] { display: none; }
+.vp-home:empty { display: none; }
+.vp-home .vp {
+  margin-top: 8px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--ss-border); background: var(--ss-surface);
+  font-size: 0.95rem;
+}
+/* 기본 화면 좌우 두 칸: 조작 패널 맨 위(카드 모양) */
+.vp-home.is-panel .vp { margin: 0 0 12px; box-shadow: var(--ss-shadow); }
+
+/* ── 장면 안 부속(3D·2D 공통): 빨리 감기 표시(모형) ── */
 .hud-ff {
   padding: 5px 12px; border-radius: 999px; background: rgba(47, 111, 214, 0.92); color: #fff; font-weight: 800;
   font-size: 0.9rem; pointer-events: none;
 }
 .hud-ff[hidden] { display: none; }
-.ss-view3d .hud { position: absolute; top: 10px; right: 10px; z-index: 3; max-width: calc(100% - 90px); justify-content: flex-end; }
 .ss-view3d .hud-ff { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 3; white-space: nowrap; }
+
+/* ── 측정기 확대 칸(모형): 장면 오른쪽 위(왼쪽 위는 모형 배지·전체 화면 보기 버튼 자리). 누르기는 장면으로 그대로 통과 ── */
+.inset {
+  position: absolute; top: 10px; right: 10px; z-index: 3; margin: 0; padding: 4px 4px 3px;
+  height: clamp(112px, 46%, 236px); aspect-ratio: 0.84; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: stretch;
+  border-radius: 12px; border: 1px solid rgba(31, 39, 51, 0.25); background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); pointer-events: none;
+}
+.inset[hidden], .inset.is-tiny { display: none; } /* 3D 칸이 낮으면(250px 미만 — 휴대폰 크게 보기) 장면을 덮지 않게 뺀다 — 관찰 카드의 눈금 그림이 대신한다 */
+.inset-svg { display: block; flex: 1 1 auto; min-height: 0; width: 100%; }
+.inset-cap {
+  flex: none; margin: 1px 0 0; display: flex; flex-direction: column; font-size: 0.66rem; line-height: 1.2; font-weight: 700;
+  text-align: center; color: #1f2733; overflow-wrap: anywhere;
+}
+.inset.is-small .cap-x { display: none; }
+.in-plate { fill: #f7f7f2; stroke: #aeb6c1; stroke-width: 1.5; }
+.in-ring { fill: none; stroke: #c9d0d9; stroke-width: 0.9; }
+.in-num { font: 700 8.5px system-ui, sans-serif; fill: #6b7480; stroke: #f7f7f2; stroke-width: 2.4px; paint-order: stroke; }
+.in-shadow { stroke: #262b35; stroke-width: 7; stroke-linecap: butt; }
+.in-tip { stroke: #d8434f; stroke-width: 2; stroke-linecap: round; }
+.in-stick { fill: #d8434f; stroke: #fff; stroke-width: 1.4; }
+.in-beam { stroke: #f08c00; stroke-width: 2.4; stroke-linecap: round; }
+.in-beam-head { fill: #f08c00; }
+.in-bulb { font-size: 15px; }
+@media (prefers-color-scheme: dark) {
+  .inset { background: rgba(25, 24, 33, 0.92); border-color: rgba(255, 255, 255, 0.28); }
+  .inset-cap { color: #eef1f6; }
+  .in-beam { stroke: #ffb347; }
+  .in-beam-head { fill: #ffb347; }
+}
 
 /* ── 관찰 카드: 값 패널 + 확대 눈금 ── */
 .val-panel {
@@ -38,6 +80,22 @@
 .val-num { font-size: 2.3rem; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 .val-unit { font-size: 1.1rem; font-weight: 700; }
 .ruler-fig { margin: 10px 0 0; }
+/* 크게 보기(넓은 화면): 값은 장면 안 막대의 측정값 패널에, 확대 그림은 장면 안 확대 칸에 있으므로 관찰 카드에서는 같은
+   값 패널·눈금 그림을 빼 카드가 짧아지게 한다(장면·막대·관찰 카드가 스크롤 없이 함께 보이게). */
+@media (min-width: 481px) and (min-height: 421px) {
+  #experiment-root .ss-exp-layout.is-full .ss-observe .val-panel,
+  #experiment-root .ss-exp-layout.is-full .ss-observe .ruler-fig { display: none; }
+}
+/* 크게 보기(좁은·낮은 화면): 값은 바로 위 장면 아래 카드에 있으니 값 패널만 뺀다. 장면이 화면 밖으로 밀리기 쉬우므로 눈금 그림은 둔다 */
+@media (max-width: 480px), (max-height: 420px) {
+  #experiment-root .ss-exp-layout.is-full .ss-observe .val-panel { display: none; }
+}
+/* 가로 크게 보기(막대 윗줄에 측정값이 있는 넓은 화면): 장면이 화면 높이를 꽉 채우므로, 입력할 것이 없는 이 앱의 관찰 카드
+   (안내 한 줄뿐)까지 보이려고 공통 틀이 장면 윗부분(측정기·확대 칸)을 화면 밖으로 밀지 않게 관찰 카드를 뺀다.
+   측정값·기록하기는 장면 안 막대에 있다. 세로 크게 보기는 짧아진 관찰 카드가 장면과 함께 들어가므로 그대로 둔다. */
+@media (orientation: landscape) and (min-width: 481px) and (min-height: 421px) {
+  #experiment-root .ss-exp-layout.is-full .ss-observe { display: none; }
+}
 .ruler-svg { display: block; width: 100%; height: auto; }
 .rl-plate { fill: #f7f7f2; stroke: #b9c0ca; stroke-width: 1.5; }
 .rl-shadow { fill: #3a414d; }
@@ -52,8 +110,20 @@
 
 /* ── 2D 대체 화면: 비스듬히 본 궤도 ── */
 .o2-wrap { position: relative; }
-.o2-head { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; min-height: 34px; margin-bottom: 6px; }
+/* 2D에서 빨리 감기 표시는 그림 왼쪽 위(비어 있는 곳). 확대 칸은 그림 위에 겹치지 않고 설명 글 아래(2D는 높이가 자유롭다 —
+   그림 위에 두면 라 이름표·지구본을 가린다) */
+.o2-wrap .hud-ff { position: absolute; top: 6px; left: 6px; z-index: 2; }
+.o2-wrap .inset { position: static; margin: 8px auto 0; width: 176px; height: auto; aspect-ratio: auto; box-shadow: none; }
+.o2-wrap .inset-svg { flex: none; height: auto; }
 .orbit-svg { display: block; width: 100%; height: auto; max-height: 440px; background: var(--ss-surface-2); border-radius: 14px; }
+/* fix-B2 L2(review-B): 크게 보기(장면이 가로 전체 폭)에서는 440px 고정 상한이 넓은 화면에서 너무 커져(가로: 높이
+   769~938px대) 장면 안 막대가 아래 이동 막대보다 한참 아래로 밀린다 — 화면 높이에 비례해 더 낮춘다(2-1-2 style.css와 같은 패턴). */
+@media (min-width: 901px) and (orientation: landscape) {
+  .ss-exp-layout.is-full .orbit-svg { max-height: 30vh; }
+}
+@media (orientation: portrait) {
+  .ss-exp-layout.is-full .orbit-svg { max-height: 40vh; }
+}
 .o2-orbit { fill: none; stroke: #7c8797; stroke-width: 2.5; stroke-dasharray: 8 6; }
 .o2-arrow { fill: #2f6fd6; }
 .o2-small { font: 600 14px system-ui, sans-serif; fill: var(--ss-muted); }
@@ -100,10 +170,8 @@
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .ss-main { padding: 12px 12px 96px; }
-  .hud { font-size: 0.78rem; padding: 4px 8px; }
-  .hud-val { font-size: 0.9rem; }
-  .ss-view3d .hud { max-width: calc(100% - 70px); }
   .ss-view3d .hud-ff { font-size: 0.78rem; bottom: 52px; }
+  .inset-cap { font-size: 0.62rem; }
   .val-num { font-size: 2rem; }
 }
 #result-table table { min-width: 0; }
@@ -111,11 +179,6 @@
 
 /* 궁금한 점은 선택 입력 한 줄 */
 .ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
-
-/* fix-1: HUD의 '고른 위치' 줄 */
-.hud-next { flex-basis: 100%; text-align: right; font-size: 0.82rem; font-weight: 700; color: #9fd0ff; }
-.hud-next[hidden] { display: none; }
-.o2-head .hud-next { text-align: left; }
 
 /* fix-1: 막대그래프 — '자전축 기울임'(2계열)은 빗금 무늬, '자전축 수직'(1계열)은 민무늬 */
 .hatch-bg { fill: #d9622b; }

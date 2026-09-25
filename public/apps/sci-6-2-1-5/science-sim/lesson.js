@@ -239,6 +239,8 @@
           /* ── '더 탐구하고 싶은 점'(#ss-curiosity)은 이제 필수 ──
            * 앱 파일을 고치지 않고 화면 문구만 다듬는다(저장 구조·질문 내용은 그대로). */
           var OPTIONAL_RE = /\s*[(（]\s*(?:선택|비워\s*두어도[^)）]*|비워도[^)）]*|안\s*적어도[^)）]*)\s*[)）]\s*/g;
+          // 괄호 없이 문장으로 붙은 "비워도 마칠 수 있어요." 같은 말도 화면에서만 뺀다(2026-09-25 — 저장되는 질문 문구·detail.qa는 그대로)
+          var OPTIONAL_SENT_RE = /\s*(?:비워\s*두어도|비워도|안\s*적어도)[^.。!?！？]*(?:[.。!！]|$)/g;
           var curEl = document.getElementById("ss-curiosity");
           var curHost = null;
           function curiosityLabel() {
@@ -269,10 +271,12 @@
               for (var ci = 0; ci < curLabel.childNodes.length; ci++) {
                 var cn = curLabel.childNodes[ci];
                 if (cn.nodeType !== 3) continue;
-                var tidy = cn.nodeValue.replace(OPTIONAL_RE, " ").replace(/\s+/g, " ").trim();
+                var tidy = cn.nodeValue.replace(OPTIONAL_RE, " ").replace(OPTIONAL_SENT_RE, "").replace(/\s+/g, " ").trim();
                 if (tidy !== cn.nodeValue) cn.nodeValue = tidy;
               }
             }
+            // 칸 안내(placeholder)가 "비워 두어도 괜찮아요"처럼 선택이라고 말하면 필수에 맞는 안내로 바꾼다(화면만)
+            if (curEl.placeholder && /비워|안\s*적어도/.test(curEl.placeholder)) curEl.placeholder = "더 알아보고 싶은 점이나 궁금한 점을 한 줄로 적어요";
             if (curEl.parentNode) curEl.parentNode.insertBefore(el("p", { class: "ss-help ss-req-note", text: "한 줄이라도 적어야 '학습 마치기'를 할 수 있어요." }), curHost);
           }
 

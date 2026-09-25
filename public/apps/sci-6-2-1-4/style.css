@@ -44,6 +44,14 @@
 
 /* 2D 대체 화면(SVG) */
 .v2-svg { display: block; width: 100%; height: auto; max-height: 62vh; }
+/* fix-B2 L2(review-B): 크게 보기(장면이 가로 전체 폭)에서는 62vh가 그대로면 그림이 너무 커져(가로: 높이
+   769~938px) 장면 안 막대가 아래 이동 막대보다 한참 아래로 밀린다 — 2-1-2 style.css와 같은 패턴으로 더 낮춘다. */
+@media (min-width: 901px) and (orientation: landscape) {
+  .ss-exp-layout.is-full .v2-svg { max-height: 28vh; }
+}
+@media (orientation: portrait) {
+  .ss-exp-layout.is-full .v2-svg { max-height: 42vh; }
+}
 .v2-cap { font-size: 2.3px; font-weight: 700; fill: #c9d3e0; }
 .v2-small { font-size: 2.2px; font-weight: 700; fill: #e6ecf5; }
 .v2-ang { font-size: 3px; font-weight: 800; fill: #7fd1ff; }

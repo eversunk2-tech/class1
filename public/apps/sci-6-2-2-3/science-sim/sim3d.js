@@ -41,6 +41,8 @@
  *     끄는 중에 v.discard(그 물체)·v.dispose()가 불리면 onEnd({ point: 마지막 point, ray: 마지막 ray, event: null, cancelled: true })를 부른다.
  *     끌 수 있는 물체 위에서는 커서가 grab으로 바뀐다(마우스 기기만). 예: 태양을 하늘 반구(plane 대신 onDrag의 ray로 구면 교차 계산)로 끌어
  *     가장 가까운 시각으로 스냅, 손전등을 평면 위로 끌어 각도 계산 후 기존 setAngle(deg) 호출.
+ *       opts.pad(px, 기본 30): 레이가 빗나가도 물체의 화면 경계 상자에서 이 거리 안이면 잡는다. 0이면 정확히 맞을 때만(기울어진 긴 물체는
+ *       경계 상자가 빈 곳까지 넓다 — pad:0에 보이지 않는 굵은 손잡이 메시(visible 그대로, 투명 재질 opacity 0)를 자식으로 붙여 쓰기를 권장).
  *   v.discard(obj)                → 장면에서 빼고 geometry·material·texture까지 해제(잠깐 쓰는 방울·스포이트 등).
  *                                   obj 안에 pickable로 등록한 자식이 있으면 그 등록도 함께 뺀다(장면 통째 바꾸기에 안전)
  *   v.cameraPose() / v.setCameraPose(pose) → 지금 시점 { position:[x,y,z], target:[x,y,z] } 얻기 / 되돌리기
@@ -428,16 +430,20 @@
         }
         if (found) return found;
       }
-      // 정확히 맞지 않아도 화면 경계 상자에서 가까우면(터치 오차 보정) 잡는다
+      // 정확히 맞지 않아도 화면 경계 상자에서 가까우면(터치 오차 보정) 잡는다.
+      // 물체마다 opts.pad(px, 기본 30)로 넓이를 정한다 — 0이면 레이가 정확히 맞을 때만 잡는다(기울어진 긴 물체는
+      // 경계 상자가 빈 곳까지 넓어 옆의 빈 곳을 끌어도 잡히므로, pad:0 + 보이지 않는 굵은 손잡이 메시를 권장 — README).
       var best = null,
-        bestD = DRAG_PAD_PX;
+        bestD = Infinity;
       list.forEach(function (d) {
+        var pad = typeof d.opts.pad === "number" ? d.opts.pad : DRAG_PAD_PX;
+        if (!(pad > 0)) return;
         var b = screenBox(d.obj, rect);
         if (!b) return;
         var dx = Math.max(b.x0 - e.clientX, 0, e.clientX - b.x1);
         var dy = Math.max(b.y0 - e.clientY, 0, e.clientY - b.y1);
         var dist = Math.hypot(dx, dy);
-        if (dist <= bestD) {
+        if (dist <= pad && dist <= bestD) {
           bestD = dist;
           best = d;
         }

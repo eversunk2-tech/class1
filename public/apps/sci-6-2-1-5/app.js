@@ -12,6 +12,15 @@
  *   - 기울임일 때 나에서는 북반구가 전등 쪽으로 기울고(여름, 그림자 0.8 cm), 라에서는 반대쪽으로 기운다(겨울, 3.5 cm).
  *   - 각 위치에서 측정기가 전등을 정면으로 향하도록(태양이 남중할 때) 지구본을 자전시킨 뒤 그림자를 보여 준다.
  *   - 빛은 평행광(DirectionalLight: 전등 → 지구본). 그림자의 '방향'은 이 빛으로 계산하고, '길이'는 교과서 예시 값을 그대로 쓴다.
+ *
+ * 개편 단계 B(2026-09-25, spec.md "개정 2"):
+ *   - 확대(closeUp)는 지금 보던 쪽(카메라 방위)에서 다가가며 조금 위에서 내려다본다 — 전등 쪽으로 돌아가지 않아 전체 화면과
+ *     좌우(전등이 화면 어느 쪽인지)가 같다(예전: 전등 쪽에서 바라봐 거울처럼 뒤집힘, 사용자 지적).
+ *   - 빛이 나아가는 방향 벡터 하나(lightDir, 전등 → 지구본)로 전등 빛·빛 화살표·그림자 방향·확대 칸의 💡 방향을 함께 정한다.
+ *   - 측정기 확대 칸(장면 오른쪽 위): 그림자 길이를 교과서 값에 비례해 크게 그린다(방향은 3D에서 계산한 빛의 방향).
+ *   - 바뀌는 값(지구본 자리·자전축·그림자 길이)은 장면 위에 띄우지 않고 측정값 패널(vp)에만 — 기본 화면은 장면 바로 아래,
+ *     크게 보기는 장면 안 막대 윗줄(공통 틀 scenePanel).
+ *   - 지구본을 궤도 위로 끌면 가장 가까운 자리(가~라)에 붙고 그 위치가 골라진다(버튼·글자 누르기는 그대로).
  */
 (function () {
   "use strict";
@@ -42,6 +51,23 @@
 
   function f1(x) {
     return x == null ? "" : Number(x).toFixed(1);
+  }
+  // 각도 차이를 -180°~180°로
+  function wrap180(d) {
+    return ((((d + 180) % 360) + 360) % 360) - 180;
+  }
+  // 궤도 위 각도(°)에서 가장 가까운 자리(가~라)
+  function nearestPos(angle) {
+    var best = POS_IDS[0];
+    var bestD = 999;
+    POS_IDS.forEach(function (id) {
+      var d = Math.abs(wrap180(angle - POS[id].angle));
+      if (d < bestD) {
+        bestD = d;
+        best = id;
+      }
+    });
+    return best;
   }
   function keyOf(tilt, pos) {
     return tilt + "|" + pos;
@@ -118,12 +144,67 @@
     ),
   ]);
 
-  // 장면에서 지구본이 마지막으로 있던 칸(새로고침·화면 전환 뒤 그 자리로 되돌림)
+  // 장면에서 지구본이 마지막으로 있던 칸(새로고침·화면 전환 뒤 그 자리로 되돌림). 끌어서 옮겨 놓은 자리도 여기에 남긴다.
   var globeAt = store.get("globeAt", null);
   function setGlobeAt(s) {
     globeAt = s ? { tilt: s.tilt, pos: s.pos } : null;
     store.set("globeAt", globeAt);
   }
+
+  /* ── 측정값 패널(vp) — 바뀌는 값(지구본 자리·자전축·그림자 길이)은 장면 위에 띄우지 않고 여기에만 쓴다 ──
+     기본 화면: vpHome(좌우 두 칸이면 조작 패널 맨 위, 위아래 한 칸이면 장면 바로 아래 — 아래 placeHome) / 크게 보기: 공통 틀이
+     장면 안 막대 윗줄(좁은·낮은 화면은 장면 아래 카드)로 옮긴다(scenePanel). 3D·2D 화면이 status로 함께 고친다. */
+  var vpCond = el("span", { class: "vp-cond" });
+  var vpVal = el("span", { class: "vp-val" });
+  var vpNext = el("span", { class: "vp-next", hidden: true });
+  var vp = el("div", { class: "vp", role: "group", "aria-label": "지금 값(측정값 패널)" }, [vpCond, vpVal, vpNext]);
+  var vpHome = el("div", { class: "vp-home" }, [vp]);
+  var status = (function () {
+    var now = { tilt: "vertical", pos: "ga", shadow: null };
+    var mode = ""; // "" | "orbit"(▶ 공전 중) | "drag"(끌어 옮기는 중)
+    var modePos = null; // 공전해 갈 자리 / 끌어서 가까워진 자리
+    var selPos = null;
+    function render() {
+      var t = TILTS[now.tilt] || TILTS.vertical;
+      var tiltText = t.name + (t.angleDeg ? "(" + t.angleDeg + "°)" : "");
+      var where =
+        mode === "orbit" && modePos
+          ? POS[modePos].name + " 위치로 공전하는 중"
+          : mode === "drag"
+          ? (modePos ? POS[modePos].name + " 위치 쪽으로 " : "") + "옮기는 중"
+          : POS[now.pos].name + " 위치";
+      vpCond.textContent = "🌍 지구본: " + where + " · " + tiltText + (now.shadow != null && !mode ? " · 태양이 남중할 때" : "");
+      vpVal.textContent = "";
+      if (now.shadow != null && !mode) {
+        vpVal.appendChild(document.createTextNode("📏 그림자 길이 "));
+        vpVal.appendChild(el("strong", { class: "vp-num", text: f1(now.shadow) }));
+        vpVal.appendChild(document.createTextNode(" cm"));
+      } else vpVal.textContent = "📏 그림자 길이: " + (mode === "orbit" ? "재는 중…" : "아직 안 쟀어요");
+      var diff = !mode && selPos && selPos !== now.pos;
+      vpNext.textContent = diff ? "➡ 고른 위치: " + POS[selPos].name + " (▶를 누르면 옮겨 가요)" : "";
+      vpNext.hidden = !diff;
+    }
+    render();
+    return {
+      set: function (tilt, pos, shadow) {
+        now = { tilt: tilt, pos: pos, shadow: shadow };
+        mode = "";
+        modePos = null;
+        render();
+      },
+      select: function (pos) {
+        selPos = pos || null;
+        render();
+      },
+      mode: function (m, pos) {
+        mode = m || "";
+        modePos = pos || null;
+        render();
+      },
+    };
+  })();
+  // 3D 화면이 기록 뒤에 할 일(확대해 있었으면 전체 화면으로 돌아가 다음 자리를 보이게) — 화면을 만들 때 걸고, 없앨 때 푼다
+  var sceneHooks = { afterRecord: null };
 
   var exp = S.Experiment.create({
     root: $("experiment-root"),
@@ -178,9 +259,10 @@
     view: {
       build3D: build3D,
       build2D: build2D,
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 가~라 글자를 눌러 위치를 고를 수도 있어요",
+      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 🌍 지구본을 끌거나 가~라를 눌러 위치 고르기",
       tip2D: "2D 화면(모형, 비스듬히 위에서 본 모습)이에요. 가~라를 눌러 위치를 고를 수 있어요.",
     },
+    scenePanel: vp,
     observe: observeCard,
     makeRecord: function (sel) {
       return { tilt: sel.tilt, pos: sel.pos, shadow: shadowOf(sel.tilt, sel.pos) };
@@ -202,7 +284,32 @@
     },
     extras: [safety],
     onChange: lesson.refresh,
+    onRecorded: function () {
+      if (sceneHooks.afterRecord) sceneHooks.afterRecord();
+    },
   });
+  /* 측정값 패널의 기본 화면 자리(vpHome) — 크게 보기에서는 공통 틀이 vp를 막대(좁은 화면은 장면 아래 카드)로 옮겼다가 끄면 vpHome으로 되돌린다.
+     기본 화면이 좌우 두 칸(가로 901px 이상)이면 조작 패널 맨 위(장면 칼럼은 sticky라 장면 아래에 두면 화면 밖으로 밀린다),
+     위아래 한 칸이면 장면 바로 아래. vp가 아니라 빈 자리(vpHome)만 옮기므로 공통 틀의 scenePanel 옮기기와 부딪히지 않는다. */
+  (function () {
+    var root = $("experiment-root");
+    var box = root.querySelector(".ss-exp-view");
+    var panel = root.querySelector(".ss-exp-panel");
+    var prog = root.querySelector(".ss-progress");
+    var twoCol = window.matchMedia ? window.matchMedia("(min-width: 901px) and (orientation: landscape)") : null;
+    function placeHome() {
+      if (twoCol && twoCol.matches && panel) {
+        var ref = prog && prog.parentNode === panel ? prog : panel.firstChild;
+        if (vpHome.parentNode !== panel || vpHome.nextSibling !== ref) panel.insertBefore(vpHome, ref);
+      } else if (box && box.parentNode && box.nextSibling !== vpHome) box.parentNode.insertBefore(vpHome, box.nextSibling);
+      vpHome.classList.toggle("is-panel", vpHome.parentNode === panel);
+    }
+    placeHome();
+    if (twoCol) {
+      if (twoCol.addEventListener) twoCol.addEventListener("change", placeHome);
+      else if (twoCol.addListener) twoCol.addListener(placeHome);
+    }
+  })();
 
   // 자전축 조건 아이콘(모양으로도 구분: 곧은 막대 / 기운 막대)
   function tiltIcon(id) {
@@ -299,37 +406,132 @@
     if (saved && TILTS[saved.tilt] && POS[saved.pos]) exp.select(saved);
   }
 
-  /* ── 두 화면이 함께 쓰는 것: 상태 표시(HUD) ── */
-  // HUD는 '지구본이 지금 있는 곳'을 "🌍 지구본:"으로 밝히고, 고른 위치가 다르면 "▶를 누르면 옮겨 가요"를 따로 보여 준다(review 낮음 5).
-  function makeHud() {
-    var cond = el("span", { class: "hud-cond" });
-    var val = el("span", { class: "hud-val" });
-    var next = el("span", { class: "hud-next", hidden: true });
-    var node = el("div", { class: "hud", "aria-hidden": "true" }, [cond, val, next]);
+  /* ── 측정기 확대 칸(모형) ── 장면 오른쪽 위에 우리나라 태양 고도 측정기를 판 위에서 크게 본 그림.
+     가운데 점 = 막대, 동심원 = 1 cm 간격. 그림자 길이는 교과서·실험관찰 값 × 같은 배율(INSET_K)이라 "짧다·길다"가 표 값 순서와
+     같게 보인다(3D의 그림자도 같은 값에 비례). 방향은 3D(또는 2D)에서 계산한 빛의 방향을 지금 보는 화면에 투영해서 정한다:
+     💡(전등 쪽) = 빛이 오는 쪽, 그림자 = 그 반대쪽(빛이 나아가는 쪽). 숫자 값은 넣지 않는다(값은 측정값 패널에만). */
+  var INSET_K = 14; // 확대 칸에서 1 cm의 길이(판 반지름 55 ≈ 3.9 cm — 가장 긴 3.5 cm도 판 안에 들어간다)
+  function makeInset() {
+    var NS = "http://www.w3.org/2000/svg";
+    function n(tag, a) {
+      var e = document.createElementNS(NS, tag);
+      Object.keys(a || {}).forEach(function (k) {
+        e.setAttribute(k, a[k]);
+      });
+      return e;
+    }
+    var CX = 84;
+    var CY = 84;
+    var RP = 55;
+    var svg = n("svg", { viewBox: "0 0 168 168", class: "inset-svg", "aria-hidden": "true", focusable: "false" });
+    svg.appendChild(n("circle", { cx: CX, cy: CY, r: RP, class: "in-plate" }));
+    for (var k = 1; k <= 3; k++) svg.appendChild(n("circle", { cx: CX, cy: CY, r: k * INSET_K, class: "in-ring" }));
+    var nums = [1, 2, 3].map(function (k) {
+      var t = n("text", { class: "in-num", "text-anchor": "middle", "dominant-baseline": "central" });
+      t.textContent = String(k);
+      svg.appendChild(t);
+      return t;
+    });
+    var shadow = n("line", { class: "in-shadow", x1: CX, y1: CY, x2: CX, y2: CY });
+    var tip = n("line", { class: "in-tip" });
+    svg.appendChild(shadow);
+    svg.appendChild(tip);
+    svg.appendChild(n("circle", { cx: CX, cy: CY, r: 3.4, class: "in-stick" }));
+    var beam = n("line", { class: "in-beam" });
+    var head = n("path", { class: "in-beam-head" });
+    var bulb = n("text", { class: "in-bulb", "text-anchor": "middle", "dominant-baseline": "central" });
+    bulb.textContent = "💡";
+    svg.appendChild(beam);
+    svg.appendChild(head);
+    svg.appendChild(bulb);
+    var node = el(
+      "figure",
+      {
+        class: "inset",
+        hidden: true,
+        role: "img",
+        "aria-label": "우리나라 태양 고도 측정기를 위에서 크게 본 그림(모형). 가운데 점이 막대, 원 사이 간격은 1 cm, 💡는 전등 쪽이에요.",
+      },
+      [
+        svg,
+        // 좁은 장면(.is-small)에서는 짧은 글만(괄호 속 말은 숨긴다)
+        el("figcaption", { class: "inset-cap", "aria-hidden": "true" }, [
+          el("span", null, ["🔍 우리나라 측정기", el("span", { class: "cap-x", text: "(확대·모형)" })]),
+          el("span", null, ["💡 전등 쪽", el("span", { class: "cap-x", text: " · 원 간격 1 cm" })]),
+        ]),
+      ]
+    );
+    var cur = { value: 0, ux: 1, uy: 0 }; // (ux, uy): 화면에서 전등 쪽(오른쪽 +, 위쪽 +)
+    function set(e, a) {
+      Object.keys(a).forEach(function (k) {
+        e.setAttribute(k, typeof a[k] === "number" ? a[k].toFixed(2) : a[k]);
+      });
+    }
+    function draw() {
+      var ux = cur.ux;
+      var uy = -cur.uy; // SVG 좌표(아래쪽 +)
+      var px = -uy; // 그림자에 수직인 방향
+      var py = ux;
+      var L = cur.value * INSET_K;
+      var tx = CX - ux * L; // 그림자 끝: 전등 반대쪽
+      var ty = CY - uy * L;
+      set(shadow, { x2: tx, y2: ty });
+      set(tip, { x1: tx + px * 7, y1: ty + py * 7, x2: tx - px * 7, y2: ty - py * 7 });
+      // 원 눈금 숫자: 그림자·전등과 겹치지 않게 수직 방향(위쪽, 수평이면 오른쪽)에
+      var qx = px;
+      var qy = py;
+      if (qy > 0.01 || (Math.abs(qy) <= 0.01 && qx < 0)) {
+        qx = -qx;
+        qy = -qy;
+      }
+      nums.forEach(function (t, i) {
+        set(t, { x: CX + qx * (i + 1) * INSET_K, y: CY + qy * (i + 1) * INSET_K });
+      });
+      // 💡와 빛 화살표(판 바깥 → 판 가장자리)
+      set(bulb, { x: CX + ux * (RP + 13), y: CY + uy * (RP + 13) });
+      var s0 = RP + 5;
+      var s1 = RP - 4;
+      var hT = RP - 11;
+      set(beam, { x1: CX + ux * s0, y1: CY + uy * s0, x2: CX + ux * s1, y2: CY + uy * s1 });
+      head.setAttribute(
+        "d",
+        "M " + (CX + ux * hT).toFixed(2) + " " + (CY + uy * hT).toFixed(2) +
+          " L " + (CX + ux * s1 + px * 4.5).toFixed(2) + " " + (CY + uy * s1 + py * 4.5).toFixed(2) +
+          " L " + (CX + ux * s1 - px * 4.5).toFixed(2) + " " + (CY + uy * s1 - py * 4.5).toFixed(2) + " Z"
+      );
+    }
+    draw();
+    return {
+      node: node,
+      // 그림자 길이(cm, 교과서 값)
+      set: function (value) {
+        cur.value = value || 0;
+        draw();
+      },
+      // 화면에서 전등 쪽 방향(오른쪽 +, 위쪽 +). 거의 화면을 똑바로 향하면(길이 0.15 미만) 앞 방향을 그대로 둔다
+      aim: function (dx, dy) {
+        var l = Math.hypot(dx, dy);
+        if (!(l >= 0.15)) return;
+        cur.ux = dx / l;
+        cur.uy = dy / l;
+        draw();
+      },
+      show: function (on) {
+        node.hidden = !on;
+      },
+    };
+  }
+
+  // 두 화면(3D·2D)이 장면 안에 함께 두는 것: 빨리 감기 표시(모형), 화면 읽기용 알림, 측정기 확대 칸
+  function makeSceneBits(host) {
     var ff = el("div", { class: "hud-ff", "aria-hidden": "true", hidden: true, text: "⏩ 빨리 감기(모형) · 공전하는 중" });
     var live = el("p", { class: "ss-sr-only", "aria-live": "polite" });
-    var now = { tilt: null, pos: null, shadow: null };
-    var selPos = null;
-    function render() {
-      cond.textContent =
-        (now.pos ? "🌍 지구본: " + POS[now.pos].name + " 위치 · " : "") +
-        (now.tilt ? TILTS[now.tilt].name + (TILTS[now.tilt].angleDeg ? " (23.5°)" : "") : "");
-      val.textContent = now.shadow != null ? "그림자 " + f1(now.shadow) + " cm" : "";
-      val.hidden = now.shadow == null;
-      var diff = selPos && now.pos && selPos !== now.pos;
-      next.textContent = diff ? "➡ 고른 위치: " + POS[selPos].name + " (▶를 누르면 옮겨 가요)" : "";
-      next.hidden = !diff;
-    }
+    var inset = makeInset();
+    [ff, live, inset.node].forEach(function (x) {
+      host.appendChild(x);
+    });
     return {
-      nodes: [node, ff, live],
-      set: function (tilt, pos, shadow) {
-        now = { tilt: tilt, pos: pos, shadow: shadow };
-        render();
-      },
-      select: function (pos) {
-        selPos = pos || null;
-        render();
-      },
+      inset: inset,
       ff: function (on) {
         ff.hidden = !on;
       },
@@ -337,7 +539,7 @@
         live.textContent = t;
       },
       remove: function () {
-        [node, ff, live].forEach(function (x) {
+        [ff, live, inset.node].forEach(function (x) {
           if (x.parentNode) x.parentNode.removeChild(x);
         });
       },
@@ -362,7 +564,6 @@
       return e;
     }
     var disposed = false;
-    var hud = makeHud();
     var CX = 300, CY = 206, RX = 215, RY = 104, GR2 = 30;
     function xy(angle) {
       var a = (angle * Math.PI) / 180;
@@ -423,11 +624,13 @@
     globe.insertBefore(vref, globe.firstChild);
     svg.appendChild(globe);
     var caption = el("p", { class: "o2-caption", "aria-live": "polite" });
-    var head = el("div", { class: "o2-head" }, [hud.nodes[0], hud.nodes[1]]);
-    var box = el("div", { class: "o2-wrap" }, [head, svg, caption, hud.nodes[2]]);
+    var box = el("div", { class: "o2-wrap" }, [svg, caption]);
+    var bits = makeSceneBits(box); // 빨리 감기 표시·화면 읽기 알림·측정기 확대 칸(값은 장면 밖 측정값 패널)
     root.appendChild(box);
 
-    var st = { angle: POS.ga.angle, tilt: "vertical", pos: "ga", shown: false };
+    // 끌어 옮겨 둔 자리·마지막으로 잰 자리에서 시작(새로고침·3D↔2D 전환 뒤)
+    var start = globeAt && POS[globeAt.pos] && TILTS[globeAt.tilt] ? globeAt : null;
+    var st = { angle: start ? POS[start.pos].angle : POS.ga.angle, tilt: start ? start.tilt : "vertical", pos: start ? start.pos : "ga", shown: false };
     function draw() {
       var q = xy(st.angle);
       globe.setAttribute("transform", "translate(" + q.x.toFixed(1) + " " + q.y.toFixed(1) + ")");
@@ -448,12 +651,19 @@
         marks[id].classList.toggle("is-sel", id === selPos);
       });
     }
-    function updateHud(sel) {
+    // 측정값 패널(장면 밖)·설명 글·확대 칸을 지금 상태로. 확대 칸의 💡는 이 2D 그림에서 지구본 → 전등 방향
+    function updateHud() {
       var shown = st.shown ? shadowOf(st.tilt, st.pos) : null;
-      hud.set(st.tilt, st.pos, shown);
+      status.set(st.tilt, st.pos, shown);
       caption.textContent = st.shown
-        ? "지구본이 " + POS[st.pos].name + " 위치에 있고, 측정기가 전등을 정면으로 향해요(남중). 그림자 " + f1(shown) + " cm (모형)"
+        ? "지구본이 " + POS[st.pos].name + " 위치에 있고, 측정기가 전등을 정면으로 향해요(남중). (모형)"
         : "지구본이 " + POS[st.pos].name + " 위치에 있어요. " + TILTS[st.tilt].name + " (모형)";
+      if (st.shown) {
+        var q = xy(st.angle);
+        bits.inset.set(shown);
+        bits.inset.aim(CX - q.x, q.y - CY); // 화면 위쪽이 +
+      }
+      bits.inset.show(st.shown);
     }
     draw();
     updateHud();
@@ -497,7 +707,7 @@
       highlight: function (s) {
         rememberSel(s);
         drawMarks(s.pos);
-        hud.select(s.pos);
+        status.select(s.pos);
         if (s.tilt && s.tilt !== st.tilt) {
           setTilt(s.tilt).then(function () {
             updateHud();
@@ -511,20 +721,21 @@
         updateHud();
         var from = st.angle % 360;
         var to = forwardAngle(from, POS[sel.pos].angle);
-        hud.ff(true);
-        hud.say(POS[sel.pos].name + " 위치로 공전하는 중(빨리 감기)");
+        bits.ff(true);
+        status.mode("orbit", sel.pos);
+        bits.say(POS[sel.pos].name + " 위치로 공전하는 중(빨리 감기)");
         await animate(to === from ? 500 : 1500, function (e) {
           st.angle = from + (to - from) * e;
           draw();
         });
-        hud.ff(false);
+        bits.ff(false);
         st.angle = POS[sel.pos].angle;
         st.pos = sel.pos;
         st.shown = true;
         draw();
         updateHud();
         setGlobeAt(sel);
-        hud.say(cellName(sel.tilt, sel.pos) + ": 그림자 " + f1(shadowOf(sel.tilt, sel.pos)) + " cm");
+        bits.say(cellName(sel.tilt, sel.pos) + ": 그림자 " + f1(shadowOf(sel.tilt, sel.pos)) + " cm");
       },
       showInstant: function (sel) {
         if (globeAt && (globeAt.tilt !== sel.tilt || globeAt.pos !== sel.pos)) return;
@@ -546,7 +757,7 @@
       resetView: function () {},
       dispose: function () {
         disposed = true;
-        hud.remove();
+        bits.remove();
       },
     };
   }
@@ -623,10 +834,8 @@
       if (!v) return null;
       var T = v.THREE;
       var M = v.make;
-      var hud = makeHud();
-      hud.nodes.forEach(function (x) {
-        container.appendChild(x);
-      });
+      // 장면 안 부속(빨리 감기 표시·화면 읽기 알림·측정기 확대 칸). 3D 칸(.ss-view3d) 안이라 크게 보기의 막대에 가리지 않는다.
+      var bits = makeSceneBits(container);
 
       // 조명: 기본 조명을 낮추고, 전등 → 지구본 방향의 평행광(태양 빛은 평행하게 들어온다)을 쓴다
       var sun = null;
@@ -726,8 +935,11 @@
       var nCap = new T.Mesh(new T.SphereGeometry(0.07, 12, 10), M.material(0xd8434f));
       nCap.position.y = GR * 1.45;
       tiltG.add(nCap);
+      // "자전축" 이름표는 축 끝(빨간 점) 오른쪽 옆에 붙인다(이름표 왼쪽 끝이 기준점) — 지구본 위쪽의 "우리나라" 이름표와 겹치지 않게.
+      // 기울기 그룹에 붙어 자전해도 돌지 않는다.
       var axisLabel = M.label("자전축", { height: 0.3 });
-      axisLabel.position.y = GR * 1.45 + 0.28;
+      axisLabel.center.set(0, 0.5);
+      axisLabel.position.set(0.13, GR * 1.45, 0);
       tiltG.add(axisLabel);
       // 수직 기준선(점선): 기울기를 눈으로 비교
       var vrefGeo = new T.BufferGeometry().setFromPoints([new T.Vector3(0, -GR * 1.55, 0), new T.Vector3(0, GR * 1.55, 0)]);
@@ -759,11 +971,41 @@
       shadowPivot.visible = false;
       dev.add(plate, stick, shadowPivot);
       spinG.add(dev);
-      var devLabel = M.label("우리나라", { height: 0.24 });
-      devLabel.position.set(0, 0.62, 0);
-      dev.add(devLabel);
+      // "우리나라" 이름표: 측정기에 붙이면 자전할 때 함께 빙빙 돌고, 확대 화면에서 판을 가렸다(예전). → 장면에 따로 두고
+      // 측정기 바로 위(이름표 아래 끝이 기준점)에 놓는다. 공전(빨리 감기)하는 동안과 확대 화면에서는 숨긴다(확대 칸이 이름을 대신한다).
+      var devLabel = M.label("우리나라", { height: 0.26 });
+      devLabel.center.set(0.5, 0);
+      v.root.add(devLabel);
 
-      var st = { angle: POS.ga.angle, tilt: "vertical", pos: "ga", spin: 0, shown: false };
+      // 빛의 방향 화살표(평행광 모형): 전등 쪽에서 지구본으로 오는 평행한 화살표 3개(지구본 중심 높이). apply()가 lightDir로 놓는다.
+      var RAY_TAIL = 2.75; // 지구본 중심에서 화살표 꼬리까지
+      var RAY_LEN = 1.08;
+      var RAY_HEAD = 0.26;
+      var rays = new T.Group();
+      var rayMat = new T.MeshBasicMaterial({ color: 0xf08c00 });
+      [-0.5, 0, 0.5].forEach(function (off) {
+        var shaft = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, RAY_LEN, 10), rayMat);
+        shaft.rotation.z = -Math.PI / 2; // 원기둥(+y) → +x
+        shaft.position.set(RAY_LEN / 2, 0, off);
+        var head = new T.Mesh(new T.ConeGeometry(0.09, RAY_HEAD, 14), rayMat);
+        head.rotation.z = -Math.PI / 2;
+        head.position.set(RAY_LEN + RAY_HEAD / 2, 0, off);
+        rays.add(shaft, head);
+      });
+      v.root.add(rays);
+      v.onThemeChange(function (dark) {
+        rayMat.color.set(dark ? 0xffb347 : 0xf08c00);
+      });
+
+      // 지구본 끌기 손잡이: 지구본보다 조금 큰 보이지 않는 공(그려지지 않지만 끌기 판정에는 쓰인다). 받침·탁자 위 표시는 포함하지 않는다.
+      var grab = new T.Mesh(new T.SphereGeometry(GR * 1.3, 16, 12), new T.MeshBasicMaterial({ visible: false }));
+      place.add(grab);
+
+      // 새로고침·3D↔2D 전환 뒤: 끌어 옮겨 둔 자리·마지막으로 잰 자리에서 시작
+      var start = globeAt && POS[globeAt.pos] && TILTS[globeAt.tilt] ? globeAt : null;
+      var st = { angle: start ? POS[start.pos].angle : POS.ga.angle, tilt: start ? start.tilt : "vertical", pos: start ? start.pos : "ga", spin: 0, shown: false };
+      var orbiting = false; // ▶ 공전(빨리 감기) 중
+      var closeNow = false; // 카메라가 지구본 가까이(확대 화면)
       var tmpQ = new T.Quaternion();
       var zAxis = new T.Vector3(0, 0, 1);
       function tiltQuat(deg, out) {
@@ -777,23 +1019,38 @@
         d.applyQuaternion(tiltQuat(deg, tmpQ).invert());
         return Math.atan2(-d.z, d.x);
       }
+      // 빛이 나아가는 방향(전등 → 지구본, 수평 단위 벡터). 전등 빛(DirectionalLight)·빛 화살표·그림자 방향·확대 칸의 💡 방향이
+      // 모두 이 한 벡터에서 나온다(따로 계산하지 않는다).
+      var lightDir = new T.Vector3(1, 0, 0);
+      var tmpV = new T.Vector3();
       function apply(tiltDeg) {
         place.position.copy(orbitPoint(st.angle));
         tiltQuat(tiltDeg != null ? tiltDeg : TILTS[st.tilt].angleDeg, tiltG.quaternion);
         spinG.rotation.y = st.spin;
+        lightDir.copy(place.position).sub(lampPos).normalize();
         if (sun) {
           sun.position.copy(lampPos);
           sun.target.position.copy(place.position);
           sun.target.updateMatrixWorld();
         }
+        rays.position.copy(place.position).addScaledVector(lightDir, -RAY_TAIL);
+        rays.rotation.y = Math.atan2(-lightDir.z, lightDir.x); // 화살표(+x)가 빛이 나아가는 쪽
+        v.root.updateMatrixWorld(true);
         drawShadow();
+        placeDevLabel();
+        if (st.shown) {
+          bits.inset.set(shadowOf(st.tilt, st.pos));
+          aimInset();
+        }
+        // fix-B2 L1(review-B): 확대 칸은 확대 화면일 때만 보인다 — st.shown만 보면 처음 방향(전체 화면)으로
+        // 돌아온 뒤에도 남아 지구본(특히 '라' 자리)을 가렸다. closeNow는 onCam()이 실제 카메라 거리로 갱신한다.
+        bits.inset.show(st.shown && closeNow);
       }
       function drawShadow() {
         shadowPivot.visible = st.shown;
         if (!st.shown) return;
-        // 평행광 방향(전등 → 지구본)을 측정기 좌표로 바꿔 판 위에 투영 → 그림자 방향. 길이는 교과서 예시 값.
-        v.root.updateMatrixWorld(true);
-        var L = place.position.clone().sub(lampPos).normalize();
+        // 평행광 방향(lightDir)을 측정기 좌표로 바꿔 판 위에 투영 → 그림자 방향. 길이는 교과서 예시 값(× SC).
+        var L = lightDir.clone();
         var q = new T.Quaternion();
         dev.getWorldQuaternion(q);
         L.applyQuaternion(q.invert());
@@ -802,6 +1059,33 @@
         shadowPivot.rotation.y = Math.atan2(-dz / len, dx / len);
         shadowPivot.scale.x = shadowOf(st.tilt, st.pos) * SC;
       }
+      // "우리나라" 이름표는 측정기 위(막대 끝보다 높게), "자전축" 이름표는 화면에서 측정기 반대쪽 옆 — 두 이름표·측정기가 서로 겹치지 않게
+      var capV = new T.Vector3();
+      var camRx = new T.Vector3();
+      function placeDevLabel() {
+        dev.getWorldPosition(tmpV);
+        devLabel.position.set(tmpV.x, tmpV.y + 0.6, tmpV.z);
+        devLabel.visible = !orbiting && !closeNow;
+        nCap.getWorldPosition(capV);
+        camRx.set(1, 0, 0).applyQuaternion(v.camera.quaternion);
+        // "우리나라" 이름표가 보이고 측정기가 화면에서 축 끝보다 오른쪽이면 "자전축"은 왼쪽에(두 이름표가 겹치지 않게).
+        // 확대 화면에서는 "우리나라" 이름표가 없으므로 늘 오른쪽(왼쪽 위의 전체 화면 보기 버튼 쪽으로 가지 않게)
+        var left = devLabel.visible && tmpV.sub(capV).dot(camRx) > 0.05;
+        axisLabel.center.set(left ? 1 : 0, 0.5);
+        axisLabel.position.x = left ? -0.13 : 0.13;
+        // 휴대폰처럼 좁은 장면의 확대 화면에서는 자리가 모자라 확대 칸·전체 화면 보기 버튼과 겹치므로 "자전축" 이름표를 쉰다(막대·빨간 끝은 그대로)
+        axisLabel.visible = !(closeNow && (container.clientWidth || 1024) < 480);
+      }
+      // 확대 칸의 💡 방향 = 지금 카메라 화면에서 전등 쪽(빛이 오는 쪽 = -lightDir)을 화면 가로·세로 축에 투영한 방향
+      var camR = new T.Vector3();
+      var camU = new T.Vector3();
+      function aimInset() {
+        v.camera.updateMatrixWorld();
+        camR.set(1, 0, 0).applyQuaternion(v.camera.quaternion);
+        camU.set(0, 1, 0).applyQuaternion(v.camera.quaternion);
+        tmpV.copy(lightDir).negate();
+        bits.inset.aim(tmpV.dot(camR), tmpV.dot(camU));
+      }
       function drawMarks(selPos) {
         POS_IDS.forEach(function (id) {
           var on = id === selPos;
@@ -809,15 +1093,16 @@
           marks[id].ring.scale.setScalar(on ? 1.15 : 1);
         });
       }
+      // 측정값 패널(장면 밖)을 지금 상태로
       function updateHud() {
-        hud.set(st.tilt, st.pos, st.shown ? shadowOf(st.tilt, st.pos) : null);
+        status.set(st.tilt, st.pos, st.shown ? shadowOf(st.tilt, st.pos) : null);
       }
-      st.spin = noonSpin(st.angle, 0);
+      st.spin = noonSpin(st.angle, TILTS[st.tilt].angleDeg);
       apply();
       updateHud();
 
       // 좁은 화면(휴대폰)에서는 이름표를 키운다
-      var tags = [lampLabel, dirLabel].concat(
+      var tags = [lampLabel, dirLabel, devLabel].concat(
         POS_IDS.map(function (id) {
           return marks[id].tag;
         })
@@ -825,7 +1110,14 @@
         return { sp: sp, sx: sp.scale.x, sy: sp.scale.y };
       });
       var labelK = 0;
+      function insetFits() {
+        return (container.clientHeight || 400) >= 250;
+      }
       function fitLabels() {
+        // 3D 칸이 낮으면(휴대폰 + 크게 보기 등) 확대 칸이 장면을 거의 다 덮으므로 빼 둔다(관찰 카드의 눈금 그림이 대신한다).
+        // 좁으면 확대 칸 글을 짧게
+        bits.inset.node.classList.toggle("is-tiny", !insetFits());
+        bits.inset.node.classList.toggle("is-small", (container.clientWidth || 1024) < 480);
         var narrow = (container.clientWidth || 1024) < 480;
         var k = narrow ? 1.35 : 1;
         dirLabel.visible = !narrow;
@@ -840,21 +1132,154 @@
       var labelRO = window.ResizeObserver ? new ResizeObserver(fitLabels) : null;
       if (labelRO) labelRO.observe(container);
 
-      // 측정기가 잘 보이도록 전등 쪽 비스듬한 곳에서 지구본을 바라본다
-      function closeUp(ms) {
+      /* ── 확대(closeUp): 방향을 뒤집지 않는다 ──
+         예전에는 카메라를 전등 쪽으로 돌려 지구본을 바라봐서 전체 화면과 좌우가 거울처럼 뒤집혔다(사용자 지적 — 예: 라에서 전체 화면은
+         전등·측정기가 왼쪽인데 확대 화면은 오른쪽). 이제는 지금 카메라가 있는 쪽(방위)을 그대로 두고 지구본으로 다가가며 조금 위에서
+         내려다본다 → 전등이 화면의 어느 쪽인지(가: 아래·앞, 나: 오른쪽, 다: 위·뒤, 라: 왼쪽)가 전체 화면과 같다.
+         높이각만 자리·기울기에 맞춰 고른다(36°~78°, 50°에 가까울수록 좋음): ① 측정기 판이 카메라 쪽을 보고(가려지지 않게),
+         ② 화면에 그림자가 충분히 길게 보이고, ③ 화면에서 그림자가 전등 반대쪽으로 뻗어 보이는 각. */
+      var CLOSE_DIST = 6.6; // 확대 화면에서 카메라 ~ 바라보는 점
+      var CLOSE_NEAR = 9.5; // 카메라가 지구본에서 이보다 가까우면 확대 화면으로 본다(처음 방향은 늘 13 이상)
+      var UPV = new T.Vector3(0, 1, 0);
+      function closeUpPose() {
+        v.root.updateMatrixWorld(true);
         var gp = place.position.clone();
-        var toLamp = lampPos.clone().sub(gp).setY(0).normalize();
-        var side = new T.Vector3(-toLamp.z, 0, toLamp.x); // 옆 방향
-        var dir = toLamp.multiplyScalar(0.85).add(new T.Vector3(0, 0.5, 0)).add(side.multiplyScalar(0.4)).normalize();
-        var toP = gp.clone().add(new T.Vector3(0, 0.35, 0)).addScaledVector(dir, 6.2);
-        var toT = gp.clone().add(new T.Vector3(0, 0.35, 0));
+        var dp = dev.getWorldPosition(new T.Vector3());
+        var nrm = new T.Vector3(0, 1, 0).applyQuaternion(dev.getWorldQuaternion(new T.Quaternion())); // 판이 향하는 쪽(막대 방향)
+        var sdir = new T.Vector3(1, 0, 0).applyQuaternion(shadowPivot.getWorldQuaternion(new T.Quaternion())); // 그림자가 뻗는 쪽
+        var tl = lightDir.clone().negate(); // 지구본 → 전등
+        var az = v.camera.position.clone().sub(v.controls.target);
+        az.y = 0;
+        if (az.lengthSq() < 1e-6) az.set(0, 0, 1);
+        az.normalize();
+        var best = null;
+        for (var e = 36; e <= 78; e += 2) {
+          var er = (e * Math.PI) / 180;
+          var c = new T.Vector3(az.x * Math.cos(er), Math.sin(er), az.z * Math.cos(er)); // 바라보는 점 → 카메라
+          var fwd = c.clone().negate();
+          var right = new T.Vector3().crossVectors(fwd, UPV).normalize();
+          var up = new T.Vector3().crossVectors(right, fwd).normalize();
+          var face = nrm.dot(c);
+          var lx = tl.dot(right);
+          var ly = tl.dot(up);
+          var sx = sdir.dot(right);
+          var sy = sdir.dot(up);
+          var sl = Math.hypot(sx, sy) || 1e-6;
+          var opp = (lx * sx + ly * sy) / ((Math.hypot(lx, ly) || 1) * sl); // -1이면 화면에서 정반대
+          var ok = face >= 0.2 && sl >= 0.3 && opp <= -0.2;
+          var score = (ok ? 0 : 100 - 10 * face - 10 * sl + 10 * opp) + Math.abs(e - 50) / 10;
+          if (!best || score < best.score) best = { score: score, c: c, e: e };
+        }
+        var target = gp.clone().lerp(dp, 0.45);
+        // 화면 오른쪽 위의 확대 칸과 겹치지 않게 장면을 왼쪽으로 옮긴다(바라보는 점을 화면 오른쪽으로 — 확대 칸 폭의 절반만큼,
+        // 화면 폭의 8~20%, 폭 480px 미만은 10%까지). 확대 칸을 뺀 낮은 장면에서는 옮기지 않는다(왼쪽 위 전체 화면 보기 버튼에 측정기가 가리지 않게)
+        if (insetFits()) {
+          var cw = container.clientWidth || 1;
+          var frac = Math.min(cw < 480 ? 0.1 : 0.2, Math.max(0.08, (0.5 * (bits.inset.node.getBoundingClientRect().width || 0)) / cw)); // 좁은 화면은 덜 옮긴다(왼쪽 위 버튼)
+          var bRight = new T.Vector3().crossVectors(best.c.clone().negate(), UPV).normalize();
+          var halfW = CLOSE_DIST * Math.tan((v.camera.fov * Math.PI) / 360) * (v.camera.aspect || 1);
+          target.addScaledVector(bRight, 2 * frac * halfW);
+        }
+        return { position: target.clone().addScaledVector(best.c, CLOSE_DIST), target: target, elev: best.e };
+      }
+      function closeUp(ms) {
+        var pose = closeUpPose();
         var fromP = v.camera.position.clone();
         var fromT = v.controls.target.clone();
         return v.tween(ms, function (e) {
-          v.controls.target.lerpVectors(fromT, toT, e);
-          v.camera.position.lerpVectors(fromP, toP, e);
+          v.controls.target.lerpVectors(fromT, pose.target, e);
+          v.camera.position.lerpVectors(fromP, pose.position, e);
         });
       }
+      // 카메라가 움직일 때마다(끌어 돌리기·확대·처음 방향): 확대 화면이면 "우리나라" 이름표를 숨기고 지구본 끌기를 끈다
+      // (확대 화면에서 끌면 카메라 돌려 보기), 확대 칸의 💡 방향은 지금 화면에 맞춘다(학생이 돌려 보아도 화면과 같게).
+      function onCam() {
+        var near = v.camera.position.distanceTo(place.position) < CLOSE_NEAR;
+        if (near !== closeNow) {
+          closeNow = near;
+          grab.visible = !near;
+          // fix-B2 L1(review-B): closeUp()·flyHome() 트윈은 apply()를 다시 부르지 않으므로, 카메라가 실제로
+          // 가깝다/멀다 경계를 넘는 이 순간에 확대 칸을 직접 다시 보이거나 숨긴다(전체 화면으로 돌아왔는데
+          // 확대 칸이 남아 있던 문제).
+          bits.inset.show(st.shown && closeNow);
+          // fix-B2 L6(review-B): 확대 화면에서는 자리 이름표(가~라)가 왼쪽 위 "⛶ 전체 화면 보기" 토글과 겹칠 수
+          // 있어 잠시 숨긴다 — 위치를 고르는 다른 길(버튼·지구본 끌기)은 그대로 있다.
+          POS_IDS.forEach(function (id) {
+            marks[id].tag.visible = !closeNow;
+          });
+        }
+        placeDevLabel(); // 이름표 숨김·"자전축" 이름표 쪽을 지금 화면에 맞게
+        if (st.shown) aimInset();
+      }
+      v.controls.addEventListener("change", onCam);
+      onCam();
+      // 기록한 뒤: 확대 화면이었으면 처음 방향(전체 화면)으로 돌아가 궤도와 다음에 고른 자리가 보이게 한다(다음 ▶도 여기서 시작한다)
+      function afterRecord() {
+        if (closeNow && !orbiting) v.flyHome(450);
+      }
+      sceneHooks.afterRecord = afterRecord;
+
+      /* ── 지구본 끌기: 궤도를 따라 끌면 따라오고, 놓으면 가장 가까운 자리(가~라)에 붙어 그 위치가 골라진다 ──
+         끄는 동안 카메라는 돌지 않는다(공통 틀 v.draggable). 손가락이 궤도 중심(전등) 둘레로 돈 각도만큼 지구본을 옮긴다(상대 각도 —
+         잡은 자리에서 튀지 않게). 자전축은 늘 같은 방향(기울기 그룹을 돌리지 않음). 버튼·가~라 글자 누르기는 그대로. */
+      var drag = null;
+      var snapAnim = null;
+      function pointerAngle(p) {
+        return (Math.atan2(-p.z, p.x) * 180) / Math.PI; // orbitPoint와 같은 각도(위에서 볼 때 시계 반대 방향)
+      }
+      v.draggable(grab, {
+        plane: { normal: [0, 1, 0], point: [0, GY, 0] }, // 궤도 면
+        onStart: function () {
+          drag = exp.isBusy() || orbiting || snapAnim ? null : { start: st.angle, acc: 0, last: null, moved: false, near: null };
+        },
+        onDrag: function (info) {
+          if (drag && exp.isBusy()) drag = null; // 실험(▶)이 시작되면 끌기를 그만둔다
+          if (!drag || !info.point || Math.hypot(info.point.x, info.point.z) < 1.2) return; // 전등 바로 옆은 각도가 흔들린다
+          var a = pointerAngle(info.point);
+          if (drag.last == null) {
+            drag.last = a;
+            return;
+          }
+          drag.acc += wrap180(a - drag.last);
+          drag.last = a;
+          if (!drag.moved) {
+            if (Math.abs(drag.acc) < 3) return; // 살짝 누른 것은 끌기가 아니다
+            drag.moved = true;
+            st.shown = false; // 잰 자리를 떠나면 그림자는 없다
+          }
+          st.angle = drag.start + drag.acc;
+          apply();
+          var np = nearestPos(st.angle);
+          if (np !== drag.near) {
+            drag.near = np;
+            drawMarks(np);
+          }
+          status.mode("drag", np);
+        },
+        onEnd: function () {
+          var d = drag;
+          drag = null;
+          if (!d || !d.moved) return;
+          var pid = nearestPos(st.angle);
+          var from = st.angle;
+          var delta = wrap180(POS[pid].angle - from);
+          snapAnim = v
+            .tween(220, function (e) {
+              st.angle = from + delta * e;
+              apply();
+            })
+            .then(function () {
+              snapAnim = null;
+              st.angle = POS[pid].angle;
+              st.pos = pid;
+              apply();
+              updateHud();
+              setGlobeAt({ tilt: st.tilt, pos: pid });
+              ctx.onPick({ pos: pid }); // 버튼을 누른 것과 같다(선택·잠금 규칙·저장 모두 공통 틀 그대로)
+              bits.say("지구본을 " + POS[pid].name + " 위치에 놓았어요.");
+            });
+        },
+      });
 
       var tiltAnim = null;
       function animateTilt(to) {
@@ -878,18 +1303,20 @@
         highlight: function (s) {
           rememberSel(s);
           drawMarks(s.pos);
-          hud.select(s.pos);
+          status.select(s.pos);
           if (s.tilt && s.tilt !== st.tilt) animateTilt(s.tilt);
           else updateHud();
           v.render();
         },
         run: async function (sel) {
+          drag = null; // 끄는 중이었으면 그만둔다
           st.shown = false;
           apply();
           updateHud();
           await v.flyHome(350);
           if (sel.tilt !== st.tilt) await animateTilt(sel.tilt);
           else if (tiltAnim) await tiltAnim;
+          if (snapAnim) await snapAnim; // 끌어 놓은 지구본이 자리에 붙는 중이면 끝난 뒤에
           var from = st.angle % 360;
           if (from <= 0) from += 360;
           var to = forwardAngle(from, POS[sel.pos].angle);
@@ -897,8 +1324,11 @@
           var spinEnd = noonSpin(POS[sel.pos].angle, deg);
           var turns = to === from ? 1 : 3; // 옮겨 가는 동안 자전(빨리 감기)
           var spinFrom = spinEnd - turns * 2 * Math.PI;
-          hud.ff(true);
-          hud.say(POS[sel.pos].name + " 위치로 공전하는 중(빨리 감기)");
+          orbiting = true;
+          placeDevLabel(); // 자전하는 동안 "우리나라" 이름표는 숨긴다(빙빙 돌지 않게)
+          bits.ff(true);
+          status.mode("orbit", sel.pos);
+          bits.say(POS[sel.pos].name + " 위치로 공전하는 중(빨리 감기)");
           var startSpin = st.spin;
           await v.tween(to === from ? 700 : 1500, function (e) {
             st.angle = from + (to - from) * e;
@@ -906,16 +1336,17 @@
             st.spin = spinFrom + (spinEnd - spinFrom) * e + (startSpin - spinFrom) * Math.max(0, 1 - e * 6);
             apply();
           });
+          orbiting = false;
           st.angle = POS[sel.pos].angle;
           st.pos = sel.pos;
           st.spin = spinEnd;
-          hud.ff(false);
+          bits.ff(false);
           st.shown = true;
           apply();
           updateHud();
           await closeUp(600);
           setGlobeAt(sel);
-          hud.say(cellName(sel.tilt, sel.pos) + ": 측정기가 전등을 정면으로 향해요. 그림자 " + f1(shadowOf(sel.tilt, sel.pos)) + " cm");
+          bits.say(cellName(sel.tilt, sel.pos) + ": 측정기가 전등을 정면으로 향해요. 그림자 " + f1(shadowOf(sel.tilt, sel.pos)) + " cm");
         },
         showInstant: function (sel) {
           if (globeAt && (globeAt.tilt !== sel.tilt || globeAt.pos !== sel.pos)) return;
@@ -941,7 +1372,10 @@
         resetView: v.resetView,
         dispose: function () {
           if (labelRO) labelRO.disconnect();
-          hud.remove();
+          v.controls.removeEventListener("change", onCam);
+          if (sceneHooks.afterRecord === afterRecord) sceneHooks.afterRecord = null;
+          drag = null;
+          bits.remove();
           v.dispose();
         },
       };

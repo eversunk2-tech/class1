@@ -1,5 +1,16 @@
 # 단계 B Build 지침 — 2학기 1단원 재설계 (`sci-6-2-1-2~5`, 앱마다 Build 1명) (2026-09-25)
 
+> **⚠️ 단계 A 결과 반영(단계 A 확정·커밋 `f93f716` 뒤 추가 — 이 절이 아래 본문보다 우선)**
+> * 공통 틀의 최종 사용법은 **`scripts/templates/science-sim/README.md`("추가 기능 2026-09-25" 절)와 `experiment.js`·`sim3d.js` 머리 주석**이 기준이다(`build-A-report.md`보다 뒤의 `fix-A-report.md`·`review-A2.md`에서 바뀐 것이 많다 — 둘 다 읽는다).
+> * **크게 보기의 모양**: 장면 왼쪽 위(모형 배지 아래, 위에서 46px)에 토글 버튼(폭 약 95~150px·높이 44px) — **앱의 HUD·이름표·값 표시를 이 자리에 두지 않는다**(review-A2 N4: `sci-6-2-1-3`의 값 이름표가 토글에 가림). 막대가 보이면 3D 칸(`.ss-view3d`)은 막대 위에서 끝난다(`.has-bar`) — 앱이 3D 칸 안에 붙인 안내 글·HUD는 자동으로 막대 위에 온다. 막대 = 윗줄 측정값(`scenePanel`, 전체 폭) + 아랫줄 실행·기록 버튼. 좁은/낮은 화면(폭 480px·높이 420px 이하)은 측정값이 장면 바로 아래 카드.
+> * **`Experiment.create()`를 쓰는 앱(`sci-6-2-1-2`, `sci-6-2-1-5`)**: 크게 보기는 자동. 앱은 **`scenePanel: 값 노드`**를 넘긴다(넘기기 전에 기본 화면의 제자리에 붙여 두면 끌 때 그 자리로 돌아온다). 크게 보기에서 관찰 카드는 장면 바로 아래(번호 👀)로 자동으로 옮겨진다. 기록 버튼을 앱이 찾을 때는 `exp.recordButton`/`.ss-record-btn`, 가려질 때 보이게 하는 것은 `exp.revealRecord()`(관찰 카드 안 선택자 금지).
+>   * **`sci-6-2-1-2`는 `factors: []`라 공통 실행·기록 버튼이 막대로 가지 않는다**(가짜 기록 방지, fix-A F1). 그래서 **앱 자신의 기록 버튼을 `scenePanel` 노드 안에 함께 넣어**(값 + 📝 기록하기) 막대에서 기록할 수 있게 한다. `scenePanel`이 없으면 태블릿 세로 기본값이 "끔"으로 남으니(review-A2 N1), 넘기면 다른 앱처럼 "켬"이 기본이 된다. 앱이 `vp`를 `matchMedia`로 직접 옮기던 코드(`app.js` 959~970행 부근)는 공통 틀과 충돌하지 않게 정리한다.
+> * **`Experiment.create()`를 안 쓰는 앱(`sci-6-2-1-3`, `sci-6-2-1-4`)**: 지금 토글이 없다. **`SciSim.Experiment.enlarge({ layout, viewBox, panel, run?, record?, runCard?, observe?, scenePanel?, onChange? })`**(README 예시)를 연결해 두 모드를 갖춘다 — 사용자 결정 "20개 모두"(review-A M5). 앱의 기록 버튼은 `record`로(막대로 옮겨짐), 측정값은 `scenePanel`로.
+> * **끌기 도우미 `v.draggable(obj, { plane | onDrag(info.ray), onStart, onDrag, onEnd })`**: 시작한 손가락만 따라가고, 마우스 왼쪽 버튼만, 끝나면 카메라 잠금 상태를 되돌리고, 숨긴 물체는 안 잡힌다(fix-A F10). 잡는 영역은 물체의 화면상 경계 상자 + 30px. 끌기와 탭 고르기(`pickable`)가 같은 물체면 짧은 탭은 고르기, 끌면 끌기로 나뉘는지 확인.
+> * **알림**은 이제 머리말 위에 뜬다(장면을 안 가림) — 앱이 따로 옮기지 않는다.
+> * 테스트 때 UI 설정 키 `ssUiPref:sceneMode:portrait|landscape`, `ssUiPref:headerCollapsed`도 자기 시험 전후에만 지운다(`localStorage.clear()` 금지). 네 명이 **동시에** 작업한다 — 자기 앱 폴더와 자기 보고서만 고치고, 개발 서버(3000)는 함께 쓰므로 끄거나 재시작하지 않는다(꺼져 있으면 멈추고 보고). `npm run build` 금지.
+> * 공통 틀에 꼭 필요한 것이 생기면 **고치지 말고** 보고서에 적는다(Claude가 모아서 처리).
+
 먼저 읽기: `CLAUDE.md`(과학 차시 앱 규칙 — 특히 2026-09-25에 더한 "실험 화면 배치·직접 조작·답을 먼저 알려 주지 않는다·장면 속 글자"), `docs/science/sim-redesign/spec.md`(**§4 전체와 끝의 "개정 1"~"개정 4" — 뒤의 개정이 우선. 특히 개정 4: 기본 배치는 지금 구조, 크게 보기는 버튼**), `docs/science/sim-redesign/audit.md`(맡은 앱 부분), `docs/science/sim-redesign/build-A-report.md`(**공통 틀의 새 기능 — "⛶ 전체 화면 보기"(크게 보기) 모드·장면 안 막대·측정값 노드·머리말 접기·`v.draggable()` 사용법**), 맡은 앱의 `spec.md`(끝 "개정" 절)·`app.js`·`data/lesson-config.js`·`style.css`, 단원 공통 `docs/science/6-2-unit1/`.
 
 ## 모든 앱 공통

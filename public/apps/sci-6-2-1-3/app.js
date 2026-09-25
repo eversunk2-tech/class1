@@ -1,7 +1,7 @@
 /*
  * app.js — sci-6-2-1-3 "계절별 태양의 남중 고도와 낮의 길이의 관계는?" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·저장·로그인·예상/분석/정리 모듈을 맡고, 이 파일은
- *   ① 실험하기 화면(앱 전용): 달 바(3월 → 2월, 계절별 묶음) · 값 패널 · 3D/2D 하늘 모형 · 지난 경로 비교
+ *   ① 실험하기 화면(앱 전용): 달 바(3월 → 2월, 계절별 묶음) · 값 패널 · 3D/2D 하늘 모형 · 궤적 보기(이번 달만·계절 대표 3개)
  *   ② 분석 표·꺾은선그래프 2개(남중 고도, 낮의 길이), 보기 고르기 2개, 결론 1개, 궁금한 점 한 줄(선택)   을 만든다.
  *
  * spec "개정 1": 12달 모두 측정. 달을 누르면 그 달 21일 태양의 하루 길을 약 1.2초 빨리 감기(모형)로 보여 주고,
@@ -88,14 +88,6 @@
       north: Math.cos(PHI) * Math.sin(dec) - Math.sin(PHI) * Math.cos(dec) * Math.cos(H),
     };
   }
-  // 지난 경로 이름표를 놓을 곳: 1~6월은 오전 쪽, 7~12월은 오후 쪽.
-  // 거의 같은 길(5월·7월, 4월·8월, 3월·9월, 2월·10월, 1월·11월)의 이름표가 서로 겹치지 않게 하고,
-  // 같은 쪽에서도 달마다 조금씩 다른 자리에 둔다.
-  function labelH(month, H0) {
-    var k = month <= 6 ? month - 1 : 12 - month; // 0~5
-    return (month <= 6 ? -1 : 1) * (0.3 + 0.08 * k) * H0;
-  }
-
   /* ───────── 저장 ───────── */
   var records = S.RecordStore(store, {
     key: "records",
@@ -122,7 +114,18 @@
   var seen = store.get("seen", {}) || {}; // 하루 길을 끝까지 본 달(기록하기를 켜는 조건)
   var selMonth = Number(store.get("month", 0)) || null;
   if (selMonth && !BY[selMonth]) selMonth = null;
-  var ghostsOn = store.get("ghosts", true) !== false;
+  /* 궤적 보기(개편 2026-09-25): "이번 달만"(기본) · "계절 대표 3개"(기록 여부와 무관하게 3·6·12월 값으로 계산해 그린다,
+   * 봄·가을은 3월 기준 한 선). 예전의 "지난 경로 보임/숨김"(기록한 달을 전부 남겨 두어 헷갈리던 것)은 없앴다.
+   * 새 UI 설정 키 pathMode를 쓰고 예전 ghosts 키는 더 이상 읽지 않는다(저장 키 버전·기록 구조는 그대로). */
+  var pathMode = store.get("pathMode", "current");
+  if (pathMode !== "current" && pathMode !== "compare3") pathMode = "current";
+  // 대표 선(fix-B1 L3): 굵고 진한 점선. 색은 달별 선(계절 색 실선)·하늘 색과 구별되는 색 — 색만으로 구분하지 않게 범례에 이름을 쓰고,
+  // 선 모양(점선 ↔ 지금 보는 달의 실선)으로도 구분한다. dark = 어두운 3D 배경에서 쓰는 밝은 색.
+  var COMPARE3 = [
+    { id: "springfall", label: "봄·가을", month: 3, color: "#7b3fb8", dark: "#c3a3ff" },
+    { id: "summer", label: "여름", month: 6, color: "#d81b60", dark: "#ff7aa8" },
+    { id: "winter", label: "겨울", month: 12, color: "#00838f", dark: "#45d3e0" },
+  ];
 
   /* ───────── 1. 예상하기 / 4. 정리 ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
@@ -180,12 +183,21 @@
     R.loading = el("p", { class: "ss-view-loading", text: "3D 하늘 모형을 준비하고 있어요…" });
     R.ff = el("div", { class: "ff-badge", hidden: true, "aria-hidden": "true" });
     R.viewBox = el("div", { class: "ss-exp-view sky-view" }, [R.view3d, R.view2d, el("div", { class: "ss-view-badge", "aria-hidden": "true", text: "모형" }), R.ff, R.tip, R.loading]);
+    // 좁은 화면(휴대폰)에서는 안내 글이 두 줄이 되어 장면 아래 가운데의 방위 이름표('북')를 가린다 → 3D 칸을 안내 글 위에서 끝내
+    // 안내 글 자리를 비워 둔다(style.css, 안내 글 높이 --tip-h) — fix-B1 L11
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {
+        R.viewBox.style.setProperty("--tip-h", Math.ceil(R.tip.getBoundingClientRect().height) + "px");
+      }).observe(R.tip);
+    }
     R.btnReset = el("button", { type: "button", class: "ss-btn", text: "🎥 처음 방향으로" });
-    R.btnGhost = el("button", { type: "button", class: "ss-btn", "aria-pressed": String(ghostsOn) });
+    R.btnPathCurrent = el("button", { type: "button", class: "ss-btn", "aria-pressed": "true", text: "🌤️ 이번 달만" });
+    R.btnPathCompare = el("button", { type: "button", class: "ss-btn", "aria-pressed": "false", text: "📊 계절 대표 3개" });
+    R.pathModeGroup = el("div", { class: "ss-row path-mode-group", role: "group", "aria-label": "궤적 보기" }, [R.btnPathCurrent, R.btnPathCompare]);
     R.btnToggle = el("button", { type: "button", class: "ss-btn", text: "2D로 보기" });
-    R.ovVal = el("div", { class: "ov-values", hidden: true, "aria-hidden": "true" });
-    R.viewBox.appendChild(R.ovVal);
-    var viewCol = el("div", { class: "ss-exp-view-col" }, [R.viewBox, el("div", { class: "ss-row ss-view-tools" }, [R.btnReset, R.btnGhost, R.btnToggle])]);
+    // 값(태양 고도·낮의 길이)은 장면 위에 겹쳐 띄우지 않는다 — "⛶ 전체 화면 보기" 토글이 그 자리(왼쪽 위)에 오고,
+    // 바뀌는 값은 3D 이름표 대신 ②값 패널(R.valuePanel)로 보여 준다(꺼짐일 때도 장면 바로 아래, 켜짐일 때는 장면 안 막대).
+    var viewCol = el("div", { class: "ss-exp-view-col" }, [R.viewBox, el("div", { class: "ss-row ss-view-tools sky-tools" }, [R.btnReset, R.pathModeGroup, R.btnToggle])]);
     var modelNote = S.rich(C.modelNote, "p");
     modelNote.className = "ss-help ss-model-note";
 
@@ -227,7 +239,7 @@
     });
     // ①과 ②를 한 카드에 둔다(세로 화면에서도 하늘 모형·달 바·값·기록 버튼이 한 화면에 들어오게)
 
-    // ② 값 패널
+    // ② 값 패널(R.valuePanel = 머리말 + 값 + 범례 — "⛶ 전체 화면 보기"를 켜면 이 노드가 그대로 장면 안 막대로 옮겨 간다)
     R.valHead = el("span", { class: "value-head" });
     R.valAlt = el("dd", { class: "value-num" });
     R.valDay = el("dd", { class: "value-num" });
@@ -236,14 +248,26 @@
       el("div", { class: "value-item" }, [el("dt", { text: "🕒 낮의 길이" }), R.valDay]),
     ]);
     R.valueLive = el("div", { "aria-live": "polite" }, [R.values]);
+    // 궤적 보기가 "계절 대표 3개"일 때만 보이는 범례(선 모양 + 이름) — 3D/2D 장면 안에는 이름표를 따로 띄우지 않는다(겹침 방지).
+    // 지금 보는 달 = 계절 색 실선, 계절 대표 = 점선(fix-B1 L3). 세 대표 선은 지금 달과 겹쳐도 늘 그려져 범례와 맞는다.
+    R.legendCurLine = el("span", { class: "path-legend-line is-cur", "aria-hidden": "true" });
+    R.legendCurText = el("span");
+    R.legendCur = el("span", { class: "path-legend-item" }, [R.legendCurLine, R.legendCurText]);
+    R.pathLegend = el(
+      "div",
+      { class: "path-legend", hidden: true },
+      [R.legendCur].concat(
+        COMPARE3.map(function (c) {
+          return el("span", { class: "path-legend-item" }, [el("span", { class: "path-legend-line", "aria-hidden": "true", style: "--c:" + c.color + ";--cd:" + c.dark }), c.label + " 대표"]);
+        })
+      )
+    );
+    // 번호는 기본 화면에서 ②(① 달 고르기 다음), 크게 보기에서는 값이 조건 카드보다 위(장면 안 막대·장면 바로 아래)라 👀(fix-B1 L12)
+    R.valStepN = el("span", { class: "ss-step-n", text: "②" });
+    R.valuePanel = el("div", { class: "value-panel" }, [el("h3", { class: "ss-step-h value-h" }, [R.valStepN, " ", R.valHead]), R.valueLive, R.pathLegend]);
     R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", text: "📝 기록하기", disabled: true });
     R.recordMsg = el("p", { class: "ss-help", "aria-live": "polite" });
-    R.valueCard = el("div", { class: "value-card" }, [
-      el("h3", { class: "ss-step-h value-h" }, [el("span", { class: "ss-step-n", text: "②" }), " ", R.valHead]),
-      R.valueLive,
-      R.record,
-      R.recordMsg,
-    ]);
+    R.valueCard = el("div", { class: "value-card" }, [R.valuePanel, R.record, R.recordMsg]);
     var monthCard = el("div", { class: "ss-card ss-step-card obs-card" }, [
       el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: "①" }), " 관찰할 달 고르기"]),
       R.monthBar,
@@ -252,12 +276,26 @@
 
     // 진행
     R.progress = el("div", { class: "ss-progress" });
-    var panel = el("div", { class: "ss-exp-panel" }, [
+    R.panel = el("div", { class: "ss-exp-panel" }, [
       monthCard,
       el("div", { class: "ss-card ss-step-card" }, [R.progress, modelNote, el("p", { class: "ss-help safety-line", text: "⚠️ " + C.safety })]),
     ]);
-    root.appendChild(el("div", { class: "ss-exp-layout" }, [viewCol, panel]));
+    R.layout = el("div", { class: "ss-exp-layout" }, [viewCol, R.panel]);
+    root.appendChild(R.layout);
   })();
+
+  // "⛶ 전체 화면 보기"(크게 보기): 이 앱은 공통 Experiment.create()를 쓰지 않아 enlarge()로 토글·장면 안 막대를 붙인다.
+  // 기록 버튼은 record로 막대 아랫줄에, 값(R.valuePanel)은 scenePanel로 막대 윗줄(좁은/낮은 화면은 장면 바로 아래 카드)에 옮겨진다.
+  var enl = S.Experiment.enlarge({
+    layout: R.layout,
+    viewBox: R.viewBox,
+    panel: R.panel,
+    record: R.record,
+    scenePanel: R.valuePanel,
+    onChange: function (on) {
+      R.valStepN.textContent = on ? "👀" : "②"; // 공통 틀의 관찰 카드와 같게(Review A2 N6)
+    },
+  });
 
   /* ── 실험 화면 상태 그리기 ── */
   var busy = false;
@@ -300,6 +338,12 @@
         : "달을 누르고 값을 확인해 기록해요. (" + n + "/" + total + ")";
     // 값 패널
     var m = selMonth;
+    // 범례의 "지금 보는 달" 줄(계절 색 실선) — 달을 고르기 전에는 숨김
+    R.legendCur.hidden = !m;
+    if (m) {
+      R.legendCurLine.style.borderTopColor = seasonOf(m).color;
+      R.legendCurText.textContent = m + "월(지금)";
+    }
     if (!m) {
       R.valHead.textContent = "값 확인하고 기록하기 — 먼저 ①에서 달을 골라요";
       R.valAlt.textContent = "—";
@@ -316,15 +360,13 @@
       R.valAlt.classList.toggle("is-wait", !showAlt);
       R.valDay.classList.toggle("is-wait", !showDay);
     }
-    // 하늘 모형 위에도 값을 작게 보여 준다(세로 화면·휴대폰에서 스크롤하지 않아도 보이게)
-    var ovAlt = m && (phase === "noon" || phase === "done");
-    R.ovVal.hidden = !ovAlt || shownMonth !== m && !busy;
-    if (ovAlt) R.ovVal.textContent = m + "월 · 남중 고도 " + f1(BY[m].altitude) + "°" + (phase === "done" ? " · 낮의 길이 " + dayLabel(BY[m].dayMinutes) : "");
     R.record.disabled = busy || !m || phase !== "done" || !seen[m];
     R.btnToggle.disabled = busy || mounting || (viewKind === "2d" && !can3D);
-    R.btnGhost.disabled = busy;
-    R.btnGhost.textContent = ghostsOn ? "👣 지난 경로: 보임" : "👣 지난 경로: 숨김";
-    R.btnGhost.setAttribute("aria-pressed", String(ghostsOn));
+    R.btnPathCurrent.disabled = busy;
+    R.btnPathCompare.disabled = busy;
+    R.btnPathCurrent.setAttribute("aria-pressed", String(pathMode === "current"));
+    R.btnPathCompare.setAttribute("aria-pressed", String(pathMode === "compare3"));
+    R.pathLegend.hidden = pathMode !== "compare3";
     if (!busy && m && phase === "done") {
       if (recOf(m)) {
         var nx = nextTodo(m);
@@ -334,8 +376,12 @@
   }
 
   /* ── 달 고르기 → 하루 길 보여 주기 ── */
-  function ghostList() {
-    return ghostsOn ? recordedMonths() : [];
+  // 궤적 보기가 "계절 대표 3개"일 때만 COMPARE3(봄·가을=3월 · 여름=6월 · 겨울=12월)를 돌려준다(기록 여부와 무관).
+  // 지금 보는 달이 대표 달과 같거나 거의 같아도(예: 3월·9월 — 봄·가을 선) 셋 다 그린다(fix-B1 L3): 3D는 같은 방향의 조금 바깥 구면에,
+  // 2D는 지금 달의 실선 위에 점선으로 — 그래서 범례의 세 선이 늘 화면에 보인다.
+  function pathList() {
+    if (pathMode !== "compare3") return [];
+    return COMPARE3.slice();
   }
   async function pickMonth(month) {
     if (busy) return;
@@ -355,10 +401,10 @@
       if (v.whenVisible) await v.whenVisible(900);
       showFF(month);
       if (reduceMotion()) {
-        v.show(month, ghostList());
+        v.show(month, pathList(month));
         phase = "noon";
       } else {
-        await v.play(month, ghostList(), function () {
+        await v.play(month, pathList(month), function () {
           phase = "noon";
           drawExp();
         });
@@ -367,8 +413,8 @@
       console.warn("[sci-6-2-1-3] 하늘 모형 애니메이션 오류(결과만 바로 보여 줘요)", e);
       ok = false;
     }
-    if (view !== v && view) view.show(month, ghostList()); // 도중에 화면이 바뀌었으면 새 화면에 결과만
-    else if (!ok && view) view.show(month, ghostList());
+    if (view !== v && view) view.show(month, pathList(month)); // 도중에 화면이 바뀌었으면 새 화면에 결과만
+    else if (!ok && view) view.show(month, pathList(month));
     hideFF();
     shownMonth = month;
     seen[month] = true;
@@ -397,7 +443,7 @@
     var n = recordedMonths().length;
     if (n >= MONTHS.length && !r.replaced) toast("🎉 12달을 모두 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
     else toast((r.replaced ? "🔁 다시 기록했어요: " : "📝 기록했어요: ") + m + "월 남중 고도 " + f1(d.altitude) + "°, 낮의 길이 " + dayLabel(d.dayMinutes));
-    if (view) view.setGhosts(ghostList(), shownMonth);
+    if (view) view.setGhosts(pathList(shownMonth));
     drawExp();
     lesson.refresh();
     // 아직 기록하지 않은 다음 달을 자동으로 골라 재생한다(학생은 기록하기만 누르면 된다)
@@ -410,12 +456,18 @@
       }, 450);
     }
   });
-  R.btnGhost.addEventListener("click", function () {
-    if (busy) return;
-    ghostsOn = !ghostsOn;
-    store.set("ghosts", ghostsOn);
-    if (view) view.setGhosts(ghostList(), shownMonth);
+  function setPathMode(mode) {
+    if (busy || pathMode === mode) return;
+    pathMode = mode;
+    store.set("pathMode", pathMode);
+    if (view) view.setGhosts(pathList(shownMonth));
     drawExp();
+  }
+  R.btnPathCurrent.addEventListener("click", function () {
+    setPathMode("current");
+  });
+  R.btnPathCompare.addEventListener("click", function () {
+    setPathMode("compare3");
   });
   R.btnReset.addEventListener("click", function () {
     if (view) view.resetView();
@@ -439,7 +491,10 @@
     return S.Sim3D.create({
       container: container,
       frame: { width: 2 * RS + 3, depth: 2 * RS + 5, center: [0, RS * 0.3, 0] },
-      viewDir: [0.45, 0.5, -0.74], // 남서쪽 위에서 비스듬히 본다(정남쪽 자오선의 남중 고도 각이 잘 보이게)
+      // 처음 시점(= "처음 방향으로"·두 번 탭): 교과서처럼 남쪽 하늘을 바라본 모습 — 동쪽이 왼쪽, 서쪽이 오른쪽으로 2D와 같다
+      // (fix-B1 L5: 예전에는 남서쪽에서 봐서 동쪽이 오른쪽이었다). 북쪽에서 동쪽으로 조금 돌려 위에서 본다 — 정북에서 보면
+      // 정남쪽 자오선에 그린 남중 고도 선·호가 옆으로 서서 보이지 않는다.
+      viewDir: [-0.34, 0.5, 0.8],
       minDistance: 7,
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -483,8 +538,10 @@
           pts.push(new T.Vector3(Math.cos(az) * RS * Math.cos(a * RAD), RS * Math.sin(a * RAD), Math.sin(az) * RS * Math.cos(a * RAD)));
         }
         root.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), guideMat));
-        var lb = M.label(a + "°", { height: 0.6, bg: "rgba(255,255,255,0.8)" });
-        // 정남쪽 자오선이 아니라 남동쪽(45°)에 둔다 — 남중 고도 이름표(예: 12월 29.0°)와 겹치지 않게
+        // 보조선 이름표도 길(선) 위에 그린다(길이 앞을 지나가도 글자가 보이게)
+        var lb = M.label(a + "°", { height: 0.6, bg: "rgba(255,255,255,0.8)", depthTest: false });
+        lb.renderOrder = 20;
+        // 정남쪽 자오선이 아니라 남동쪽(45°)에 둔다 — 남중할 때의 태양·남중 고도 선과 겹치지 않게
         var ca = RS * Math.cos(a * RAD) * Math.SQRT1_2;
         lb.position.set(-ca, RS * Math.sin(a * RAD) + 0.35, -ca);
         root.add(lb);
@@ -502,7 +559,10 @@
         ["남", 0, -RS - 1.0],
         ["북", 0, RS + 1.0],
       ].forEach(function (d) {
-        var lb = M.label(d[0], { height: 1.1, bold: true, bg: "rgba(255,255,255,0.92)" });
+        // 방위 이름표는 하늘의 길(선) 위에 그린다 — 남쪽 하늘을 바라보는 처음 시점에서 여름 길(북서쪽으로 지는 부분)이 '서' 이름표
+        // 앞을 지나가도 글자가 가려지지 않게(fix-B1 L5와 함께)
+        var lb = M.label(d[0], { height: 1.1, bold: true, bg: "rgba(255,255,255,0.92)", depthTest: false });
+        lb.renderOrder = 20;
         lb.position.set(d[1], 0.55, d[2]);
         root.add(lb);
       });
@@ -600,30 +660,39 @@
           arc.push(new T.Vector3(0, 0.1 + ar * Math.sin(th), -ar * Math.cos(th)));
         }
         grp.add(tube(arc, 0.045, orange, 24));
-        var lb = M.label("남중 고도 " + f1(g.alt) + "°", { height: 0.9, bold: true, border: "#e0802b", bg: "rgba(255,248,230,0.96)" });
-        var la = a / 2;
-        lb.position.set(0, 0.1 + 3.7 * Math.sin(la) + 0.2, -3.7 * Math.cos(la));
-        lb.material.depthTest = false; // 지난 경로 이름표에 가려지지 않게 맨 위에 그린다
-        lb.renderOrder = 30;
-        grp.add(lb);
+        // 남중 고도 숫자는 3D 이름표로 띄우지 않는다(fix-B1 L4 — 바뀌는 값은 값 패널에만, CLAUDE.md "장면 속 글자")
         root.add(grp);
         noonGroup = grp;
       }
-      function setGhosts(list, current) {
+      // 궤적 보기(compare3): 대표 3개(봄·가을=3월·여름=6월·겨울=12월)를 기록 여부와 무관하게 그린다.
+      // 이름표는 3D 안에 띄우지 않는다(개수가 늘면 서로 겹치던 문제, audit.md) — 색·이름은 값 패널 옆 범례(R.pathLegend)로.
+      // fix-B1 L3: 굵기 0.05·불투명 0.9의 점선. 하늘 반구보다 2% 큰 구면에 그린다(보는 사람에게는 같은 방향 = 하늘의 같은 자리) —
+      // 지금 보는 달의 굵은 길(반지름 RS)과 겹치는 달(3월·9월 등)에도 대표 선이 그 길 안에 묻히지 않고 보인다.
+      var RG = RS * 1.02;
+      var ghostDark = false;
+      var ghostMats = [];
+      v.onThemeChange(function (dk) {
+        ghostDark = dk;
+        ghostMats.forEach(function (m) {
+          m.color.set(dk ? m.userData.cmp.dark : m.userData.cmp.color);
+        });
+      });
+      function setGhosts(list) {
         if (ghostGroup) v.discard(ghostGroup);
         ghostGroup = new T.Group();
-        list.forEach(function (m) {
-          if (m === current) return;
-          var s = seasonOf(m);
-          var pts = pathSamples(m, 64).map(function (d) {
-            return P(d);
+        ghostMats = [];
+        list.forEach(function (c) {
+          var pts = pathSamples(c.month, 96).map(function (d) {
+            return P(d, RG);
           });
-          ghostGroup.add(tube(pts, 0.035, new T.MeshBasicMaterial({ color: new T.Color(s.color), transparent: true, opacity: 0.5, depthWrite: false }), 64));
-          var g = geo(m);
-          var lp = P(sunDir(g.dec, labelH(m, g.H0)));
-          var lb = M.label(m + "월", { height: 0.7, border: s.color, bg: "rgba(255,255,255,0.85)" });
-          lb.position.copy(lp).add(new T.Vector3(0, 0.6, 0));
-          ghostGroup.add(lb);
+          var mat = new T.MeshBasicMaterial({ color: new T.Color(ghostDark ? c.dark : c.color), transparent: true, opacity: 0.9 });
+          mat.userData.cmp = c;
+          ghostMats.push(mat);
+          // 점선: 표본 간격 4칸 그리고 2칸 비운다
+          for (var i = 0; i + 1 < pts.length; i += 6) {
+            var seg = pts.slice(i, Math.min(i + 5, pts.length));
+            if (seg.length >= 2) ghostGroup.add(tube(seg, 0.05, mat, 4));
+          }
         });
         root.add(ghostGroup);
         v.render();
@@ -742,8 +811,8 @@
     var noonG = svg("g", {});
     var sunC = svg("circle", { r: 12, class: "sky2d-sun" });
     sunC.style.display = "none";
-    s.appendChild(ghostG);
     s.appendChild(curLine);
+    s.appendChild(ghostG); // 대표 선(점선)은 지금 달의 실선 위에 — 같은 길이어도 보이게(fix-B1 L3)
     s.appendChild(noonG);
     s.appendChild(sunC);
     container.appendChild(s);
@@ -760,30 +829,26 @@
       );
     }
     setLabel(null);
-    function setGhosts(list, current) {
+    // 궤적 보기(compare3): 대표 3개를 기록 여부와 무관하게 그린다. 이름표는 화면 안에 두지 않고(겹침 방지) 값 패널 옆 범례로.
+    function setGhosts(list) {
       ghostG.textContent = "";
-      list.forEach(function (m) {
-        if (m === current) return;
-        var sc = seasonOf(m).color;
-        var p = pathSamples(m, 64)
+      list.forEach(function (c) {
+        var p = pathSamples(c.month, 64)
           .map(function (d) {
             var q = azAlt(d);
             return X(q.az).toFixed(1) + "," + Y(Math.max(0, q.alt)).toFixed(1);
           })
           .join(" ");
-        ghostG.appendChild(svg("polyline", { points: p, fill: "none", stroke: sc, "stroke-width": 3, "stroke-opacity": 0.55 }));
-        var g = geo(m);
-        var q = azAlt(sunDir(g.dec, labelH(m, g.H0)));
-        ghostG.appendChild(svg("text", { x: X(q.az), y: Y(q.alt) - 8, "text-anchor": "middle", class: "sky2d-glabel" }, m + "월"));
+        var pl = svg("polyline", { points: p, fill: "none", stroke: c.color, "stroke-width": 4.5, "stroke-opacity": 0.95, "stroke-dasharray": "13 8", "stroke-linecap": "round" });
+        pl.appendChild(svg("title", {}, c.label + " 대표(" + c.month + "월 21일, 모형)"));
+        ghostG.appendChild(pl);
       });
     }
     function drawNoon(month) {
       noonG.textContent = "";
       var a = BY[month].altitude;
+      // 남중할 때 태양 높이(정남쪽 점선)만 그린다 — 숫자 이름표는 없앴다(fix-B1 L4, 값은 값 패널에만)
       noonG.appendChild(svg("line", { x1: X(180), x2: X(180), y1: HOR, y2: Y(a), class: "sky2d-noon" }));
-      var tx = X(180) + 16;
-      noonG.appendChild(svg("rect", { x: tx - 4, y: Y(a / 2) - 20, width: 168, height: 28, rx: 8, class: "sky2d-noon-bg" }));
-      noonG.appendChild(svg("text", { x: tx + 4, y: Y(a / 2) - 1, class: "sky2d-noon-txt" }, "남중 고도 " + f1(a) + "°"));
     }
     function setDay(d) {
       var up = d ? d.up : -1;
@@ -946,6 +1011,7 @@
     viewKind = kind;
     R.loading.hidden = true;
     R.viewBox.classList.toggle("is-2d", kind === "2d");
+    if (enl) enl.fit(); // 3D↔2D 전환 뒤 크게 보기 장면 높이를 다시 잰다(science-sim/README "enlarge()" 안내)
     var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
     R.tip.textContent =
       kind === "3d"
@@ -955,9 +1021,9 @@
     R.btnToggle.textContent = kind === "3d" ? "2D로 보기" : can3D ? "3D로 보기" : /[?&]no3d=1/.test(location.search) ? "2D 화면으로 고정됨" : "3D를 쓸 수 없는 기기예요";
     var shown = Number(store.get("shown", 0)) || null;
     if (shown && BY[shown] && seen[shown]) {
-      v.show(shown, ghostList());
+      v.show(shown, pathList(shown));
       shownMonth = shown;
-    } else v.setGhosts(ghostList(), null);
+    } else v.setGhosts(pathList(null));
     drawExp();
   }
   R.btnToggle.addEventListener("click", function () {
@@ -977,6 +1043,8 @@
       mount(can3D && !store.get("view2d", false) ? "3d" : "2d");
     }
     drawExp();
+    // 실험하기에 들어올 때는 스크롤하지 않는다(fix-B1 M3 — 공통 틀과 같게: 펼쳐진 '🔎 실험 방법 알아 두기'를 먼저 읽게).
+    // 달을 고르면(pickMonth) 그때 장면이 보이게 맞춘다.
   }
   drawExp();
 

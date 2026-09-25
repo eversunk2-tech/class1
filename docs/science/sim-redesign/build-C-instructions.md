@@ -45,6 +45,7 @@
 * `npm run lint`와 `node_modules/.bin/tsc --noEmit -p tsconfig.json`(매핑 타입) 통과.
 
 ## 4. 실험 앱(C1·C2)만 — 실험하기 화면 점검(단계 D에서 이 4개는 다시 보지 않는다)
+* 단계 A·B에서 바뀐 공통 틀(README "추가 기능 2026-09-25" 절): 크게 보기에서 실행·기록 버튼은 장면 안 막대, 관찰 카드는 장면 바로 아래(번호 👀), 3D 칸은 막대 위에서 끝남. 앱이 기록 버튼을 찾을 때는 `exp.recordButton`/`.ss-record-btn`, 가려질 때 보이게 하는 것은 `exp.revealRecord()`(관찰 카드 안 선택자 금지 — 크게 보기에서 못 찾는다). 끌기를 쓰면 `v.draggable`의 `opts.pad`·움직임 문턱·상대 변화량(README). 실험하기에 들어올 때 앱이 따로 스크롤하지 않는다(spec 개정 5-2).
 * 공통 틀(단계 A)의 **두 모드**(기본 / "⛶ 전체 화면 보기")에서 실험하기가 잘 보이고 동작하는지 — 1024×768·768×1024·375×812, 어두움, `?no3d=1`. 장면에 지금 값을 보여 주는 요소가 있으면 크게 보기용 `scenePanel`을 넘길지 판단(필요 없으면 안 넘김 — 까닭을 보고서에).
 * 점검(audit)이 자동화로 못 본 **실행 뒤 화면**(용액 관찰·지시약 색 변화·달걀 껍데기 반응·방울 수 늘리기)을 끝까지 열어 이름표 겹침·싱크·말 줄임을 본다. 바뀌는 값을 3D 이름표로 띄우고 있으면 값 패널/관찰 카드로(CLAUDE.md "장면 속 글자").
 * **직접 조작**: 조건(용액·지시약·물질·홈판 칸·방울 수)이 3D에서 탭으로 골라지는지 확인하고, 빠진 것만 기존 `v.pickable` 패턴으로 더한다(버튼은 그대로 — 조작 단계·시간 늘리지 않기). spec §3.3 해당 줄 참고(이미 된 것이 많다).
@@ -62,11 +63,11 @@
 
 ## 6. 하지 않는 것
 * 다른 앱·공통 틀 정본·사본 수정, `src/data/app-responses/` 중 자기 앱 두 파일 밖 수정, `src/lib/`·관리자 화면 수정.
-* git commit/push, 실제 DB 쓰기, 실제 Supabase·Gemini 호출, 내려받기.
+* git commit/push, 실제 DB 쓰기, 실제 Supabase·Gemini 호출, **내려받기(CDN 파일을 읽으려고 받는 것도 금지)**, `npm run build`.
 
 ## 7. 테스트 규칙
-* 개발 서버가 이미 `http://localhost:3000/class1/apps/<앱>/index.html`에서 돈다(끄지 말 것). **자기 전용 headless Chrome**(위 포트, 프로필은 스크래치 `…/scratchpad/build-C{n}/`), WebGL은 `--use-angle=swiftshader --enable-unsafe-swiftshader`, Node 24 전역 `WebSocket`으로 CDP(설치 금지).
-* **실제 Supabase는 첫 로드부터 차단**: `--host-resolver-rules="MAP *.supabase.co 127.0.0.1:9, MAP supabase.co 127.0.0.1:9"` + `--disable-web-security` + CDP `Fetch.enable`(`*supabase.co*`) 가짜 응답(`site_settings`→`login_required:false`, `profiles`→`role:"user"`, `app_progress` GET→`[]` 또는 시험용 예전 스냅샷, POST/PATCH→201(본문은 기록해 둠), OPTIONS→204, `functions/v1/check-answer`→통과 모양). 가짜 로그인은 localhost 출처에서만 localStorage `sb-<ref>-auth-token`(만료 먼 미래, ref 값은 문서에 적지 않음). 새는 요청이 없는지 기록.
+* **개발 서버 대신 자기 정적 서버로 저장소 `public/`을 직접 서빙**한다(개발 서버는 데스크톱 앱이 꺼 버리는 일이 있다): `python3 -m http.server <포트> --bind 127.0.0.1 --directory /Users/sungchul/Desktop/classroom/public` → `http://127.0.0.1:<포트>/apps/<앱>/index.html` (포트: C1 8784, C2 8785, C3 8786 — 끝나면 종료). **자기 전용 headless Chrome**(위 포트, 프로필은 스크래치 `…/scratchpad/build-C{n}/`), WebGL은 `--use-angle=swiftshader --enable-unsafe-swiftshader`, Node 24 전역 `WebSocket`으로 CDP(설치 금지).
+* **실제 Supabase는 첫 로드부터 차단**: `--host-resolver-rules="MAP *.supabase.co 127.0.0.1:9, MAP supabase.co 127.0.0.1:9"` + `--disable-web-security` + CDP `Fetch.enable`(`*supabase.co*`) 가짜 응답(`site_settings`→`login_required:false`, `profiles`→`role:"user"`, `app_progress` GET→`[]` 또는 시험용 예전 스냅샷, POST/PATCH→201(본문은 기록해 둠), OPTIONS→204, `functions/v1/check-answer`→통과 모양). 가짜 로그인은 로컬 출처(127.0.0.1·localhost)에서만 localStorage `sb-<ref>-auth-token`(만료 먼 미래, ref 값은 문서에 적지 않음). 새는 요청이 없는지 기록.
 * `localStorage.clear()` 금지(그 앱 `sci6…` 키와 `ssUiPref:` 키만 지움), 다른 탭·프로세스 건드리지 않기, 끝나면 Chrome 종료·임시 파일 정리(스크린숏만 남김 — `…/scratchpad/build-C{n}/shots/`).
 
 ## 8. 보고서 `docs/science/sim-redesign/build-C{n}-report.md`

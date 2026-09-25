@@ -217,11 +217,13 @@
     R.live = el("p", { class: "ss-sr-only", "aria-live": "polite" });
     R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide" });
     R.recMsg = el("p", { class: "ss-help rec-msg", "aria-live": "polite" });
+    // 크게 보기(enlarge())가 켜지면 이 노드를 그대로 장면 안 막대(또는 좁은 화면 카드)로 옮긴다(scenePanel).
+    R.valGrid = el("div", { class: "val-grid" }, [tile("각도", R.valAngle, "°", "is-angle"), tile("빛의 세기", R.valLux, "", "is-lux"), tile("그림자 길이", R.valShadow, "cm", "is-shadow")]);
     var ctrlCard = el("div", { class: "ss-card ss-step-card ang-card" }, [
       el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: "①" }), " 각도를 바꾸고 기록하기"]),
       el("p", { class: "ang-how", text: "슬라이더를 끌거나 눈금 버튼·◀ ▶(1°씩)을 눌러요." }),
       el("div", { class: "ang-row" }, [R.minus, el("div", { class: "ang-track" }, [snapBox, R.range, scale]), R.plus]),
-      el("div", { class: "val-grid" }, [tile("각도", R.valAngle, "°", "is-angle"), tile("빛의 세기", R.valLux, "", "is-lux"), tile("그림자 길이", R.valShadow, "cm", "is-shadow")]),
+      R.valGrid,
       R.live,
       R.record,
       R.recMsg,
@@ -251,9 +253,21 @@
       ),
     ]);
 
-    var panel = el("div", { class: "ss-exp-panel" }, [ctrlCard, recCard, safety]);
-    root.appendChild(el("div", { class: "ss-exp-layout" }, [viewCol, panel]));
+    R.panel = el("div", { class: "ss-exp-panel" }, [ctrlCard, recCard, safety]);
+    R.layout = el("div", { class: "ss-exp-layout" }, [viewCol, R.panel]);
+    root.appendChild(R.layout);
   })();
+
+  // 크게 보기(전체 화면 보기) 토글 — 이 앱은 SciSim.Experiment.create()를 쓰지 않고 실험 화면을 직접 만들므로,
+  // 같은 .ss-exp-layout > .ss-exp-view-col + .ss-exp-panel 구조에 enlarge()를 직접 연결한다(단계 A README 예시,
+  // fix-A F9에서 이 앱으로 먼저 시험됨). 기록 버튼은 record로, 각도·빛의 세기·그림자 값(R.valGrid)은 scenePanel로 넘긴다.
+  var enl = S.Experiment.enlarge({
+    layout: R.layout,
+    viewBox: R.viewBox,
+    panel: R.panel,
+    record: R.record,
+    scenePanel: R.valGrid,
+  });
 
   // 슬라이더 위 자리(엄지 44px 기준): 눈금 버튼·숫자를 엄지 가운데와 맞춘다
   function pos(deg) {
@@ -281,6 +295,10 @@
       });
     }
   }
+  // 손전등 끌기(아래 build3D 안의 v.draggable)가 부를 이름을 따로 둔다: build3D() 콜백 안에는 3D 장면만 갱신하는
+  // "지역" setAngle(deg)가 또 있어(장면 만들 때 view로 돌려주는 그 함수), 그 안에서 그냥 setAngle(...)을 부르면
+  // 상태·DOM을 갱신하는 이 바깥쪽 setAngle이 아니라 그 지역 함수가 불린다(이름 가림). 별칭으로 가린다.
+  var applyAngleFromScene = setAngle;
   function valueText(d) {
     return d + "도, 빛의 세기 " + readingOf(d) + ", 그림자 길이 " + cm1(shadowOf(d)) + " cm";
   }
@@ -482,12 +500,13 @@
     viewKind = kind;
     R.loading.hidden = true;
     R.viewBox.classList.toggle("is-2d", kind === "2d");
+    if (enl) enl.fit(); // 3D↔2D 전환 뒤 크게 보기 장면 높이를 다시 맞춘다(README "추가 기능 2026-09-25")
     var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
     R.tip.textContent =
       kind === "3d"
         ? narrow
-          ? "👆 드래그: 돌리기 · 두 번 탭: 처음 방향"
-          : "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향"
+          ? "👆 손전등을 끌면 각도가 바뀌어요 · 그 밖은 드래그: 돌리기" // fix-B2 L6: 센서·그림자 끝을 안 가리게 더 줄임
+          : "👆 손전등을 끌면 각도가 바뀌어요 · 그 밖은 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향"
         : "2D 화면(모형): 위는 옆에서 본 모습, 아래는 위에서 본 빛이 닿는 곳이에요.";
     R.btnReset.hidden = kind !== "3d";
     v.setAngle(angle);
@@ -656,7 +675,12 @@
         labels.push({ sp: sp, sx: sp.scale.x, sy: sp.scale.y, narrow: (o && o.narrow) || "grow", pos: at.slice() });
         return sp;
       }
-      var torchLabel = fixedLabel("🔦 손전등(태양)", [0, 0, 0], { bold: true, border: "#f2c230" });
+      // narrow:"hide"(좁은 화면에서 숨김, fix-B2 L6) — 개편 단계 B에서 왼쪽 위에 "⛶ 전체 화면 보기" 토글이 생겨, 좁은
+      // 화면(폭 480px 미만)에서 이 이름표가 각도에 따라 토글과 자주 겹쳤다(review-B L6, "grow"→"keep"으로 자람만 막은
+      // 이전 시도로는 부족했음 — 겹침이 남음). 이름표 자리를 토글을 피해 동적으로 옮기려면 화면 좌표 투영이 필요해 범위를
+      // 넘는다고 판단해, 이미 같은 파일에 있는 "화면 이름표 숨김"(예: "스마트 기기 화면(지표면)")과 같은 방식으로 좁은
+      // 화면에서는 숨긴다 — 손전등 자체는 장면에서 뚜렷이 보이므로 이름표가 없어도 무엇인지 알 수 있다.
+      var torchLabel = fixedLabel("🔦 손전등(태양)", [0, 0, 0], { bold: true, border: "#f2c230", narrow: "hide" });
       var sensorLabel = fixedLabel("센서", [2.4, SURF + 1.1, 4.6], { height: 2, narrow: "grow" });
       sensorLabel.userData.narrowPos = [4.2, SURF + 0.9, 6.2];
       var rodLabel = fixedLabel("막대", [2.9, SURF + ROD - 0.4, ROD_Z], { height: 2, narrow: "grow" });
@@ -664,39 +688,10 @@
       fixedLabel("스마트 기기 화면(지표면)", [8.5, SURF + 0.9, PHONE.z1 + 2.4], { height: 2, narrow: "hide" });
       var distLabel = fixedLabel("20.0 cm (늘 같음)", [0, 0, 0], { height: 2.1, border: "#dfe8f5" });
 
-      var angCanvas = document.createElement("canvas");
-      angCanvas.width = 256;
-      angCanvas.height = 128;
-      var angTex = new T.CanvasTexture(angCanvas);
-      angTex.colorSpace = T.SRGBColorSpace;
-      var angSprite = new T.Sprite(new T.SpriteMaterial({ map: angTex, transparent: true, depthTest: false }));
-      angSprite.renderOrder = 12;
-      angSprite.scale.set(6, 3, 1);
-      v.root.add(angSprite);
-      labels.push({ sp: angSprite, sx: 6, sy: 3, narrow: "grow" });
-      var angShown = null;
-      function drawAngleText(d) {
-        if (angShown === d) return;
-        angShown = d;
-        var g = angCanvas.getContext("2d");
-        g.clearRect(0, 0, 256, 128);
-        g.fillStyle = "rgba(20,30,45,0.88)";
-        g.beginPath();
-        if (g.roundRect) g.roundRect(8, 14, 240, 100, 26);
-        else g.rect(8, 14, 240, 100);
-        g.fill();
-        g.lineWidth = 6;
-        g.strokeStyle = "#7fd1ff";
-        g.stroke();
-        g.fillStyle = "#ffffff";
-        g.font = "800 70px system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
-        g.textAlign = "center";
-        g.textBaseline = "middle";
-        g.fillText(d + "°", 128, 68);
-        angTex.needsUpdate = true;
-      }
+      // fix-B2 L4(review-B): 3D 각도 숫자 스프라이트(예전 angSprite/drawAngleText)는 없앴다 — 바뀌는 값은 값
+      // 패널에만(CLAUDE.md "장면 속 글자 규칙"). 각도를 눈으로 보여 주는 호(arc)는 그대로 남긴다.
 
-      // 좁은 화면(휴대폰)에서는 중요한 이름표(손전등·거리·각도)를 키우고, 화면 이름표는 숨긴다(겹침 방지)
+      // 좁은 화면(휴대폰)에서는 중요한 이름표(손전등·거리)를 키우고, 화면 이름표는 숨긴다(겹침 방지)
       var labelK = 0;
       function fitLabels() {
         var k = (container.clientWidth || 1024) < 480 ? 1.4 : 1;
@@ -772,11 +767,9 @@
         arc.geometry = new T.RingGeometry(6.2, 6.8, 40, 1, Math.PI - th, th);
         axisLine.position.set((-DIST * c) / 2, SURF + (DIST * s) / 2, GUIDE_Z);
         axisLine.rotation.set(0, 0, -th);
-        drawAngleText(deg);
-        var mid = th / 2;
-        angSprite.position.set(-10.5 * Math.cos(mid), SURF + 10.5 * Math.sin(mid) + 0.6, GUIDE_Z + 0.5);
         distLabel.position.set((-DIST * c) / 2 + 2.6 * s, SURF + (DIST * s) / 2 + 2.6 * c + 1.2, GUIDE_Z + 0.5);
-        // 손전등 이름표: 몸통 가운데에서 빛 방향에 수직(위·오른쪽)으로 조금 떨어진 곳
+        // 손전등 이름표: 몸통 가운데에서 빛 방향에 수직(위·오른쪽)으로 조금 떨어진 곳(좁은 화면에서는 narrow:"hide"로
+        // 숨겨 왼쪽 위 토글과 안 겹친다 — fix-B2 L6, fitLabels()가 처리)
         var back = DIST + 3.2 + BODY_LEN / 2;
         // 눕힌 손전등(각이 작을 때)은 위쪽에, 세운 손전등(각이 클 때)은 왼쪽에(오른쪽 위 조도 앱 화면과 겹치지 않게)
         var off = 4 + 5 * s * s;
@@ -784,6 +777,73 @@
         torchLabel.position.set(-back * c + sg * off * s, SURF + back * s + sg * off * c, 0);
         v.render();
       }
+
+      // 손전등을 직접 끌어 각도 바꾸기(개편 단계 B, spec.md "개정 1"·build-B 지침, fix-B2 M1로 다시 수정): 손전등은
+      // 늘 센서 옆(0, SURF, 0)을 중심으로 z=0 평면 위를 도는 부채꼴 위에 있으므로, 그 평면과의 교점에서 각도를 구한다.
+      // applyAngleFromScene을 부르는 것에 주의: 이 스코프 안의 지역 setAngle(deg)(바로 위, 3D 장면만 갱신)와 이름이
+      // 겹치므로 별칭을 쓴다.
+      //   fix-B2 M1(review-B): ① 상대 각도 — 손전등은 회전체라, 잡은 자리가 축 위든(머리·몸통) 축 밖이든(버튼처럼
+      //   튀어나온 곳) "잡은 지점의 각(pivot 기준 atan2)"이 실제 회전각과 같은 속도로 바뀐다(강체 회전이므로 상수 오프셋만
+      //   다르다) — 그래서 "잡은 순간의 각도 + 변화량"으로 계산하면 어디를 잡아도 결과가 같다(예전 절대값 방식은 머리·
+      //   버튼 등 잡은 자리에 따라 각도가 30°→36°/34°/27°처럼 다르게 튀었다). ② 움직임 문턱(6px, 화면 좌표) — 이 문턱을
+      //   넘기 전에는 onDrag·onEnd 모두 각도를 바꾸지 않는다(누르기만 해도 바뀌던 문제, 30° 기록 뒤 살짝 건드리면 풀리던
+      //   문제). ③ 잡는 영역 — pad:0(레이가 손전등 자신에 실제로 맞을 때만, 화면 경계 상자+30px 기본값을 끔 — 기울어진
+      //   손전등 옆 빈 하늘을 끌어도 잡히던 문제)과, 손전등 축을 따라 두르는 보이지 않는 굵은 손잡이 메시(터치를 쉽게, 몸통
+      //   전체를 넉넉히 감싸되 화면 경계 상자보다 훨씬 좁게)를 함께 쓴다(README "추가 기능 2026-09-25").
+      var dragPivot = new T.Vector3(0, SURF, 0);
+      function degFromPoint(pt) {
+        var dx = pt.x - dragPivot.x;
+        var dy = pt.y - dragPivot.y;
+        if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return null;
+        return (Math.atan2(dy, -dx) * 180) / Math.PI;
+      }
+      // 보이지 않는 굵은 손잡이(자식이라 torch와 함께 움직·회전한다): 몸통 끝(-11.2)~렌즈(0) 둘레를 반지름 4로 감싼다
+      // (머리 반지름 최대 3.05·버튼 돌출 1.85보다 넉넉하게, pad:0과 짝을 이룬다).
+      var handleGeo = new T.CylinderGeometry(4, 4, 13, 10);
+      handleGeo.rotateZ(-Math.PI / 2);
+      var handle = new T.Mesh(handleGeo, new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+      handle.position.x = -5.5;
+      torch.add(handle);
+      var DRAG_MOVE_PX = 6;
+      var dragStart = null; // { angle, point, x, y, moved }
+      v.draggable(torch, {
+        pad: 0,
+        plane: { normal: [0, 0, 1], point: [0, SURF, 0] },
+        onStart: function (info) {
+          dragStart = {
+            angle: angle,
+            point: info.point ? info.point.clone() : null,
+            x: info.event ? info.event.clientX : null,
+            y: info.event ? info.event.clientY : null,
+            moved: false,
+          };
+        },
+        onDrag: function (info) {
+          if (!dragStart) return;
+          if (!dragStart.moved) {
+            if (dragStart.x === null || !info.event) return; // 화면 좌표를 모르면 문턱을 넘었다고 볼 수 없다(그대로 대기)
+            var mdx = info.event.clientX - dragStart.x;
+            var mdy = info.event.clientY - dragStart.y;
+            if (Math.hypot(mdx, mdy) < DRAG_MOVE_PX) return; // 문턱 안: 각도를 바꾸지 않는다
+            dragStart.moved = true;
+          }
+          if (!info.point || !dragStart.point) return;
+          var d0 = degFromPoint(dragStart.point);
+          var d1 = degFromPoint(info.point);
+          if (d0 === null || d1 === null) return;
+          applyAngleFromScene(dragStart.angle + (d1 - d0)); // 슬라이더 "input"과 같은 방식(requestAnimationFrame 한 번으로 묶임)
+        },
+        onEnd: function (info) {
+          var st = dragStart;
+          dragStart = null;
+          if (!st || !st.moved || !info.point || !st.point) return; // 문턱을 못 넘겼으면(누르기만 함) 각도를 그대로 둔다
+          var d0 = degFromPoint(st.point);
+          var d1 = degFromPoint(info.point);
+          if (d0 === null || d1 === null) return;
+          applyAngleFromScene(st.angle + (d1 - d0), true); // 슬라이더 "change"와 같은 방식(끝났을 때 값을 확정하고 읽어 준다)
+          R.live.textContent = valueText(angle);
+        },
+      });
 
       v.render();
       return {
@@ -925,10 +985,8 @@
       // 각도 표시
       var R0 = 7;
       arc.setAttribute("d", "M " + -R0 + " " + y0 + " A " + R0 + " " + R0 + " 0 0 1 " + (-R0 * c).toFixed(3) + " " + (y0 - R0 * sn).toFixed(3));
-      var mid = th / 2;
-      angT.setAttribute("x", (-10.5 * Math.cos(mid)).toFixed(2));
-      angT.setAttribute("y", (y0 - 10.5 * Math.sin(mid) + 1.2).toFixed(2));
-      angT.textContent = deg + "°";
+      // 각도 숫자는 그림에 쓰지 않는다 — 바뀌는 값은 값 패널에만(CLAUDE.md "장면 속 글자", spec 개정 5-3 · review-B2 N3)
+      angT.textContent = "";
       axis.setAttribute("x1", 0);
       axis.setAttribute("y1", y0);
       axis.setAttribute("x2", Lx.toFixed(3));

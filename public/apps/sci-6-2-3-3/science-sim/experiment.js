@@ -271,7 +271,8 @@
       return window.matchMedia ? window.matchMedia(q) : null;
     };
     var compactMq = mm("(max-width: 480px), (max-height: 420px)");
-    var wideLandscapeMq = mm("(orientation: landscape) and (min-width: 901px)");
+    // 가로 화면이면(태블릿·PC뿐 아니라 휴대폰 가로 812×375도) 켜짐일 때 장면 높이를 화면 띠에 맞춘다(Review B L7 — 휴대폰 가로에서 막대가 아래 이동 막대와 겹치던 것)
+    var wideLandscapeMq = mm("(orientation: landscape)");
     var portraitMq = mm("(orientation: portrait)");
 
     function setToggleText() {
@@ -319,7 +320,7 @@
       viewBox.classList.toggle("has-bar", !bar.hidden);
     }
 
-    /* 가로 태블릿·PC(대략 폭 901px 이상 + 가로 방향), 켜짐일 때만: 장면을 머리말 바로 아래에 맞춰 두었을 때 장면 전체
+    /* 가로 화면(태블릿·PC·휴대폰 가로), 켜짐일 때만: 장면을 머리말 바로 아래에 맞춰 두었을 때 장면 전체
        (안의 막대 포함)가 아래 이동 막대 위까지 꽉 차게 --ss-scene-h를 계산한다(= 창 높이 − 머리말 − 아래 막대 − 위아래 틈).
        조건 고르기 줄은 장면 아래로 스크롤해서 본다 — 조건 줄까지 한 화면에 넣으려고 장면을 줄이면 "크게 보기"가 아니게 된다
        (2026-09-25 Claude 수정: 조건 줄을 넣으려다 장면이 160px 띠가 되던 문제). 세로·좁은 화면이거나 꺼짐이면 CSS의 vh 기본값.
@@ -327,7 +328,7 @@
        있었으면 장면을 다시 머리말 아래에 맞추고(접은 직후 막대가 아래 이동 막대 뒤로 숨던 문제), 장면을 지나 조건 카드 쪽을 보고
        있었으면 끌어올리지 않고 보던 곳이 튀지 않게 한다. "keep" = 그 밖의 머리말·아래 막대 크기 변화(불러오는 중 계정 줄·글꼴 등) —
        보던 곳만 지키고 장면으로 맞춤 이동은 하지 않는다(실험하기에 들어올 때 맞춤은 L1, 이번에 안 함). */
-    var MIN_SCENE_H = 240; // 창이 아주 낮을 때의 바닥값
+    var MIN_SCENE_H = 140; // 창이 아주 낮을 때의 바닥값 — 휴대폰 가로(머리말 펼침)는 쓸 수 있는 높이가 180px 남짓이라 240이면 막대가 아래 막대 밑으로 들어갔다(review-B2 N2)
     var SCENE_GAP = 8; // 머리말·아래 막대와 장면 사이 틈(scrollIntoViewSafe가 머리말 아래 8px에 맞춘다)
     function sceneShare() {
       var b = bandOf();

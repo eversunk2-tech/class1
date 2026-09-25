@@ -378,7 +378,7 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
    #experiment-root를 앞에 붙여 특이도를 높였다 — 앱이 자기 style.css에 .ss-exp-view 높이를 따로 정해 둔 경우에도
    (앱 코드를 고치지 않고) 이 규칙이 이겨서 켜짐 모드가 모든 앱에서 그대로 동작한다. */
 #experiment-root .ss-exp-layout.is-full .ss-exp-view {
-  height: var(--ss-scene-h, min(46vh, 540px)); min-height: 160px; /* 기본(300px)을 낮춘다 — JS(fitSceneHeight)가 남는 세로 공간에 맞춰 정확히 계산하므로 */
+  height: var(--ss-scene-h, min(46vh, 540px)); min-height: 140px; /* 기본(300px)을 낮춘다 — JS(fitSceneHeight)가 남는 세로 공간에 맞춰 정확히 계산하므로 */
 }
 @media (orientation: portrait) {
   #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, min(52vh, 620px)); }
@@ -387,7 +387,7 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
   #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, 35vh); min-height: 240px; }
 }
 @media (max-height: 480px) {
-  #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, min(30vh, 230px)); min-height: 200px; }
+  #experiment-root .ss-exp-layout.is-full .ss-exp-view { height: var(--ss-scene-h, min(30vh, 230px)); min-height: 140px; } /* 휴대폰 가로: JS가 화면 띠에 맞춘 높이(바닥 140px)를 막지 않게(review-B2 N2) */
 }
 #experiment-root .ss-exp-layout.is-full .ss-exp-view.is-2d { height: auto; min-height: 0; }
 .ss-view3d { position: absolute; inset: 0; }

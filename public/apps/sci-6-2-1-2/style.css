@@ -29,6 +29,37 @@
   padding: 4px 12px; border-radius: 999px; background: #b7791f; color: #fff; font-weight: 700; font-size: 0.85rem;
 }
 
+/* ── 옆에서 본 모습 칸(모형) — 3D 칸 오른쪽 위(fix-B1, review-B M2·사용자 결정) ──
+   왼쪽 위는 모형 배지·시각·전체 화면 보기 버튼, 오른쪽 맨 위는 빨리 감기 배지 자리라 그 아래(위에서 46px, 토글과 같은 줄)에 둔다.
+   폭은 app.js가 처음 시점에서 해 길(해 원판)·이름표를 재서 그 오른쪽에 들어가게 줄인다(아래 값은 재기 전 기본값).
+   누르기는 장면으로 그대로 통과한다. 3D 칸이 좁거나 낮으면(휴대폰) app.js가 .is-off로 숨긴다. 그림(하늘·땅·나무·빛줄기·호)은
+   어두움에서도 밝은 그림 그대로 두고 틀만 어둡게 한다(과학 그림 색은 바꾸지 않음). */
+.side-view {
+  position: absolute; top: 46px; right: 10px; z-index: 3; margin: 0; box-sizing: border-box;
+  width: clamp(150px, 28%, 240px); padding: 3px 4px 4px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-radius: 12px; border: 1px solid rgba(31, 39, 51, 0.25); background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); pointer-events: none;
+}
+.side-view.is-off { display: none; }
+.side-cap { margin: 0; font-size: 0.72rem; line-height: 1.25; font-weight: 800; text-align: center; color: #1f2733; }
+.sv-svg { display: block; width: 100%; height: auto; border-radius: 8px; }
+.sv-sky { fill: #dcecfb; }
+.sv-earth { fill: #d9c7a0; }
+.sv-ground { stroke: #6b5a3a; stroke-width: 1.6; }
+.sv-shadow { fill: #2b2b2b; opacity: 0.85; }
+.sv-trunk { fill: #8b5a2b; }
+.sv-crown { fill: #4b9f5b; stroke: #2f6f3c; stroke-width: 0.8; }
+.sv-ray { stroke: #ef7d00; stroke-width: 2.4; stroke-linecap: round; }
+.sv-arc { fill: rgba(216, 67, 79, 0.4); stroke: #d8434f; stroke-width: 1.8; }
+.sv-tip { fill: #2f8a3a; stroke: #fff; stroke-width: 1.4; }
+.sv-sun { fill: #ffc928; stroke: #d98f00; stroke-width: 1.6; }
+.sv-lbl { font: 800 11px system-ui, sans-serif; fill: #9b1b28; }
+@media (prefers-color-scheme: dark) {
+  .side-view { background: rgba(25, 24, 33, 0.92); border-color: rgba(255, 255, 255, 0.28); }
+  .side-cap { color: #eef1f6; }
+}
+
 /* ── 시간 바 ── */
 .tb-card { margin: 8px 0 8px; padding: 6px 10px 8px; }
 .vals-card .ss-step-h { margin-bottom: 6px; }
@@ -82,8 +113,23 @@
 @media (max-width: 760px) { .vp { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .vp-src { margin: 6px 0 0; font-size: 0.88rem; font-weight: 600; color: var(--ss-muted); }
 .vp-south { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--ss-warn-bg); font-weight: 600; }
-.vals-card .ss-btn-big { margin-top: 10px; }
+.vals-rec { margin-top: 10px; }
 .tb-msg { margin-top: 6px; }
+
+/* 측정값 패널(scenePanel = .vals-scene: 값 4칸 + 기록하기 줄) — 개편 단계 B(2026-09-25)
+   기본 화면: 측정값 카드(.vals-card) 안. 크게 보기: 공통 틀이 장면 안 막대 윗줄(.ss-exp-overlay-panel)로 옮긴다
+   (좁은/낮은 화면은 장면 바로 아래 카드 .ss-scene-panel-card). 옮겨 간 동안 카드에는 출처 줄·남중 안내만 남아 한 줄 글로 보인다. */
+.vals-card.is-away { background: transparent; border: 0; box-shadow: none; padding: 0 4px; margin: -4px 0 10px; }
+.vals-card.is-away .ss-step-h { display: none; }
+.vals-card.is-away .vp-src { margin-top: 0; }
+.ss-exp-overlay-panel .vals-scene { display: grid; gap: 6px; }
+.ss-exp-overlay-panel .vp { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
+.ss-exp-overlay-panel .vp-cell { padding: 3px 8px; border-left-width: 4px; border-radius: 10px; }
+.ss-exp-overlay-panel .vp-name { font-size: 0.74rem; }
+.ss-exp-overlay-panel .vp-val { font-size: 1.12rem; }
+.ss-exp-overlay-panel .vals-rec { margin-top: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ss-exp-overlay-panel .vals-rec .ss-btn-big { width: auto; flex: 0 1 auto; }
+.ss-exp-overlay-panel .tb-msg { flex: 1 1 200px; margin: 0; font-size: 0.85rem; line-height: 1.35; }
 
 /* 실험 패널의 내 기록 표 */
 .my-records .ss-table-wrap { max-height: none; }
@@ -103,22 +149,27 @@
 .d2-horizon { stroke: #6b5a3a; stroke-width: 3; }
 .d2-path { fill: none; stroke: #e0901a; stroke-width: 3; stroke-dasharray: 8 6; }
 .d2-pathdot { fill: #e0901a; }
-.d2-sun circle { fill: #ffc928; stroke: #d98f00; stroke-width: 3; }
-.d2-board { fill: #e6cfa0; stroke: #a8895a; stroke-width: 1.5; }
-.d2-ruler { fill: #fff6cf; stroke: #b99a1e; stroke-width: 1.5; }
+.d2-sunball { fill: #ffc928; stroke: #d98f00; stroke-width: 3; }
+/* 해 끌기·시각 점 누르기 자리(보이지 않는 넓은 원). 해에서 시작한 손가락 끌기는 페이지를 움직이지 않는다 */
+.d2-sun { cursor: grab; touch-action: none; }
+.d2-sunhit, .d2-dothit { fill: transparent; }
+.d2-dothit { cursor: pointer; }
 .d2-tick { stroke: #1f2733; stroke-width: 2; }
-.d2-stick { fill: #8b5a2b; }
 .d2-shadow { fill: #2b2b2b; opacity: 0.8; }
-.d2-ray { stroke: #f2a900; stroke-width: 4; stroke-dasharray: 10 6; opacity: 0.8; }
-.d2-thread { stroke: #3a3f4a; stroke-width: 3; }
-.d2-protbg { fill: rgba(235, 245, 255, 0.8); stroke: #1f2733; stroke-width: 2; }
-.d2-arc { fill: rgba(216, 67, 79, 0.45); stroke: #d8434f; stroke-width: 2; }
-.d2-tip { fill: #2f8a3a; }
-.d2-val { font: 800 22px system-ui, sans-serif; }
-.d2-val-solar { fill: #b3202e; }
-.d2-val-shadow { fill: #1d6a2a; }
-.d2-val-temp { fill: #1f4a9e; }
-.d2-tboard { fill: #ffffff; stroke: #9aa6b5; stroke-width: 1.5; }
+.d2-ray { stroke: #f08c00; stroke-width: 4; }
+.d2-faint { stroke: #f2b400; stroke-width: 3; opacity: 0.45; }
+.d2-arc { fill: rgba(216, 67, 79, 0.35); stroke: #d8434f; stroke-width: 2.5; }
+.d2-tip { fill: #2f8a3a; stroke: #fff; stroke-width: 2; }
+.d2-len { stroke: #2f8a3a; stroke-width: 3; }
+.d2-lenlbl { fill: #1d6a2a; }
+.d2-trunk { fill: #8b5a2b; }
+.d2-crown { fill: #4b9f5b; stroke: #2f6f3c; stroke-width: 1.5; }
+.d2-pleg { fill: #2f3a56; }
+.d2-pbody { fill: #7d5fd6; }
+.d2-phead { fill: #f1c7a0; }
+.d2-pcap { fill: #f2c21b; }
+.d2-box { fill: #fbfbf7; stroke: #9aa6b5; stroke-width: 1.5; }
+.d2-boxleg { stroke: #9aa6b5; stroke-width: 4; }
 .d2-tube { fill: #eef2f7; stroke: #9aa6b5; stroke-width: 1.5; }
 .d2-liquid { fill: #d8434f; }
 
@@ -146,7 +197,7 @@
   body { font-size: 16px; }
   .ss-main { padding: 12px 12px 96px; }
   .scene-clock { font-size: 0.9rem; padding: 3px 10px; }
-  .scene-fast { top: 44px; font-size: 0.78rem; }
+  .scene-fast { font-size: 0.78rem; } /* 휴대폰도 위쪽 줄(시각 옆 오른쪽) — 44px 아래로 내리면 오후 해를 가린다 */
   .vp-val { font-size: 1.15rem; }
   .tb-card { padding: 4px 6px 8px; }
 }
@@ -154,16 +205,19 @@
 
 /* ── fix-1 ── */
 /* 2D 화면 높이 제한(세로 태블릿에서 시간 바·기록 버튼이 한 화면에 들어오게) */
-.d2-sky { max-height: 12vh; }
-.d2-dev { max-height: 22vh; }
+.d2-sky { max-height: 11vh; }
+.d2-dev { max-height: 20vh; }
 @media (max-width: 900px), (orientation: portrait) {
   .vals-card .ss-step-h { display: none; }
 }
-/* 2D 도움말은 SVG 제목(하늘 남쪽 모습 / 측정기 옆모습)과 겹쳐서 숨긴다 */
+/* 2D 도움말은 SVG 제목(하늘 남쪽 모습 / 나무와 그림자 옆모습)과 겹쳐서 숨긴다(해 끌기 안내는 하늘 그림 안에) */
 .ss-exp-view.is-2d .ss-view-tip { display: none; }
 @media (min-width: 901px) and (orientation: landscape) {
-  .d2-sky { max-height: 16vh; }
-  .d2-dev { max-height: 26vh; }
+  .d2-sky { max-height: 14vh; }
+  .d2-dev { max-height: 23vh; }
+  /* 크게 보기(막대가 2D 그림 바로 아래에 온다): 그림을 조금 더 낮춰 장면+막대가 한 화면에 들어오게 */
+  .ss-exp-layout.is-full .d2-sky { max-height: 12vh; }
+  .ss-exp-layout.is-full .d2-dev { max-height: 20vh; }
 }
 @media (max-width: 640px) {
   .d2-sky { max-height: none; }
@@ -174,7 +228,7 @@
 
 /* 휴대폰: 기록할 때 스크롤을 줄인다(3D 장면을 조금 낮추고 값 패널을 한 줄로) */
 @media (max-width: 520px) {
-  #experiment-root .ss-exp-view:not(.is-2d) { height: 240px; }
+  #experiment-root .ss-exp-view:not(.is-2d) { height: 270px; }
   .vals-card { padding: 10px; }
   .vals-card .ss-step-h { display: none; }
   .vp { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 0; }
@@ -183,7 +237,8 @@
   .vp-name > span:first-child { display: none; }
   .vp-val { font-size: 0.95rem; }
   .vp-src { font-size: 0.78rem; }
-  .vals-card .ss-btn-big { margin-top: 6px; }
+  .vals-rec { margin-top: 6px; }
   .tb-card { margin: 6px 0; }
   .tb-track { height: 50px; }
 }
+.d2-hint { font: 600 15px system-ui, sans-serif; fill: #6b4a00; }
