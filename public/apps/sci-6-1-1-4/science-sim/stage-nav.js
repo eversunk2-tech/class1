@@ -33,6 +33,7 @@
       ? opts.current
       : stages[0].id;
     var list = SciSim.el("ol", { class: "ss-stepper" });
+    list.style.setProperty("--ss-steps", String(stages.length)); // 단계 수만큼 칸을 나눈다(4단계 앱에 빈 칸이 남지 않게)
     opts.el.textContent = "";
     opts.el.appendChild(list);
 

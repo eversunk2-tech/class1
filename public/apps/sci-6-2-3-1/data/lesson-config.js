@@ -62,7 +62,7 @@ window.LessonConfig = {
       short: "(가)",
       lit: false,
       wire: { a: "plus", c: null },
-      seen: "전구에 불이 켜지지 않았어요. 전선이 전지의 (+)극에만 연결되어 있어요.",
+      seen: "전구에 불이 켜지지 않았어요.",
     },
     {
       id: "na",
@@ -70,7 +70,7 @@ window.LessonConfig = {
       short: "(나)",
       lit: true,
       wire: { a: "plus", c: "minus" },
-      seen: "전구에 불이 켜졌어요! 전구가 밝게 빛나고 있어요.",
+      seen: "전구에 불이 켜졌어요!",
     },
     {
       id: "da",
@@ -78,7 +78,7 @@ window.LessonConfig = {
       short: "(다)",
       lit: false,
       wire: { a: "plus", c: "plus" },
-      seen: "전구에 불이 켜지지 않았어요. 전선 두 개가 모두 전지의 (+)극에만 연결되어 있어요.",
+      seen: "전구에 불이 켜지지 않았어요.",
     },
     {
       // 실험관찰 75쪽 (라) 카드: 검정 집게가 전지의 (-)극에 물려 있고, 스위치의 다른 단자가 비어 있다.
@@ -87,7 +87,7 @@ window.LessonConfig = {
       short: "(라)",
       lit: false,
       wire: { a: "minus", c: null, color: "black" },
-      seen: "전구에 불이 켜지지 않았어요. 전선이 전지의 (-)극에만 연결되어 있어요.",
+      seen: "전구에 불이 켜지지 않았어요.",
     },
   ],
 

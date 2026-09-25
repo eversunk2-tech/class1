@@ -72,14 +72,37 @@
  *     onRecorded: function (info) {},                       // { record, replaced, phaseCompleted: "A"|null, allDone }
  *     onChange: function () {},                             // 진행 상황이 바뀔 때(단계 이동 막대 갱신 등)
  *     can3D: true,                                          // false면 처음부터 2D(주소에 ?no3d=1이면 자동 false)
+ *     scenePanel: node,                                     // 선택(2026-09-25): 지금 값을 보여 주는 노드(예: 시각·측정값 패널). 전체 화면 모드일 때
+ *                                                           //   장면 안 막대의 윗줄(넓은 화면) 또는 장면 바로 아래 카드(좁은 화면)로 틀이 자동으로 옮긴다. 안 주면 막대에는 실행·기록 버튼만 나온다.
+ *     sceneBar: true,                                       // 선택(fix-A): false면 크게 보기에서도 실행·기록 버튼을 막대로 옮기지 않는다(앱이 자기 버튼으로
+ *                                                           //   측정·기록하는 경우). factors가 []이면 자동으로 false처럼 동작한다. 이때 막대에는 scenePanel만, 없으면 막대를 숨긴다.
  *   });
  *   exp.activate()            → 실험하기 단계에 들어올 때 호출(처음 한 번 실험 화면을 만든다)
  *   exp.select(sel)           → 조건 고르기(분석 단계의 '다시 실험' 버튼 등)
  *   exp.phaseDone(id) / exp.allDone() / exp.progress() → { done, total }
  *   exp.skipInfo(sel)         → 관찰하지 않는 조합이면 skipCells의 그 항목, 아니면 null
+ *   exp.runButton / exp.recordButton → 공통 실행·기록 버튼 엘리먼트(클래스 ss-run-btn / ss-record-btn). 앱이 기록 버튼을 찾을 때는
+ *                               이것을 쓴다 — '관찰 카드 안' 선택자(.ss-observe .ss-btn-primary 등)로 찾지 않는다(크게 보기에서는 막대에 있다).
+ *   exp.revealRecord()        → '기록하기'가 켜져 있고 화면에 안 보이면 최소로 스크롤해 보이게 한다(꺼져 있으면 아무것도 안 함,
+ *                               크게 보기에서는 막대와 관찰 카드가 함께 보이게, 함께 안 들어가면 막대 우선). 앱의 '가리면 스크롤' 도우미는 이것을 부른다.
  *
  * 저장 키: "scene"(실험 화면에 남아 있는 결과), "view2d"(2D 보기 선택), "intro"(알아 두기 접힘)
  * 실행 버튼을 누르면 실험 화면이 보이도록 먼저 스크롤한 뒤(세로 화면·휴대폰) 애니메이션을 시작한다.
+ *
+ * ▶ 전체 화면 보기(2026-09-25 추가, 모든 앱에 자동 적용 — 앱 코드를 바꿀 필요 없다):
+ *   장면 왼쪽 위(모형 배지 바로 아래)에 "⛶ 전체 화면 보기" 토글 버튼이 늘 있다. 글자가 할 일을 말한다
+ *   ("⛶ 전체 화면 보기" ↔ "↙ 기본 화면", 켜짐 모양은 클래스 is-on — aria-pressed는 쓰지 않는다). DOM에서 막대보다 앞(Tab 순서 = 보이는 순서).
+ *   켜면: 장면이 화면 폭 전체로 커지고(가로 화면은 뷰포트 높이 기준으로 장면+막대가 스크롤 없이 다 보이도록 계산),
+ *         실행·기록 버튼과 scenePanel(있으면, 막대 윗줄)이 장면 아래쪽 막대로 옮겨 가고(3D 칸은 막대 위에서 끝난다 — 막대가
+ *         장면을 가리지 않게), 관찰 카드는 장면 바로 아래(패널 맨 앞), 조건 고르기 카드는 그 아래로 온다.
+ *   끄면: 지금까지와 같은 배치(가로 화면은 장면·패널 좌우 분할, 세로/좁은 화면은 위아래). 옮긴 것은 모두 원래 자리로.
+ *   기본값: 세로 태블릿(portrait, 폭 600px 이상)은 켜짐, 그 밖(가로·휴대폰)은 꺼짐 — 방향이 바뀌면 그 방향에서
+ *   학생이 직접 고른 적이 없을 때만 다시 기본값을 적용한다. 학생이 누른 선택은 방향별로 기억한다(localStorage,
+ *   "sci6" 접두사 아님 — 로그아웃 정리 대상이 아닌 기기 UI 설정이라서).
+ *   앱이 .ss-exp-view 높이를 직접 재정의해 둔 스타일이 있어도(예: 가로 화면 전용 규칙) 전체 화면 모드의 템플릿
+ *   규칙이 더 구체적인 선택자(#experiment-root 포함)로 이긴다 — 앱 코드를 고치지 않아도 된다.
+ *   공통 create()를 안 쓰고 같은 .ss-exp-layout·.ss-exp-view 구조를 직접 만드는 앱은 SciSim.Experiment.enlarge(opts)로
+ *   같은 기능(토글·기본값·기억·장면 높이·막대·scenePanel·관찰 카드 옮기기)을 붙인다 — 아래 enlarge() 주석.
  *
  * ▶ 실제 시간 카운트다운(초시계) — view.run 안에서 쓴다(예: 5초 간격으로 두 번 사진 찍기)
  *   await SciSim.Countdown.run(container, 5, {
@@ -126,6 +149,31 @@
     // 다 들어가지 않으면 위쪽을 머리말 바로 아래에 맞춘다
     var target = window.scrollY + r.top - top - 8;
     if (opts.align === "nearest" && r.height <= room && r.bottom > vh - bottom) target = window.scrollY + r.bottom - (vh - bottom) + 8;
+    return scrollToY(target);
+  }
+  // 화면 띠: 고정 머리말 아래 ~ 아래 이동 막대 위(뷰포트 좌표)
+  function bandOf() {
+    var header = document.querySelector(".ss-header");
+    var footer = document.querySelector(".ss-footer-nav");
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    return { top: header ? header.getBoundingClientRect().height : 0, bottom: vh - (footer ? footer.getBoundingClientRect().height : 0) };
+  }
+  /* 뷰포트 좌표 [top, bottom] 범위를 화면 띠 안(위아래 8px 틈)에 **최소로** 움직여 넣는다. 이미 들어 있으면 가만히.
+     다 안 들어가면: keep({top, bottom} — 꼭 보여야 하는 부분, 예: 장면 안 막대)이 있으면 keep이 띠 안에 남는 데까지만
+     아래쪽을 더 보이고(keep이 띠 밖이면 keep이 보이게), 없으면 위쪽부터 맞춘다. */
+  function revealRange(top, bottom, keep) {
+    var b = bandOf();
+    var bt = b.top + 8;
+    var bb = b.bottom - 8;
+    if (top >= bt - 1 && bottom <= bb + 1) return Promise.resolve(false);
+    var d;
+    if (bottom - top <= bb - bt) d = bottom > bb ? bottom - bb : top - bt;
+    else if (keep) d = Math.min(bottom - bb, keep.top - bt);
+    else d = top - bt;
+    if (Math.abs(d) < 1) return Promise.resolve(false);
+    return scrollToY(window.scrollY + d);
+  }
+  function scrollToY(target) {
     target = Math.max(0, target);
     try {
       window.scrollTo({ top: target, behavior: reduceMotion() ? "auto" : "smooth" });
@@ -149,6 +197,245 @@
         else setTimeout(tick, 16);
       })();
     });
+  }
+
+  // 노드의 원래 자리(부모·앞뒤 형제)를 기억했다가 그 자리로 되돌린다(앞 형제 기준 → 없으면 뒤 형제 → 없으면 부모 맨 끝)
+  function homeOf(node) {
+    return node && node.parentNode ? { parent: node.parentNode, prev: node.previousSibling, next: node.nextSibling } : null;
+  }
+  function goHome(node, home) {
+    if (!node || !home) return;
+    var p = home.parent;
+    var ref = home.prev && home.prev.parentNode === p ? home.prev.nextSibling : home.next && home.next.parentNode === p ? home.next : null;
+    if (ref === node || (node.parentNode === p && node.nextSibling === ref)) return; // 이미 제자리
+    p.insertBefore(node, ref);
+  }
+  function listenMq(mq, fn) {
+    if (!mq) return;
+    if (mq.addEventListener) mq.addEventListener("change", fn);
+    else if (mq.addListener) mq.addListener(fn);
+  }
+
+  /* ── 크게 보기(전체 화면 보기) 도우미 — create()가 이것을 쓰고, 공통 create()를 안 쓰고 같은 구조(.ss-exp-layout > .ss-exp-view-col >
+   *    .ss-exp-view + .ss-exp-panel, #experiment-root 안)를 직접 만드는 앱도 부를 수 있다(fix-A F9, 예: sci-6-2-1-3·sci-6-2-1-4 단계 B).
+   *   var enl = SciSim.Experiment.enlarge({
+   *     layout: layoutEl,          // .ss-exp-layout — 켜면 .is-full(1열). #experiment-root 안에 있어야 템플릿 장면 높이 규칙이 적용된다
+   *     viewBox: viewBoxEl,        // .ss-exp-view(장면 칸) — 토글 버튼과 막대가 이 안(맨 뒤)에 붙는다
+   *     panel: panelEl,            // 선택: .ss-exp-panel — 관찰 카드·scenePanel 카드가 이 맨 앞으로 온다
+   *     run: btn, record: btn,     // 선택: 켜면 막대로 옮길 실행·기록 버튼(끄면 원래 자리로 — 복제가 아니라 같은 엘리먼트 이동)
+   *     runCard: node,             // 선택: run을 막대로 옮긴 동안 숨길 카드
+   *     observe: node,             // 선택: 켜면 패널 맨 앞(scenePanel 카드가 있으면 그 다음)으로 옮길 관찰 카드(끄면 원래 자리로)
+   *     scenePanel: node,          // 선택: 지금 값 노드 — 켜짐+넓은 화면은 막대 윗줄 전체, 켜짐+좁은/낮은 화면(폭 480px·높이 420px 이하)은
+   *                                //   장면 바로 아래 카드, 끄면 원래 자리(넘기기 전에 어디에도 안 붙였으면 그 카드)
+   *     onChange: function (on) {} // 선택: 켜고 끌 때마다(관찰 카드 번호 바꾸기 등)
+   *   });
+   *   → { isOn(), set(on)(앱이 켜고 끔 — 학생 선택으로 기억하지 않음), refresh()(자리·높이 다시 맞춤), fit()(장면 높이만), bar, toggle }
+   *   막대에 넣을 것이 없으면(run·record 없고 scenePanel도 없거나 좁은 화면) 막대를 숨긴다(빈 막대 없음). 막대가 보이는 3D 장면은
+   *   .ss-view3d가 막대 위에서 끝난다(.has-bar) — 3D 칸 안의 안내 글·이름표·카메라 맞춤이 막대에 가리지 않는다. */
+  function enlarge(e) {
+    var layout = e.layout;
+    var viewBox = e.viewBox;
+    var panel = e.panel || null;
+    var run = e.run || null;
+    var record = e.record || null;
+    var runCard = e.runCard || null;
+    var observe = e.observe || null;
+    var scenePanel = e.scenePanel || null;
+    var on = false;
+    var runHome = homeOf(run);
+    var recordHome = homeOf(record);
+    var observeHome = homeOf(observe);
+    var panelHome = homeOf(scenePanel); // 앱이 넘기기 전에 이미 자기 DOM에 붙여 둔 자리(기본 화면에서 되돌아갈 곳)
+
+    var toggle = el("button", { type: "button", class: "ss-scene-toggle" });
+    var bar = el("div", { class: "ss-exp-overlay", role: "group", "aria-label": run ? "실행하고 기록하기" : record ? "기록하기" : "지금 측정값", hidden: true });
+    viewBox.appendChild(toggle); // 토글이 막대보다 앞 — Tab 순서 = 보이는 순서(왼쪽 위 토글 → 아래쪽 막대)
+    viewBox.appendChild(bar);
+    viewBox.classList.add("has-toggle"); // 2D 대체 화면의 위 여백을 토글 아래까지(style-common.css)
+    var barPanel = null;
+    var panelCard = null;
+    if (scenePanel) {
+      barPanel = el("div", { class: "ss-exp-overlay-panel", hidden: true }); // 막대 윗줄(켜짐 + 넓은 화면) — 막대의 첫 칸
+      bar.appendChild(barPanel);
+      panelCard = el("div", { class: "ss-card ss-scene-panel-card", hidden: true }); // 장면 바로 아래 카드
+      if (panel) panel.insertBefore(panelCard, panel.firstChild);
+      else viewBox.parentNode.insertBefore(panelCard, viewBox.nextSibling);
+    }
+    // 막대 실제 높이 → --ss-exp-overlay-h(3D 칸 아래 끝·드래그 안내 문구 자리)
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(function () {
+        viewBox.style.setProperty("--ss-exp-overlay-h", Math.ceil(bar.getBoundingClientRect().height) + "px");
+      }).observe(bar);
+    }
+    var mm = function (q) {
+      return window.matchMedia ? window.matchMedia(q) : null;
+    };
+    var compactMq = mm("(max-width: 480px), (max-height: 420px)");
+    var wideLandscapeMq = mm("(orientation: landscape) and (min-width: 901px)");
+    var portraitMq = mm("(orientation: portrait)");
+
+    function setToggleText() {
+      toggle.textContent = "";
+      toggle.appendChild(el("span", { "aria-hidden": "true", text: on ? "↙ " : "⛶ " }));
+      toggle.appendChild(document.createTextNode(on ? "기본 화면" : "전체 화면 보기"));
+      toggle.classList.toggle("is-on", on);
+    }
+    // 켜짐/꺼짐·화면 크기에 맞게 옮길 것을 옮긴다(복제 아님 — 이벤트·disabled 상태가 하나로 유지된다)
+    function place() {
+      var compact = !!(compactMq && compactMq.matches);
+      layout.classList.toggle("is-full", on);
+      setToggleText();
+      if (on) {
+        // 막대 순서(보이는 순서 = DOM·Tab 순서): 측정값(윗줄 전체, barPanel은 늘 첫 칸) → 실행 → 기록하기
+        if (run && run.parentNode !== bar) bar.appendChild(run);
+        if (record && record.parentNode !== bar) bar.appendChild(record);
+      } else {
+        goHome(run, runHome);
+        goHome(record, recordHome);
+      }
+      if (runCard) runCard.hidden = on && !!run;
+      if (scenePanel) {
+        if (on && !compact) {
+          if (scenePanel.parentNode !== barPanel) barPanel.appendChild(scenePanel);
+          barPanel.hidden = false;
+          panelCard.hidden = true;
+        } else if (on || !panelHome) {
+          if (scenePanel.parentNode !== panelCard) panelCard.appendChild(scenePanel);
+          barPanel.hidden = true;
+          panelCard.hidden = false;
+        } else {
+          goHome(scenePanel, panelHome);
+          barPanel.hidden = true;
+          panelCard.hidden = true;
+        }
+      }
+      if (observe && panel) {
+        if (on) {
+          var ref = panelCard && panelCard.parentNode === panel ? panelCard.nextSibling : panel.firstChild;
+          if (observe !== ref) panel.insertBefore(observe, ref);
+        } else goHome(observe, observeHome);
+      }
+      bar.hidden = !(on && (run || record || (scenePanel && !compact)));
+      viewBox.classList.toggle("has-bar", !bar.hidden);
+    }
+
+    /* 가로 태블릿·PC(대략 폭 901px 이상 + 가로 방향), 켜짐일 때만: 장면을 머리말 바로 아래에 맞춰 두었을 때 장면 전체
+       (안의 막대 포함)가 아래 이동 막대 위까지 꽉 차게 --ss-scene-h를 계산한다(= 창 높이 − 머리말 − 아래 막대 − 위아래 틈).
+       조건 고르기 줄은 장면 아래로 스크롤해서 본다 — 조건 줄까지 한 화면에 넣으려고 장면을 줄이면 "크게 보기"가 아니게 된다
+       (2026-09-25 Claude 수정: 조건 줄을 넣으려다 장면이 160px 띠가 되던 문제). 세로·좁은 화면이거나 꺼짐이면 CSS의 vh 기본값.
+       mode(fix-A F5): true = 학생이 머리말을 접거나 폈거나 창 크기(방향)를 바꿔 다시 잴 때 — 장면이 화면 띠의 절반 이상 보이고
+       있었으면 장면을 다시 머리말 아래에 맞추고(접은 직후 막대가 아래 이동 막대 뒤로 숨던 문제), 장면을 지나 조건 카드 쪽을 보고
+       있었으면 끌어올리지 않고 보던 곳이 튀지 않게 한다. "keep" = 그 밖의 머리말·아래 막대 크기 변화(불러오는 중 계정 줄·글꼴 등) —
+       보던 곳만 지키고 장면으로 맞춤 이동은 하지 않는다(실험하기에 들어올 때 맞춤은 L1, 이번에 안 함). */
+    var MIN_SCENE_H = 240; // 창이 아주 낮을 때의 바닥값
+    var SCENE_GAP = 8; // 머리말·아래 막대와 장면 사이 틈(scrollIntoViewSafe가 머리말 아래 8px에 맞춘다)
+    function sceneShare() {
+      var b = bandOf();
+      var r = viewBox.getBoundingClientRect();
+      var bh = b.bottom - b.top;
+      if (!(r.height > 0) || !(bh > 0)) return 0;
+      return Math.max(0, Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top)) / bh;
+    }
+    function fit(mode) {
+      if (!on || !wideLandscapeMq || !wideLandscapeMq.matches) {
+        viewBox.style.removeProperty("--ss-scene-h"); // 꺼짐·세로·좁은 화면: CSS 기본값(vh)으로
+        return;
+      }
+      if (viewBox.classList.contains("is-2d")) return; // 2D는 height:auto라 계산 대상이 아님
+      var wasShown = mode === true && sceneShare() >= 0.5; // 새 높이를 넣기 전(지금 자리) 기준
+      var b = bandOf();
+      // 장면을 지나 그 아래(조건 카드 쪽)를 보고 있었으면, 장면 높이가 바뀌어도 보던 곳이 튀지 않게 아래 패널 자리를 재서 되돌린다
+      var below = mode && !wasShown && panel && viewBox.getBoundingClientRect().top < b.top ? panel.getBoundingClientRect().top : null;
+      viewBox.style.setProperty("--ss-scene-h", Math.max(MIN_SCENE_H, Math.round(b.bottom - b.top - 2 * SCENE_GAP)) + "px");
+      if (wasShown) scrollIntoViewSafe(viewBox); // 이미 맞으면 움직이지 않는다. 움직임 줄이기면 즉시 이동
+      else if (below !== null) {
+        var d = panel.getBoundingClientRect().top - below;
+        if (Math.abs(d) >= 1) window.scrollBy(0, d);
+      }
+    }
+    // 창 크기 변화: 폭이나 방향이 바뀌었을 때만 장면으로 다시 맞춘다. 높이만 바뀐 것(휴대기기 주소 막대가 스크롤 중에 숨고 나타남,
+    // 화면 키보드 등)은 높이만 다시 재고 보던 곳을 지킨다 — 학생이 스크롤하는 중에 장면으로 끌려 올라가지 않게(Review A2 N2).
+    var lastW = window.innerWidth || 0;
+    var lastPortrait = !!(portraitMq && portraitMq.matches);
+    window.addEventListener("resize", function () {
+      var w = window.innerWidth || 0;
+      var p = !!(portraitMq && portraitMq.matches);
+      var widthOrTurn = w !== lastW || p !== lastPortrait;
+      lastW = w;
+      lastPortrait = p;
+      fit(widthOrTurn ? true : "keep");
+    });
+    listenMq(wideLandscapeMq, function () {
+      fit(true);
+    });
+    listenMq(compactMq, function () {
+      place();
+    });
+    // 머리말을 접고 펴거나(계정 줄·단계 메뉴) 아래 막대 높이가 바뀌면 다시 잰다(처음 알림은 맞춤 이동 없이).
+    // 장면으로 다시 맞추는 것은 학생이 머리말을 접거나 폈을 때만(.is-collapsed가 바뀜) — 불러오는 중 계정 줄·글꼴로 높이가 바뀔 때는 아님
+    if ("ResizeObserver" in window) {
+      var hdr = document.querySelector(".ss-header");
+      var ftr = document.querySelector(".ss-footer-nav");
+      var lastBars = null;
+      var lastCollapsed = null;
+      var barsRo = new ResizeObserver(function () {
+        var now = (hdr ? Math.round(hdr.getBoundingClientRect().height) : 0) + "|" + (ftr ? Math.round(ftr.getBoundingClientRect().height) : 0);
+        var collapsed = !!(hdr && hdr.classList.contains("is-collapsed"));
+        var changed = lastBars !== null && lastBars !== now;
+        var toggled = lastCollapsed !== null && collapsed !== lastCollapsed;
+        lastBars = now;
+        lastCollapsed = collapsed;
+        fit(changed ? (toggled ? true : "keep") : false);
+      });
+      if (hdr) barsRo.observe(hdr);
+      if (ftr) barsRo.observe(ftr);
+    }
+
+    function prefKey() {
+      return "sceneMode:" + (portraitMq && portraitMq.matches ? "portrait" : "landscape");
+    }
+    // 태블릿 세로(세로 방향·폭 600px 이상)는 켜짐이 기본 — 단 막대에 넣을 것(실행·기록 버튼이나 측정값)이 없는 앱은 끔이 기본
+    // (크게 보기가 장면만 키워 앱 자신의 기록 버튼을 화면 밖으로 밀어내지 않게, Review A2 N1 — 예: sci-6-2-1-2). 학생이 누른 선택은 그대로 기억한다.
+    function defaultOn() {
+      var w = window.innerWidth || document.documentElement.clientWidth || 0;
+      return !!(portraitMq && portraitMq.matches && w >= 600 && (run || record || scenePanel));
+    }
+    function set(v, opts) {
+      on = !!v;
+      place();
+      fit(false);
+      if (!(opts && opts.silent) && SciSim.uiPref) SciSim.uiPref.set(prefKey(), on);
+      if (e.onChange) e.onChange(on);
+    }
+    function applyForOrientation() {
+      var pref = SciSim.uiPref ? SciSim.uiPref.get(prefKey()) : null;
+      set(pref === null || pref === undefined ? defaultOn() : pref, { silent: true });
+    }
+    toggle.addEventListener("click", function () {
+      set(!on);
+      // 바뀐 배치에서 장면이 화면에 다 보이게(가로 크게 보기는 장면을 머리말 바로 아래에 맞추면 아래 막대 위까지 꽉 찬다)
+      scrollIntoViewSafe(viewBox);
+    });
+    listenMq(portraitMq, applyForOrientation);
+    applyForOrientation();
+
+    return {
+      isOn: function () {
+        return on;
+      },
+      set: function (v) {
+        set(v, { silent: true });
+      },
+      refresh: function () {
+        place();
+        fit(false);
+      },
+      fit: function () {
+        fit(false);
+      },
+      bar: bar,
+      toggle: toggle,
+    };
   }
 
   function create(o) {
@@ -310,33 +597,29 @@
       R.factorNotes[f.id] = note;
       panel.appendChild(el("div", { class: "ss-card ss-step-card" }, [el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: CIRCLED[fi] }), " " + f.title]), grid, note]));
     });
-    var nRun = CIRCLED[o.factors.length];
-    var nObs = CIRCLED[o.factors.length + 1];
-    R.run = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", disabled: true });
-    panel.appendChild(el("div", { class: "ss-card ss-step-card ss-run-card" }, [el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: nRun }), " " + (o.runTitle || "실험하기")]), R.run]));
+    // 크게 보기에서는 관찰 카드가 장면 바로 아래(조건 카드 위)에 와서 번호 대신 👀로 보인다(enlarge onChange)
+    var nRunDefault = CIRCLED[o.factors.length];
+    var nObsDefault = CIRCLED[o.factors.length + 1];
+    // ss-run-btn / ss-record-btn: 앱이 버튼을 찾는 고정 훅(크게 보기에서는 관찰 카드가 아니라 장면 안 막대에 있다) — exp.runButton / exp.recordButton
+    R.run = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide ss-run-btn", disabled: true });
+    R.runStepN = el("span", { class: "ss-step-n", text: nRunDefault });
+    R.runCard = el("div", { class: "ss-card ss-step-card ss-run-card" }, [el("h3", { class: "ss-step-h" }, [R.runStepN, " " + (o.runTitle || "실험하기")]), R.run]);
+    panel.appendChild(R.runCard);
     R.skip = el("div", { class: "ss-card ss-skip-card", role: "note", "aria-live": "polite", hidden: true });
     panel.appendChild(R.skip);
     R.obsQ = el("p", { class: "ss-observe-q" });
     R.obsBody = el("div", { class: "ss-observe-body" });
     R.obsChoices = el("div", { class: "ss-obs-input" });
-    R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", text: "📝 기록하기", disabled: true });
+    R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide ss-record-btn", text: "📝 기록하기", disabled: true }); // 진행 중인 관찰이 없으니 처음부터 꺼 둔다
     R.recordMsg = el("p", { class: "ss-help", "aria-live": "polite" });
     R.checkBtn = el("button", { type: "button", class: "ss-btn ss-check-btn", text: "✔️ 확인하기" });
     R.retryBtn = el("button", { type: "button", class: "ss-btn ss-btn-ghost", hidden: true });
     R.checkRow = el("div", { class: "ss-row ss-check-row", hidden: true }, [R.checkBtn, R.retryBtn]);
     R.checkFb = el("p", { class: "ss-feedback", "aria-live": "polite", hidden: true });
     R.checkNode = el("div", { class: "ss-check-node", hidden: true });
-    R.observe = el("div", { class: "ss-card ss-step-card ss-observe", hidden: true }, [
-      el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: nObs }), " 관찰하고 기록하기"]),
-      R.obsQ,
-      R.obsBody,
-      R.obsChoices,
-      R.checkRow,
-      R.checkFb,
-      R.checkNode,
-      R.record,
-      R.recordMsg,
-    ]);
+    R.obsStepN = el("span", { class: "ss-step-n", text: nObsDefault });
+    var observeKids = [el("h3", { class: "ss-step-h" }, [R.obsStepN, " 관찰하고 기록하기"]), R.obsQ, R.obsBody, R.obsChoices, R.checkRow, R.checkFb, R.checkNode, R.record, R.recordMsg];
+    R.observe = el("div", { class: "ss-card ss-step-card ss-observe", hidden: true }, observeKids);
     panel.appendChild(R.observe);
     if (o.miniTable) {
       R.mini = el("div");
@@ -350,7 +633,48 @@
     (o.extras || []).forEach(function (x) {
       panel.appendChild(x);
     });
-    o.root.appendChild(el("div", { class: "ss-exp-layout" }, [viewCol, panel]));
+    var layoutEl = el("div", { class: "ss-exp-layout" }, [viewCol, panel]);
+    o.root.appendChild(layoutEl);
+
+    /* ── 전체 화면 보기(2026-09-25, 모든 앱에 자동 — 토글, 옵트인 아님) ── 공통 도우미 enlarge()가 맡는다.
+       기본 배치(꺼짐)는 지금까지와 같다. 켜면: 장면이 전체 폭으로 커지고, 실행·기록 버튼(+scenePanel)이 장면 아래쪽 막대로,
+       관찰 카드가 장면 바로 아래(패널 맨 앞)로 옮겨 간다(복제 아님 — 이벤트·disabled 상태 유지). 조건 고르기는 그 아래.
+       조건이 없거나(factors: []) sceneBar:false면 실행·기록 버튼과 관찰 카드는 옮기지 않는다(앱이 자기 버튼으로 기록하는 경우 —
+       앱이 숨겨 둔 실행 카드가 막대에 가짜 버튼으로 나오지 않게, fix-A F1). */
+    var useBar = o.sceneBar !== false && o.factors.length > 0;
+    R.enl = enlarge({
+      layout: layoutEl,
+      viewBox: R.viewBox,
+      panel: panel,
+      run: useBar ? R.run : null,
+      record: useBar ? R.record : null,
+      runCard: useBar ? R.runCard : null,
+      observe: useBar ? R.observe : null,
+      scenePanel: o.scenePanel || null,
+      onChange: function (on) {
+        // 크게 보기에서는 관찰 카드가 조건 카드(①②…)보다 위(장면 바로 아래)에 오므로 번호 대신 👀로 표시한다(Review A2 N6)
+        R.obsStepN.textContent = on && useBar ? "👀" : nObsDefault;
+      },
+    });
+    R.overlay = R.enl.bar;
+    R.enlargeBtn = R.enl.toggle;
+    R.fitSceneHeight = R.enl.fit; // finish()(3D/2D 전환 뒤)·activate()에서도 다시 잰다
+    // 실행·기록 버튼이 막대에 있는 크게 보기인가(관찰 카드도 장면 바로 아래에 있다)
+    function barMode() {
+      return useBar && R.enl.isOn() && !R.overlay.hidden;
+    }
+    // 방금 누른 곳(조건 버튼·미니 표 칸 등) — 크게 보기에서 관찰 카드를 숨길 때 그 자리가 튀지 않게 한다(afterSelect)
+    var touched = null;
+    o.root.addEventListener(
+      "click",
+      function (ev) {
+        touched = ev.target;
+        setTimeout(function () {
+          touched = null;
+        }, 0);
+      },
+      true
+    );
 
     /* ── 고르기 ── */
     // 조건 보기 숨기기(factor.visible): 다른 조건에 따라 보기를 숨기고, 숨겨진 보기를 골라 두었으면 선택을 푼다
@@ -393,10 +717,25 @@
       });
     }
     function afterSelect() {
+      // 크게 보기: 관찰 카드가 조건 카드 위(장면 바로 아래)에 있어서, 카드를 숨기면 아래의 조건 버튼이 위로 튄다 →
+      // 숨기기 전·후 방금 누른 곳(의 카드)의 자리를 재서 차이만큼 되돌린다. 브라우저 스크롤 앵커링이 이미 맞췄으면 차이가 0이라
+      // 두 번 보정되지 않는다(iPad Safari는 앵커링이 없을 수 있다). 장면·막대에서 고른 경우(3D 누르기 등)는 그 자리가 안 움직이므로 그대로.
+      var anchor = null;
+      var before = 0;
+      if (barMode() && !R.observe.hidden && touched && touched.isConnected && !R.observe.contains(touched) && R.observe.compareDocumentPosition(touched) & 4 /* 뒤에 있음 */) {
+        anchor = (touched.closest && touched.closest(".ss-card")) || touched;
+        before = anchor.getBoundingClientRect().top;
+      }
       trial = null;
       R.observe.hidden = true;
+      R.record.disabled = true; // 기록 버튼이 관찰 카드 밖(장면 안 막대)에 있어도 진행 중인 관찰이 없으면 늘 비활성
       draw();
       if (view) view.highlight(Object.assign({}, sel));
+      if (anchor && anchor.isConnected) {
+        var ar = anchor.getBoundingClientRect();
+        var d = ar.top - before;
+        if (ar.height > 0 && Math.abs(d) >= 1) window.scrollBy(0, d);
+      }
     }
 
     function draw() {
@@ -556,6 +895,7 @@
       }
       setBusy(true);
       R.observe.hidden = true;
+      R.record.disabled = true;
       var v = view;
       try {
         // 세로 화면·휴대폰: 버튼이 실험 화면 아래에 있으므로 먼저 실험 화면을 보이게 한다
@@ -658,7 +998,7 @@
             });
             resetCheck();
             R.record.disabled = !!trial.check;
-            revealRecord();
+            revealNext(); // 켜졌으면 '기록하기', 확인이 필요하면 '확인하기' 줄이 보이게(가리면만)
           });
           box.appendChild(b);
         });
@@ -685,7 +1025,13 @@
           : "";
       R.observe.hidden = false;
       setTimeout(function () {
-        scrollIntoViewSafe(R.observe, { align: "nearest" });
+        if (R.observe.hidden) return;
+        if (barMode()) {
+          // 크게 보기: 관찰 카드가 장면(막대) 바로 아래 — 막대가 화면에 남는 데까지만 최소로 내려 관찰 카드를 보인다
+          var br = R.overlay.getBoundingClientRect();
+          var or = R.observe.getBoundingClientRect();
+          revealRange(Math.min(br.top, or.top), Math.max(br.bottom, or.bottom), br);
+        } else scrollIntoViewSafe(R.observe, { align: "nearest" });
       }, 60);
     }
     function checkNumeric() {
@@ -737,18 +1083,55 @@
       R.checkNode.hidden = !res.node;
       if (res.node) R.checkNode.appendChild(res.node);
       R.retryBtn.hidden = res.ok || !(trial && trial.ob && trial.ob.retryLabel);
-      revealRecord();
+      revealNext();
     }
-    /* 보기를 고르거나 '확인하기'를 누르면 카드가 길어져 '기록하기'가 아래 이동 막대에 가릴 수 있다.
-       가려져 있을 때만 막대 위로 보이게 스크롤한다(이미 보이면 그대로 둔다). */
+    /* 보기를 고르거나 '확인하기'를 누른 뒤 다음에 누를 곳이 가려져 있을 때만 최소로 스크롤한다(이미 보이면 그대로 둔다).
+       '기록하기'가 켜졌으면 revealRecord, 꺼져 있고 확인이 필요하면 '확인하기' 줄과 그 아래 피드백(revealCheck). */
+    function revealNext() {
+      revealRecord();
+      revealCheck();
+    }
+    /* '기록하기'가 켜져 있고 안 보이면 보이게 한다(fix-A F4). 꺼져 있으면 아무것도 안 한다(확인 전에 막대까지 끌어올려
+       '확인하기'를 화면 밖으로 밀어내지 않게). 크게 보기: 막대와 관찰 카드(방금 바뀐 곳까지)가 이미 보이면 가만히, 아니면 함께
+       보이게 최소로(함께 안 들어가면 막대 우선). 기본 화면: 예전처럼 기록 버튼(관찰 카드 맨 아래)이 가리면 보이게.
+       앱의 '가리면 스크롤' 도우미도 exp.revealRecord()로 부른다(규칙을 한 곳에). */
     function revealRecord() {
       setTimeout(function () {
-        if (R.observe.hidden) return;
+        if (R.observe.hidden || R.record.disabled) return;
+        if (barMode()) {
+          // 막대(위)부터 관찰 카드에서 방금 바뀐 곳(확인 피드백·덧붙인 노드, 없으면 보기 칸)까지 — 이미 다 보이면 가만히,
+          // 안 들어가면 막대가 띠 안에 남는 데까지만
+          var br = R.overlay.getBoundingClientRect();
+          var bottom = 0;
+          [R.checkNode, R.checkFb, R.obsChoices].forEach(function (n) {
+            if (bottom || n.hidden) return;
+            var q = n.getBoundingClientRect();
+            if (q.height > 0) bottom = q.bottom;
+          });
+          if (!bottom) bottom = R.observe.getBoundingClientRect().bottom;
+          revealRange(Math.min(br.top, R.observe.getBoundingClientRect().top), Math.max(br.bottom, bottom), br);
+          return;
+        }
         var f = document.querySelector(".ss-footer-nav");
         var vh = window.innerHeight || document.documentElement.clientHeight;
         var bottom = f ? f.getBoundingClientRect().height : 0;
         var r = R.record.getBoundingClientRect();
         if (r.bottom > vh - bottom + 1 || r.top < 0) scrollIntoViewSafe(R.record, { align: "nearest" });
+      }, 60);
+    }
+    // '기록하기'가 꺼져 있고 '확인하기'가 필요할 때: '확인하기' 줄과 그 아래 피드백·덧붙인 노드가 가리면 최소로 보이게
+    function revealCheck() {
+      setTimeout(function () {
+        if (R.observe.hidden || !R.record.disabled || R.checkRow.hidden) return;
+        var r = R.checkRow.getBoundingClientRect();
+        var top = r.top;
+        var bottom = r.bottom;
+        [R.checkFb, R.checkNode].forEach(function (n) {
+          if (n.hidden) return;
+          var q = n.getBoundingClientRect();
+          if (q.height > 0) bottom = Math.max(bottom, q.bottom);
+        });
+        revealRange(top, bottom, null);
       }, 60);
     }
     function runCheck() {
@@ -886,6 +1269,7 @@
       if (view) view.clear();
       trial = null;
       R.observe.hidden = true;
+      R.record.disabled = true;
       toast(o.clearMessage || "실험 화면을 비웠어요. 기록은 그대로 남아 있어요.");
     });
     R.btnToggle.addEventListener("click", function () {
@@ -986,6 +1370,7 @@
       });
       v.highlight(Object.assign({}, sel));
       drawToggle();
+      if (R.fitSceneHeight) R.fitSceneHeight(); // 전체 화면 모드: 2D↔3D를 바꾸면 장면 높이 계산을 다시 한다(2D는 계산 안 함)
     }
 
     var activated = false;
@@ -999,6 +1384,9 @@
           mount(can3D && !store.get("view2d", false) ? "3d" : "2d");
         }
         draw();
+        // 전체 화면 모드: 이 단계가 화면에 보이자마자 한 번 재서(3D 로딩이 끝나 finish()가 불리기 전이라도) 너무 크게
+        // 잡혀 있던 값(장면이 숨어 있던 동안 잰 값)이 오래 보이지 않게 한다.
+        if (R.fitSceneHeight) R.fitSceneHeight();
       },
       select: select,
       refresh: draw,
@@ -1031,10 +1419,17 @@
       can3D: function () {
         return can3D;
       },
+      // 앱이 공통 실행·기록 버튼을 찾는 고정 훅(fix-A F2) — 관찰 카드 안 선택자로 찾지 않는다(크게 보기에서는 막대에 있다)
+      runButton: R.run,
+      recordButton: R.record,
+      revealRecord: revealRecord,
+      isEnlarged: function () {
+        return R.enl.isOn();
+      },
     };
   }
 
-  SciSim.Experiment = { create: create, scrollIntoView: scrollIntoViewSafe, sleep: sleep };
+  SciSim.Experiment = { create: create, enlarge: enlarge, scrollIntoView: scrollIntoViewSafe, sleep: sleep };
 
   /* ── 실제 시간 카운트다운(초시계) ── */
   function countdown(container, seconds, opts) {

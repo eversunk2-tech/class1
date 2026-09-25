@@ -1268,12 +1268,12 @@
     };
   }
 
-  /* 확인을 통과하면 📝 기록하기 버튼이 아래쪽 이동 막대에 가리지 않게 보이도록 올린다(앱 전용) */
+  /* 확인을 통과하면 📝 기록하기 버튼이 아래쪽 이동 막대에 가리지 않게 보이도록 올린다 — 공통 틀의 규칙(exp.revealRecord:
+     기록하기가 꺼져 있으면 그대로, 크게 보기에서는 장면 안 막대와 관찰 카드가 함께 보이게) */
   $("experiment-root").addEventListener("click", function (e) {
     if (!e.target.closest || !e.target.closest(".ss-check-btn")) return;
     setTimeout(function () {
-      var rec = $("experiment-root").querySelector(".ss-observe:not([hidden]) > .ss-btn-big");
-      if (rec && !rec.disabled) S.Experiment.scrollIntoView(rec, { align: "nearest" });
+      exp.revealRecord();
     }, 60);
   });
 

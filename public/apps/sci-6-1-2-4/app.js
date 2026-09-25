@@ -255,7 +255,7 @@
   $("experiment-root").addEventListener("input", function (e) {
     var t = e.target;
     if (!t || !t.classList || !t.classList.contains("ss-num-input") || !check) return;
-    var btn = document.querySelector("#experiment-root .ss-observe .ss-btn-primary");
+    var btn = exp.recordButton; // 공통 틀의 기록 버튼(크게 보기에서는 관찰 카드가 아니라 장면 안 막대에 있다)
     var raw = t.value.trim();
     var v = raw === "" ? NaN : Number(raw);
     var ok = false;
@@ -785,7 +785,7 @@
         }),
       })
     );
-    bar.appendChild(el("p", { class: "trend-note", text: "막대가 짧을수록 결승선까지 걸린 시간이 짧아요." }));
+    bar.appendChild(el("p", { class: "trend-note", text: "막대 길이는 걸린 시간이에요." }));
   }
 
   /* ───────── 4. 마치기(결과 저장) ───────── */

@@ -95,6 +95,8 @@
 }
 .obs-chip strong { font-weight: 700; opacity: 0.92; }
 .chip-tx { font-weight: 800; }
+/* 실제 상태 글은 '확인하기'를 누른 뒤에만 보인다(2026-09-25) — 보기 고르기 전에는 안내 문장만 보여 정답을 미리 알려주지 않는다 */
+.chip-reveal { display: block; margin-top: 4px; }
 
 /* ── 내 기록(2×2) ── */
 .my-records .ss-step-h { margin-bottom: 6px; }

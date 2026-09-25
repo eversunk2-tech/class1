@@ -240,26 +240,13 @@
     };
   }
 
-  /* ── 관찰 카드에서 보기를 고르거나 확인하면 '기록하기' 버튼이 아래 단계 이동 막대에 가리지 않게 올린다(fix-1, 앱 전용) ── */
-  function keepAboveFooter(node) {
-    if (!node || node.hidden || !node.offsetParent) return;
-    var footer = document.querySelector(".ss-footer-nav");
-    var limit = (footer ? footer.getBoundingClientRect().top : window.innerHeight) - 10;
-    var r = node.getBoundingClientRect();
-    if (r.bottom <= limit) return;
-    var dy = r.bottom - limit;
-    try {
-      window.scrollBy({ top: dy, behavior: "smooth" });
-    } catch (e) {
-      window.scrollBy(0, dy);
-    }
-  }
+  /* ── 관찰 카드에서 보기를 고르거나 확인하면 '기록하기' 버튼이 아래 단계 이동 막대에 가리지 않게 올린다(fix-1) — 공통 틀의
+     규칙(exp.revealRecord: 기록하기가 꺼져 있으면 그대로, 크게 보기에서는 장면 안 막대와 관찰 카드가 함께 보이게) ── */
   $("experiment-root").addEventListener("click", function (e) {
     var t = e.target && e.target.closest ? e.target.closest(".ss-observe .ss-obs, .ss-observe .ss-check-btn") : null;
     if (!t) return;
     setTimeout(function () {
-      var btns = document.querySelectorAll(".ss-observe button");
-      for (var i = 0; i < btns.length; i++) if (/기록하기/.test(btns[i].textContent)) return keepAboveFooter(btns[i]);
+      exp.revealRecord();
     }, 120);
   });
 

@@ -31,6 +31,16 @@
  *   v.fadeColor(material, "#hex", ms) → Promise
  *   v.focus([x,y,z], ratio, ms) / v.flyHome(ms) → 관찰할 곳으로 다가가기 / 처음 시점으로 돌아가기(Promise)
  *   v.pickable(obj, pickValue)    → 탭 선택 대상 등록
+ *   v.draggable(obj, opts)        → 물체를 끌어 값 바꾸기(2026-09-25 추가, 순수 추가라 안 쓰면 영향 없음). opts:
+ *       { plane: THREE.Plane | {normal:[x,y,z], point:[x,y,z]} | function()→그 중 하나,   // 선택: 끄는 동안 이 평면과의 교점을 point로 준다
+ *         onStart(info), onDrag(info), onEnd(info) }                                    // info = { point(평면 없으면 null), ray(레이, 구면·곡선에 직접 투영할 때), event }
+ *     포인터다운으로 등록한 물체(자식 포함)를 잡으면 카메라 회전을 잠시 멈추고(끝나면 끌기 전 controls.enabled 값으로 되돌림),
+ *     포인터무브마다 onDrag(info)를 부른다. 레이가 물체에 맞지 않아도 물체의 보이는 부분을 화면에 그린 경계 상자에서 30px 안쪽이면
+ *     잡힌다(터치가 작은 물체도 잡기 쉽게, 여러 개면 가장 가까운 것). 끌기를 시작한 pointerId만 끌고 끝낸다(다른 손가락·손바닥의
+ *     포인터업은 무시), 마우스는 주(왼쪽) 버튼만, 숨긴 물체(자신·조상의 visible === false)는 안 잡힌다. 포인터취소도 onEnd로 끝난다.
+ *     끄는 중에 v.discard(그 물체)·v.dispose()가 불리면 onEnd({ point: 마지막 point, ray: 마지막 ray, event: null, cancelled: true })를 부른다.
+ *     끌 수 있는 물체 위에서는 커서가 grab으로 바뀐다(마우스 기기만). 예: 태양을 하늘 반구(plane 대신 onDrag의 ray로 구면 교차 계산)로 끌어
+ *     가장 가까운 시각으로 스냅, 손전등을 평면 위로 끌어 각도 계산 후 기존 setAngle(deg) 호출.
  *   v.discard(obj)                → 장면에서 빼고 geometry·material·texture까지 해제(잠깐 쓰는 방울·스포이트 등).
  *                                   obj 안에 pickable로 등록한 자식이 있으면 그 등록도 함께 뺀다(장면 통째 바꾸기에 안전)
  *   v.cameraPose() / v.setCameraPose(pose) → 지금 시점 { position:[x,y,z], target:[x,y,z] } 얻기 / 되돌리기
@@ -348,6 +358,160 @@
     el.addEventListener("pointerup", onUp);
     el.addEventListener("webglcontextlost", onContextLost, false);
 
+    // ── 물체 끌기(v.draggable) — 탭 선택(pickable)과는 별개, 순수 추가 ──
+    var draggables = [];
+    var dragState = null; // { entry, pointerId, prevEnabled, last: { point, ray } }
+    var DRAG_PAD_PX = 30; // 레이가 빗나가도 물체(보이는 부분)의 화면 경계 상자에서 이 거리 안이면 잡힌 것으로 본다(작은 물체도 잡기 쉽게)
+    var dragVec = new THREE.Vector3();
+    var dragBox = new THREE.Box3();
+    var dragBoxPart = new THREE.Box3();
+    var dragCorner = new THREE.Vector3();
+    function ndcOf(e, rect) {
+      return new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    }
+    function entryOf(obj) {
+      for (var i = 0; i < draggables.length; i++) if (draggables[i].obj === obj) return draggables[i];
+      return null;
+    }
+    // 자신이나 조상 가운데 하나라도 visible === false면 보이지 않는 물체다(장면 root까지)
+    function shown(obj) {
+      for (var o = obj; o; o = o.parent) if (o.visible === false) return false;
+      return true;
+    }
+    // 물체의 보이는 부분(숨긴 자식 가지는 빼고)을 감싸는 월드 경계 상자 → 화면(클라이언트 px) 경계 상자. 카메라 뒤에 있으면 null
+    function screenBox(obj, rect) {
+      obj.updateWorldMatrix(true, true);
+      dragBox.makeEmpty();
+      (function add(o) {
+        if (o.visible === false) return;
+        var g = o.geometry;
+        if (g) {
+          if (!g.boundingBox) g.computeBoundingBox();
+          if (g.boundingBox && !g.boundingBox.isEmpty()) dragBox.union(dragBoxPart.copy(g.boundingBox).applyMatrix4(o.matrixWorld));
+        }
+        for (var i = 0; i < o.children.length; i++) add(o.children[i]);
+      })(obj);
+      if (dragBox.isEmpty()) dragBox.setFromCenterAndSize(obj.getWorldPosition(dragCorner), new THREE.Vector3(0, 0, 0));
+      var x0 = Infinity,
+        y0 = Infinity,
+        x1 = -Infinity,
+        y1 = -Infinity;
+      for (var k = 0; k < 8; k++) {
+        dragCorner.set(k & 1 ? dragBox.max.x : dragBox.min.x, k & 2 ? dragBox.max.y : dragBox.min.y, k & 4 ? dragBox.max.z : dragBox.min.z).project(camera);
+        if (dragCorner.z > 1) return null; // 카메라 뒤
+        var sx = ((dragCorner.x + 1) / 2) * rect.width + rect.left;
+        var sy = ((1 - dragCorner.y) / 2) * rect.height + rect.top;
+        x0 = Math.min(x0, sx);
+        x1 = Math.max(x1, sx);
+        y0 = Math.min(y0, sy);
+        y1 = Math.max(y1, sy);
+      }
+      return { x0: x0, y0: y0, x1: x1, y1: y1 };
+    }
+    function hitDraggable(e) {
+      var rect = el.getBoundingClientRect();
+      raycaster.setFromCamera(ndcOf(e, rect), camera);
+      var list = draggables.filter(function (d) {
+        return shown(d.obj);
+      });
+      var objs = list.map(function (d) {
+        return d.obj;
+      });
+      var hits = objs.length ? raycaster.intersectObjects(objs, true) : [];
+      for (var i = 0; i < hits.length; i++) {
+        if (!shown(hits[i].object)) continue; // 숨긴 자식은 레이가 맞아도 잡지 않는다
+        var o = hits[i].object;
+        var found = null;
+        while (o && !found) {
+          found = entryOf(o);
+          o = o.parent;
+        }
+        if (found) return found;
+      }
+      // 정확히 맞지 않아도 화면 경계 상자에서 가까우면(터치 오차 보정) 잡는다
+      var best = null,
+        bestD = DRAG_PAD_PX;
+      list.forEach(function (d) {
+        var b = screenBox(d.obj, rect);
+        if (!b) return;
+        var dx = Math.max(b.x0 - e.clientX, 0, e.clientX - b.x1);
+        var dy = Math.max(b.y0 - e.clientY, 0, e.clientY - b.y1);
+        var dist = Math.hypot(dx, dy);
+        if (dist <= bestD) {
+          bestD = dist;
+          best = d;
+        }
+      });
+      return best;
+    }
+    function resolvePlane(p) {
+      if (!p) return null;
+      if (typeof p === "function") p = p();
+      if (!p) return null;
+      if (p.isPlane) return p;
+      if (p.normal && p.point) return new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3().fromArray(p.normal), new THREE.Vector3().fromArray(p.point));
+      if (p.normal && typeof p.constant === "number") return new THREE.Plane(new THREE.Vector3().fromArray(p.normal), p.constant);
+      return null;
+    }
+    function dragInfo(e, opts2) {
+      var rect = el.getBoundingClientRect();
+      raycaster.setFromCamera(ndcOf(e, rect), camera);
+      var plane = resolvePlane(opts2.plane);
+      var point = plane && raycaster.ray.intersectPlane(plane, dragVec) ? dragVec.clone() : null;
+      var info = { point: point, ray: raycaster.ray.clone(), event: e };
+      if (dragState) dragState.last = info;
+      return info;
+    }
+    function onDragDown(e) {
+      if (dragState) return; // 이미 끄는 중이면 다른 손가락은 무시
+      if (e.pointerType === "mouse" && e.button !== 0) return; // 마우스는 주(왼쪽) 버튼만
+      var entry = hitDraggable(e);
+      if (!entry) return;
+      dragState = { entry: entry, pointerId: e.pointerId, prevEnabled: controls.enabled, last: null };
+      controls.enabled = false; // 카메라 회전을 잠시 멈춘다(끝나면 끌기 전 값으로 되돌림)
+      el.style.cursor = "grabbing";
+      var info = dragInfo(e, entry.opts);
+      if (entry.opts.onStart) entry.opts.onStart(info);
+      window.addEventListener("pointermove", onDragMove);
+      window.addEventListener("pointerup", onDragUp);
+      window.addEventListener("pointercancel", onDragUp);
+    }
+    function onDragMove(e) {
+      if (!dragState || e.pointerId !== dragState.pointerId) return; // 끌기를 시작한 포인터만
+      var info = dragInfo(e, dragState.entry.opts);
+      if (dragState.entry.opts.onDrag) dragState.entry.opts.onDrag(info);
+    }
+    function onDragUp(e) {
+      if (!dragState || e.pointerId !== dragState.pointerId) return; // 다른 손가락·손바닥의 포인터업은 무시
+      endDrag(dragInfo(e, dragState.entry.opts));
+    }
+    // 끌기 끝내기(포인터업·취소, 또는 끄는 중인 물체의 discard·dispose). info가 없으면 마지막 point로 onEnd를 부른다.
+    function endDrag(info) {
+      if (!dragState) return;
+      var st = dragState;
+      dragState = null;
+      controls.enabled = st.prevEnabled;
+      el.style.cursor = "";
+      window.removeEventListener("pointermove", onDragMove);
+      window.removeEventListener("pointerup", onDragUp);
+      window.removeEventListener("pointercancel", onDragUp);
+      if (!info) info = { point: st.last ? st.last.point : null, ray: st.last ? st.last.ray : null, event: null, cancelled: true };
+      if (st.entry.opts.onEnd) {
+        try {
+          st.entry.opts.onEnd(info);
+        } catch (err) {
+          console.warn("[science-sim] 끌기 onEnd 오류", err);
+        }
+      }
+    }
+    var hoverMq = window.matchMedia ? window.matchMedia("(hover: hover)") : null;
+    function onHoverMove(e) {
+      if (dragState || !draggables.length || !(hoverMq && hoverMq.matches)) return;
+      el.style.cursor = hitDraggable(e) ? "grab" : "";
+    }
+    el.addEventListener("pointerdown", onDragDown);
+    el.addEventListener("pointermove", onHoverMove);
+
     // 물체 하나(와 자식들)의 GPU 자원 해제
     function freeObject(obj) {
       obj.traverse(function (o) {
@@ -365,12 +529,22 @@
     function discard(obj) {
       if (!obj) return;
       if (obj.parent) obj.parent.remove(obj);
-      // obj와 그 자식 가운데 탭 대상으로 등록한 것은 모두 뺀다(떼어 낸 물체가 계속 탭에 걸리지 않게)
+      // obj와 그 자식 가운데 탭·끌기 대상으로 등록한 것은 모두 뺀다(떼어 낸 물체가 계속 걸리지 않게)
+      if (dragState && entryOfObjTree(obj, dragState.entry.obj)) endDrag(null); // 끄는 중이던 물체면 마지막 point로 onEnd
       obj.traverse(function (o) {
         var i = pickables.indexOf(o);
         if (i >= 0) pickables.splice(i, 1);
+        for (var j = draggables.length - 1; j >= 0; j--) if (draggables[j].obj === o) draggables.splice(j, 1);
       });
       freeObject(obj);
+    }
+    // obj(또는 그 자손)가 target인지 확인(끌던 물체가 discard될 때 드래그를 안전하게 끝내려고)
+    function entryOfObjTree(obj, target) {
+      var found = false;
+      obj.traverse(function (o) {
+        if (o === target) found = true;
+      });
+      return found;
     }
 
     // ── 시점 저장·되돌리기 / 화면 위 자리 / 사진(스냅샷) ──
@@ -699,6 +873,9 @@
         obj.userData.pick = value;
         pickables.push(obj);
       },
+      draggable: function (obj, dopts) {
+        draggables.push({ obj: obj, opts: dopts || {} });
+      },
       discard: discard,
       cameraPose: cameraPose,
       setCameraPose: setCameraPose,
@@ -718,6 +895,7 @@
       },
       dispose: function () {
         if (disposed) return;
+        if (dragState) endDrag(null); // 끄는 중이면 마지막 point로 onEnd(카메라 조작 값도 되돌린다)
         disposed = true; // 이후 onLost·렌더·리사이즈는 모두 무시
         running = false;
         finishAll();
@@ -729,10 +907,17 @@
         themeFns.length = 0;
         el.removeEventListener("pointerdown", onDown);
         el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointerdown", onDragDown);
+        el.removeEventListener("pointermove", onHoverMove);
+        window.removeEventListener("pointermove", onDragMove);
+        window.removeEventListener("pointerup", onDragUp);
+        window.removeEventListener("pointercancel", onDragUp);
+        dragState = null;
         controls.dispose();
         freeObject(scene);
         if (scene.background && scene.background.isTexture) scene.background.dispose();
         pickables.length = 0;
+        draggables.length = 0;
         try {
           renderer.renderLists.dispose();
         } catch (e) {

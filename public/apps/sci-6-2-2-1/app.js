@@ -209,22 +209,10 @@
     onChange: lesson.refresh,
   });
 
-  /* 확인하기·보기 고르기 뒤 피드백이 생기면 📝 기록하기가 하단 이동 막대에 가려질 수 있다 → 막대 위로 보이게 스크롤(앱에서만 처리) */
+  /* 확인하기·보기 고르기 뒤 피드백이 생기면 📝 기록하기가 하단 이동 막대에 가려질 수 있다 → 공통 틀의 규칙으로 보이게
+     (기록하기가 꺼져 있으면 움직이지 않음, 크게 보기에서는 막대와 관찰 카드가 함께 보이게 — exp.revealRecord) */
   function revealRecordButton() {
-    var btn = document.querySelector("#experiment-root .ss-observe .ss-btn-big");
-    if (!btn || btn.closest("[hidden]")) return;
-    var footer = document.querySelector(".ss-footer-nav");
-    var fh = footer ? footer.getBoundingClientRect().height : 0;
-    var vh = window.innerHeight || document.documentElement.clientHeight;
-    var r = btn.getBoundingClientRect();
-    var over = r.bottom - (vh - fh - 12);
-    if (over > 0) {
-      try {
-        window.scrollBy({ top: over, behavior: reduceMotion() ? "auto" : "smooth" });
-      } catch (e) {
-        window.scrollBy(0, over);
-      }
-    }
+    exp.revealRecord();
   }
   $("experiment-root").addEventListener("click", function (e) {
     var t = e.target && e.target.closest ? e.target.closest(".ss-observe .ss-obs, .ss-observe .ss-check-btn") : null;

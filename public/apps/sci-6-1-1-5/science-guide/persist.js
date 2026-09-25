@@ -1374,4 +1374,26 @@
     debounced.flush = runNow;
     return debounced;
   };
+
+  /* 기기 UI 설정(2026-09-25) — 전체 화면 보기·머리말 접기처럼 "이 기기에서 학생이 고른 화면 모양" 기억용.
+   * sci6 접두사를 일부러 안 쓴다: 로그아웃 때 지우는 학습 기록이 아니라 기기 UI 취향이라 로그인·로그아웃과 무관하게 남아야 한다. */
+  SciSim.uiPref = {
+    get: function (key) {
+      try {
+        var v = localStorage.getItem("ssUiPref:" + key);
+        if (v === "1") return true;
+        if (v === "0") return false;
+        return null;
+      } catch (e) {
+        return null;
+      }
+    },
+    set: function (key, val) {
+      try {
+        localStorage.setItem("ssUiPref:" + key, val ? "1" : "0");
+      } catch (e) {
+        /* 저장 안 돼도 화면은 그대로 동작(기본값으로) */
+      }
+    },
+  };
 })();

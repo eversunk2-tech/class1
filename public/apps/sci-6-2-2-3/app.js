@@ -1154,11 +1154,15 @@
 
   /* ── 관찰·기록 카드: 지금 모습(아이콘+글자) + 보기 고르기 + 확인하기 ── */
   var liveChip = null; // { cond, node }
+  // 관찰 카드 캡션은 중립적으로만 안내한다("지금 모습: 불꽃 없음 — 꺼졌어요" 같은 상태 글이 바로 아래 보기와 같은 말이 되지 않게).
+  // 실제 상태(icon·txt)는 화면에서 직접 보고 고르는 몫이라 기본은 숨겨 두고, 스크린리더용 설명은 맞는 보기를 고르고
+  // '확인하기'를 눌렀을 때만 드러낸다(틀린 답으로 확인하면 계속 숨김).
   function chipNode(cond) {
     var icon = el("span", { class: "chip-ic", "aria-hidden": "true" });
     var txt = el("span", { class: "chip-tx" });
-    var node = el("p", { class: "obs-chip" }, [el("strong", { text: COND[cond].name + " · 지금 모습: " }), icon, txt]);
-    return { cond: cond, node: node, icon: icon, txt: txt };
+    var reveal = el("span", { class: "chip-reveal", hidden: true }, [icon, txt]);
+    var node = el("p", { class: "obs-chip" }, [el("strong", { text: COND[cond].name }), el("span", { text: " — 장면에서 불꽃을 살펴보세요." }), reveal]);
+    return { cond: cond, node: node, icon: icon, txt: txt, reveal: reveal };
   }
   function observeCard(sel) {
     var o = C.observe[sel.cond];
@@ -1177,6 +1181,8 @@
       check: function (observed) {
         if (e1 && !sim.seen) return "먼저 시간 바를 끝까지 끌어 두 촛불을 살펴보세요.";
         if (observed === o.answer) {
+          // 맞는 보기로 확인했을 때만 실제 상태 글(스크린리더용 설명 포함)을 보여 준다(틀린 답으로 확인하면 계속 숨김 — 답을 먼저 알려 주지 않게).
+          if (liveChip) liveChip.reveal.hidden = false;
           return { ok: true, message: o.ok, node: e1 ? null : S.rich(sel.cond === "wood" ? C.ignitionNoteWood : C.ignitionNote, "p") };
         }
         return o.wrong;
@@ -1414,27 +1420,13 @@
     };
   })();
 
-  /* ── 확인하기를 누른 뒤 '기록하기' 버튼이 아래 단계 버튼에 가려지면 보이게 올린다(앱 전용, fix-1) ── */
+  /* ── 확인하기를 누른 뒤 '기록하기' 버튼이 아래 단계 버튼에 가려지면 보이게 올린다(fix-1) — 공통 틀의 규칙(exp.revealRecord:
+     기록하기가 꺼져 있으면 그대로, 크게 보기에서는 장면 안 막대와 관찰 카드가 함께 보이게) ── */
   $("experiment-root").addEventListener("click", function (e) {
     var t = e.target && e.target.closest ? e.target.closest(".ss-check-btn") : null;
     if (!t) return;
     setTimeout(function () {
-      var obs = t.closest(".ss-observe");
-      var rec = obs && [].slice.call(obs.querySelectorAll("button")).filter(function (b) {
-        return b.textContent.indexOf("기록하기") >= 0;
-      })[0];
-      if (!rec || rec.offsetParent === null) return;
-      var ft = document.querySelector(".ss-footer-nav");
-      var limit = (window.innerHeight || 0) - (ft ? ft.getBoundingClientRect().height : 0) - 8;
-      var r = rec.getBoundingClientRect();
-      if (r.bottom > limit) {
-        var dy = r.bottom - limit;
-        try {
-          window.scrollBy({ top: dy, behavior: reduceMotion() ? "auto" : "smooth" });
-        } catch (err) {
-          window.scrollBy(0, dy);
-        }
-      }
+      exp.revealRecord();
     }, 80);
   });
 

@@ -156,7 +156,20 @@ a { color: var(--ss-primary); }
 .ss-title { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.35; flex: 1 1 240px; }
 .ss-title small { display: block; color: var(--ss-muted); font-family: var(--ss-font); font-weight: 500; font-size: 0.82rem; }
 
-.ss-stepper { list-style: none; margin: 8px auto 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 1180px; }
+/* 머리말 접기 토글(2026-09-25, 모든 앱) — 제목 줄 맨 끝. 애니메이션 없이 즉시 바뀐다(reduce-motion 여부와 무관). */
+.ss-header-toggle {
+  flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--ss-border); background: var(--ss-surface); color: var(--ss-text);
+  font-weight: 600; font-size: 0.85rem; cursor: pointer; box-shadow: var(--ss-shadow-sm);
+}
+/* 접힘: 계정 줄(.ss-who/.ss-trial, persist.js가 나중에 넣어도 그대로 적용된다)과 단계 이동 막대만 감춘다 —
+   제목 줄(.ss-topline, 저장 상태 배지 포함)은 그대로 남는다. */
+.ss-header.is-collapsed > .ss-who,
+.ss-header.is-collapsed > .ss-trial,
+.ss-header.is-collapsed > #stage-nav,
+.ss-header.is-collapsed > .ss-stepper { display: none; }
+
+.ss-stepper { list-style: none; margin: 8px auto 0; padding: 0; display: grid; grid-template-columns: repeat(var(--ss-steps, 5), 1fr); gap: 6px; max-width: 1180px; }
 .ss-step {
   position: relative;
   width: 100%; min-height: 48px; border: 2px solid transparent; border-radius: 999px;

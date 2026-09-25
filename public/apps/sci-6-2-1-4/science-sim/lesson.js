@@ -68,6 +68,35 @@
         if ("ResizeObserver" in window) new ResizeObserver(setF).observe(footerNav);
       }
 
+      /* 머리말 접기(2026-09-25, 모든 앱 공통). 제목 줄(.ss-topline: 뒤로 가기·제목·저장 상태 배지)만 남기고
+       * 계정 줄(.ss-who/.ss-trial, persist.js가 나중에 끼워 넣을 수도 있다 — CSS로 가려서 순서에 안 흔들린다)과
+       * 단계 이동 막대(#stage-nav)를 접는다. 아래 이동 막대(이전/다음)로는 계속 단계를 옮길 수 있다.
+       * 애니메이션은 만들지 않는다(prefers-reduced-motion과 무관하게 항상 즉시 바뀐다 — 가장 안전한 선택). */
+      if (header) {
+        var topline = header.querySelector(".ss-topline");
+        if (topline) {
+          var collapseBtn = el("button", {
+            type: "button",
+            class: "ss-header-toggle",
+            "aria-expanded": "true",
+            text: "▲ 접기",
+          });
+          topline.appendChild(collapseBtn);
+          var setCollapsed = function (on, opts) {
+            opts = opts || {};
+            header.classList.toggle("is-collapsed", on);
+            collapseBtn.setAttribute("aria-expanded", String(!on));
+            collapseBtn.textContent = on ? "▼ 펼치기" : "▲ 접기";
+            if (!opts.silent && SciSim.uiPref) SciSim.uiPref.set("headerCollapsed", on);
+          };
+          collapseBtn.addEventListener("click", function () {
+            setCollapsed(!header.classList.contains("is-collapsed"));
+          });
+          var storedCollapsed = SciSim.uiPref ? SciSim.uiPref.get("headerCollapsed") : null;
+          setCollapsed(storedCollapsed === true, { silent: true }); // 기본은 펼침(예전과 같음) — 접었던 적 있으면 그 상태로 시작
+        }
+      }
+
       /* 답 되짚기·차단(answer-check.js를 불러온 앱에서만). 앱 코드는 바꿀 필요가 없다. */
       if (SciSim.AnswerCheck) SciSim.AnswerCheck.configure({ appId: o.appId, store: store });
 
