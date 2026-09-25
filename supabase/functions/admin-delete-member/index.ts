@@ -18,7 +18,16 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ALLOWED_ORIGINS = new Set(["https://eversunk2-tech.github.io", "http://localhost:3000"]);
+// 허용 출처(CORS): GitHub Pages·로컬 개발 + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 출처 — 예: Vercel 주소
+// https://class1-xxxx.vercel.app). 주소가 바뀌어도 코드를 고치지 않고 Secrets만 바꾼다. https://로 시작하는 정확한 출처만 받는다("*" 등은 무시).
+const ALLOWED_ORIGINS = new Set([
+  "https://eversunk2-tech.github.io",
+  "http://localhost:3000",
+  ...(Deno.env.get("EXTRA_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter((s) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(s)),
+]);
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {

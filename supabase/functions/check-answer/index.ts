@@ -22,7 +22,16 @@
 // - 서비스 롤 키도, DB 조회도 쓰지 않는다(로그인 여부는 게이트웨이가 본다).
 // - block은 "질문과 전혀 관련이 없거나 뜻을 알 수 없을 때"만 고르게 프롬프트에서 강하게 제한한다(오차단 방지).
 
-const ALLOWED_ORIGINS = new Set(["https://eversunk2-tech.github.io", "http://localhost:3000"]);
+// 허용 출처(CORS): GitHub Pages·로컬 개발 + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 출처 — 예: Vercel 주소
+// https://class1-xxxx.vercel.app). 주소가 바뀌어도 코드를 고치지 않고 Secrets만 바꾼다. https://로 시작하는 정확한 출처만 받는다("*" 등은 무시).
+const ALLOWED_ORIGINS = new Set([
+  "https://eversunk2-tech.github.io",
+  "http://localhost:3000",
+  ...(Deno.env.get("EXTRA_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter((s) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(s)),
+]);
 
 const MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-flash-lite-latest";
 const GEMINI_TIMEOUT_MS = 3000; // 클라이언트는 3.5초에 포기한다(spec §2.3)

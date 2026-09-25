@@ -14,7 +14,7 @@
 
 - **필요한 시크릿: `GEMINI_API_KEY` 하나.** (`SUPABASE_URL` 등은 이 함수가 쓰지 않습니다. 서비스 롤 키도 쓰지 않습니다.)
 - 선택 시크릿 `GEMINI_MODEL` — 기본값 `gemini-flash-lite-latest`. 모델 이름이 바뀌거나 다른 모델을 쓰고 싶을 때만 넣습니다.
-- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000`.
+- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000` + Supabase Secrets **`EXTRA_ALLOWED_ORIGINS`**(쉼표로 구분한 추가 출처, 예: Vercel 주소 `https://class1-xxxx.vercel.app` — 끝에 `/` 없이). 다른 도메인을 더 쓰게 되면 코드를 고치지 말고 이 Secret을 바꾼 뒤 함수를 다시 배포하세요.
 - **JWT 검증(Verify JWT)은 켠 채로 배포합니다**(`--no-verify-jwt`를 붙이지 마세요. `supabase/config.toml`에도 `verify_jwt = true`로 적어 두었습니다).
   게이트웨이는 "이 프로젝트 키로 서명된 토큰인지"만 봅니다 — **anon key 자체도 그런 토큰이라 게이트웨이만으로는 로그인 확인이 되지 않습니다.**
   그래서 함수가 `Authorization` 토큰의 내용을 한 번 더 확인합니다: `role`이 `authenticated`이고 `sub`(user id)가 있으며 만료 전일 때만 처리하고,

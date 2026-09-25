@@ -24,7 +24,7 @@
 ## 환경·설정
 
 - 환경변수 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`는 Supabase가 자동으로 넣어 주므로 **따로 설정할 필요가 없습니다.**
-- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000`. 다른 도메인을 쓰게 되면 `index.ts`의 `ALLOWED_ORIGINS`를 고친 뒤 다시 배포하세요.
+- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000` + Supabase Secrets **`EXTRA_ALLOWED_ORIGINS`**(쉼표로 구분한 추가 출처, 예: Vercel 주소 `https://class1-xxxx.vercel.app` — 끝에 `/` 없이). 다른 도메인을 더 쓰게 되면 코드를 고치지 말고 이 Secret을 바꾼 뒤 함수를 다시 배포하세요.
 - **JWT 검증(Verify JWT)은 켜 둔 상태(기본값)로 배포하세요.**
 - Supabase 프로젝트의 **Authentication > Sign Ups**에서 가입이 꺼져 있어도 이 함수는 동작합니다(Admin API라 가입 설정과 무관).
 

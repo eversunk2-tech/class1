@@ -7,7 +7,7 @@
 * 블로그 본체: Next.js 16 (App Router) + Tailwind + shadcn/ui, 정적 export
 * 웹앱: HTML, CSS, JavaScript로 만든 독립 정적 앱 (`/public/apps/{앱이름}/`)
 * Supabase 기반 백엔드 데이터 서버 (글, 댓글, 좋아요, 조회수, 로그인, 웹앱 데이터)
-* 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`)
+* 배포: GitHub Pages 프로젝트 사이트 (`https://eversunk2-tech.github.io/class1/`, 저장소 `eversunk2-tech/class1`, basePath `/class1`) + **Vercel**(프로젝트 `class1`, 같은 저장소 main에서 자동 배포, 주소 `https://<Vercel 주소>/class1/` — 첫 주소 `/`는 `vercel.json`이 `/class1/`로 넘김. `class1.vercel.app`은 다른 사람 주소라 실제 주소는 Vercel Settings → Domains에서 확인)
 * 언어/디자인: 한국어 UI, 다크모드 지원. 디자인 체계는 `docs/design/redesign/spec.md`(2026-09-24 개편: 보라 주색, 본문 Pretendard·제목 G마켓 산스 Bold + 부드러운 그림자, Fluent 3D 아이콘, 부엉이 과학자 마스코트) — 아래 "디자인 규칙"
 * 메뉴: 홈 · 학습게임활동 · 과학수업 · 자유게시판 (수학수업은 삭제됨, `/math/` 없음)
 * 진행 현황·확정 결정은 `docs/STATUS.md`에 기록한다(위에서 함께 불러옴).
@@ -21,7 +21,7 @@
 * 서버 기능을 쓰지 않는다: Server Actions, Route Handlers, middleware/proxy, 동적 SSR, `@supabase/ssr` 서버 쿠키 세션 금지.
 * Supabase 호출은 모두 브라우저(Client Component)에서 `@supabase/supabase-js`로 한다.
 * 동적 경로(예: 글 상세)는 쿼리스트링(`/post?slug=...`)이나 클라이언트 라우팅으로 처리한다. `generateStaticParams`로 DB 글을 빌드 타임에 고정하지 않는다.
-* 배포는 GitHub Actions로 `next build` → `out/` 폴더를 Pages에 올린다.
+* 배포는 GitHub Actions로 `next build` → `out/` 폴더를 Pages에 올린다. Vercel도 같은 push로 자동 빌드·배포한다(Next.js 프리셋 기본값, 환경 변수 `NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_ANON_KEY`는 Vercel 프로젝트 설정에 — service_role 키는 넣지 않는다).
 
 ### 블로그 글
 * 글 원본은 Supabase `posts` 테이블에 마크다운 텍스트로 저장한다.
@@ -36,7 +36,7 @@
 * 학습 테이블: `member_directory`, `app_results`, `app_progress`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks`, `praise_presets` (설계: `docs/admin/spec.md`, `docs/admin/responses-spec.md`).
 * 관리 테이블: `site_settings`(로그인 잠금 스위치 한 줄, 읽기는 항상 공개), `password_reset_log`, `member_withdrawal_log`, `member_create_log`(감사 로그, 관리자만 조회, 쓰기는 service_role 함수로만) (설계: `docs/admin/admin-tools/spec.md`, `docs/admin/create-members/`).
 * 커뮤니티 테이블: `community_posts`(kind: board|game), `community_comments`, `community_likes`, `community_reports`, Storage 버킷 `game-uploads`(비공개) (설계: `docs/community/spec.md`).
-* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `check-answer`(Gemini, 비밀 `GEMINI_API_KEY`). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지).
+* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `check-answer`(Gemini, 비밀 `GEMINI_API_KEY`). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지). 함수의 허용 출처(CORS)는 GitHub Pages·localhost + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 주소, 예: Vercel) — 주소를 더할 때 코드는 고치지 않는다.
 * 외부 AI API 키 등 비밀값은 Supabase Secrets에만 두고 코드·저장소·로그·브라우저에 절대 넣지 않는다. 외부로 보내는 학생 데이터는 답 글·질문·모범 답안뿐(이름·학번·user id·이메일 금지).
 * 웹앱 전용 테이블은 `app_{앱이름}_` 접두사를 붙인다.
 * 스키마 변경은 `supabase/migrations/`에 SQL 파일로 남긴다.
@@ -56,7 +56,7 @@
 * 가입 정책: Supabase 가입 허용 유지(OAuth 방문자는 첫 로그인 시 일반 사용자로 자동 가입), Confirm email 켬.
 * 계정은 관리자 대시보드 **회원 관리 > 회원 추가**(한 명 / 엑셀 일괄: 아이디·비밀번호·역할)로 만든다. 역할은 학생=`user`, 교사=`admin`(새 역할 없음), 이메일은 `아이디@class1.local`, 첫 로그인 때 비밀번호 변경 강제. 로컬 스크립트(`scripts/import-users.mjs`)는 예비용.
 * **강제 탈퇴는 완전 탈퇴**: `auth.users`를 삭제(복구 없음)하되 학습 기록은 남기고 "탈퇴한 학생"으로 표시한다. 관리자 대상은 불가. 기록을 지울 수 있는 외래키가 생기면 안 된다(`withdrawal_blocking_fks()`가 막음).
-* redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`를 등록한다.
+* redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`, Vercel 주소 `/**`를 등록한다(Supabase Authentication → URL Configuration).
 
 
 ## 작업 사이클
@@ -114,7 +114,7 @@
 * **활동 시간: 앱 전체를 학생이 7분 안에 마칠 분량**으로 구성한다. `spec.md`에 단계별 예상 소요 시간표를 적고(합계 7분 이하), Review에서 실제로 진행해 확인한다. 단, 아래 측정 규칙(실험관찰의 조건은 모두 측정)을 줄여서 시간을 맞추지 않는다 — 읽기·질문·연출을 줄이고, 그래도 넘으면 예상 시간을 사용자에게 알린다.
 * **예상하기: 탐구형 질문 1개만.** 답을 절대 미리 제시하지 않고, 학생이 직접 짧게 타이핑한다. 힌트 버튼을 둔다(힌트도 답을 알려주지 않는다).
 * **실험하기**: 지도서의 핵심 실험을 3D 장면으로 보여주고 드래그로 방향을 바꿀 수 있게 한다(three.js CDN, 터치 드래그). 측정 조건은 **실험관찰(교과서)에 제시된 상황을 모두** 측정하게 한다(아래 측정 규칙). 가능하면 정해진 조건 사이의 연속 구간도 슬라이더 등으로 자유롭게 살펴볼 수 있게 한다. 실시간 연출은 짧게 하고, 기다림이 길면 "빨리 감기(모형)"로 줄인다. 측정값은 **기록** 버튼으로 저장한다.
-* **실험 화면 배치(2026-09-25 사용자 결정, 적용 중 — `docs/science/sim-redesign/spec.md` 개정 4)**: **기본은 지금 구조**(가로 화면: 장면 왼쪽·조작 오른쪽, 세로: 위아래). 장면 한쪽의 **"⛶ 전체 화면 보기"** 버튼(공통 틀)을 누르면 페이지 안에서 크게 보기 — 장면이 가로 전체, **실행·기록하기·측정값은 장면 안 막대**, 조건 버튼은 장면 바로 아래, 가로 화면에서도 장면 전체가 스크롤 없이 보이게. **태블릿 세로에서는 크게 보기가 기본**, 선택은 기억. 상단의 계정 줄과 단계 메뉴는 **접었다 펼 수 있다**(접으면 제목 줄만).
+* **실험 화면 배치(2026-09-25·26 사용자 결정 — `docs/science/sim-redesign/spec.md` 개정 4·6)**: **기본은 지금 구조**(가로 화면: 장면 왼쪽·조작 오른쪽, 세로: 위아래). 장면 한쪽의 **"⛶ 전체 화면 보기"**(공통 틀)를 누르면 **한 화면 실험실** — 실험 영역이 머리말과 아래 이동 막대 사이 화면 전체를 채우고, 그 안에 **장면 + 한쪽의 조작 칸**(가로 화면은 오른쪽, 세로는 아래쪽; 조건 고르기·슬라이더·관찰 카드·기록 표 등 전부, 장면을 가리지 않음, 길면 칸 안에서만 스크롤) — **페이지 위아래 스크롤 없이** 한눈에 조작. 실행·기록하기·측정값은 장면 안 막대. **태블릿 세로에서는 크게 보기가 기본**, 선택은 방향별로 기억. 상단의 계정 줄과 단계 메뉴는 **접었다 펼 수 있다**(접으면 제목 줄만).
 * **직접 조작하는 느낌**: 학생이 장면의 물체를 직접 끌거나 누르는 조작을 우선한다(예: 태양·손전등 끌기, 물체를 눌러 고르기 — 버튼 조작은 대안으로 남김). 단 **복잡해지거나 시간이 늘면 안 된다**(조작 단계를 더하지 않고 기존 고르기를 대신할 뿐, 연출은 1초 안쪽).
 * **답을 먼저 알려 주지 않는다**: 실험하기 단계와 **기록하는 순간**(알림·관찰 카드 안내·이름표·참고 팝업)에는 **측정값·관찰 사실만** 말한다. "~할수록 ~해요", "그래서 ~이다", 원인 단정, 정답 보기와 같은 문구 금지. 분석·정리하기에서 학생이 고르거나 쓴 **뒤**의 피드백·모범 답안은 괜찮다.
 * **장면 속 글자**: 바뀌는 값(측정값·각도 등)은 3D 이름표로 띄우지 않고 **값 패널**에 둔다(이름표가 측정 지점·다른 이름표를 가리지 않게). 3D에는 안 바뀌는 이름표만. 태양·빛줄기·그림자처럼 서로 맞아야 하는 그림은 **한 상태값에서 함께 계산**한다(따로 계산해 어긋나지 않게). 알림은 장면을 가리지 않는 곳에.

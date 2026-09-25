@@ -12,7 +12,7 @@
 >   이미 발급된 access token은 만료(기본 1시간)까지 유효할 수 있습니다.
 
 - 환경변수 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`는 Supabase가 자동으로 넣어 주므로 **따로 설정할 필요가 없습니다.**
-- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000`. 다른 도메인을 쓰게 되면 `index.ts`의 `ALLOWED_ORIGINS`를 고친 뒤 다시 배포하세요.
+- 허용 출처(CORS): `https://eversunk2-tech.github.io`, `http://localhost:3000` + Supabase Secrets **`EXTRA_ALLOWED_ORIGINS`**(쉼표로 구분한 추가 출처, 예: Vercel 주소 `https://class1-xxxx.vercel.app` — 끝에 `/` 없이). 다른 도메인을 더 쓰게 되면 코드를 고치지 말고 이 Secret을 바꾼 뒤 함수를 다시 배포하세요.
 - **JWT 검증(Verify JWT)은 켜 둔 상태(기본값)로 배포하세요.** 로그인하지 않은 요청은 Supabase 게이트웨이에서 먼저 막히고, 함수 안에서도 한 번 더 확인합니다.
 - 임시 비밀번호는 응답에만 담기며 로그에 남지 않습니다. 관리자가 창을 닫으면 다시 볼 수 없습니다(다시 초기화하면 새로 발급).
 
