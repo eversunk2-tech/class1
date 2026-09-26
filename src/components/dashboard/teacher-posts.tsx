@@ -379,6 +379,17 @@ export function TeacherPosts({
     return () => observer.disconnect();
   }, [posts, listShown, besideHeadingId]);
 
+  // 쪽을 넘길 때 펼친 글이 접히며 쪽 넘기기가 위로 올라가도 화면이 튀지 않게(Review notice-pages M1):
+  // 넘기기 직전 쪽 넘기기의 화면 위치를 기억해 두고(goTo), 새 쪽을 그린 직후(화면에 보이기 전) 그 차이만큼 되돌린다.
+  const pagerTopBeforeRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const before = pagerTopBeforeRef.current;
+    if (before == null) return;
+    pagerTopBeforeRef.current = null;
+    const after = rootRef.current?.querySelector(":scope > nav")?.getBoundingClientRect().top;
+    if (after != null && Math.abs(after - before) > 1) window.scrollBy(0, after - before);
+  }, [view.page]);
+
   if (isLocked) {
     return <LoginNeededNotice what="선생님 글" description="로그인하면 담임 선생님 글을 확인할 수 있어요." className="py-8" />;
   }
@@ -428,6 +439,7 @@ export function TeacherPosts({
 
   function goTo(target: number) {
     if (target < 0 || target >= pageCount || target === current) return;
+    pagerTopBeforeRef.current = rootRef.current?.querySelector(":scope > nav")?.getBoundingClientRect().top ?? null;
     setView((prev) => ({ ...prev, page: target }));
     setOpen(new Set()); // 쪽을 넘기면 펼친 글은 접는다
     setAnnounce(`선생님 글 ${pageCount}쪽 중 ${target + 1}쪽`);
