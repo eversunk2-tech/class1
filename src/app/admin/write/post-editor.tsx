@@ -3,9 +3,17 @@
 import { useCallback, useDeferredValue, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftIcon, ExternalLinkIcon, Loader2Icon, SaveIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, ExternalLinkIcon, Loader2Icon, LockIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
+import {
+  canModifyContent,
+  contentLockReason,
+  isPermissionRejection,
+  OWNER_ONLY_DELETE,
+  OWNER_ONLY_EDIT,
+  useAdminContext,
+} from "@/hooks/use-admin-context";
 import { useSession } from "@/hooks/use-session";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { editPostHref, postHref } from "@/components/post-card";
@@ -230,6 +238,9 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { loading: sessionLoading, user } = useSession();
+  // 남의 글은 쓴 선생님과 총괄만 고치고 지운다(20260927030000_content_owner_only.sql). 새 글은 교사 누구나(자기 이름으로).
+  const adminCtx = useAdminContext();
+  const canModify = !isEdit || canModifyContent(adminCtx, initial.author_id);
   const draftKey = draftKeyOf(initial);
   // 이전에 세션이 만료되며 임시 저장된 내용이 있으면 복원을 제안한다.
   const [pendingDraft, setPendingDraft] = useState<Draft | null>(() => readDraft(draftKey, snapshotOf(initial)));
@@ -273,6 +284,11 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
 
   const save = useCallback(async () => {
     if (saving) return;
+    if (!canModify) {
+      // 저장 버튼은 꺼 두지만 Ctrl/Cmd + S로도 들어온다.
+      toast.error(`저장하지 못했습니다. ${OWNER_ONLY_EDIT}`);
+      return;
+    }
     const title = form.title.trim();
     const slugInput = effectiveSlug.trim();
     const coverUrl = form.coverUrl.trim();
@@ -326,13 +342,16 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
         if (result.error.code === "23505") {
           setErrors({ slug: "이미 사용 중인 slug입니다. 다른 값을 입력하세요." });
           toast.error("slug가 다른 글과 겹칩니다.");
+        } else if (isEdit && isPermissionRejection(result.error)) {
+          toast.error(`저장하지 못했습니다. ${OWNER_ONLY_EDIT}`);
         } else {
           toast.error("저장하지 못했습니다. 네트워크 상태나 권한을 확인해 주세요.");
         }
         return;
       }
       if (!result.data) {
-        toast.error("저장하지 못했습니다. 글이 삭제되었거나 권한이 없습니다.");
+        // 오류 없이 0행 = RLS가 남의 글을 걸렀거나 그사이 글이 지워졌다.
+        toast.error(`저장하지 못했습니다. ${OWNER_ONLY_EDIT} 글이 이미 지워졌을 수도 있어요.`);
         return;
       }
 
@@ -351,7 +370,7 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
     } finally {
       setSaving(false);
     }
-  }, [saving, form, effectiveSlug, slugTouched, initial, isEdit, onSaved, router, draftKey]);
+  }, [saving, canModify, form, effectiveSlug, slugTouched, initial, isEdit, onSaved, router, draftKey]);
 
   // Ctrl/Cmd + S 로 저장
   useEffect(() => {
@@ -371,7 +390,8 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
     const { data, error } = await supabase.from("posts").delete().eq("id", initial.id).select("id");
     setDeleting(false);
     if (error || !data?.length) {
-      toast.error("글을 삭제하지 못했습니다.");
+      // 오류 없이 0행 = RLS가 남의 글을 걸렀다(또는 이미 지워짐).
+      toast.error(!error || isPermissionRejection(error) ? `글을 삭제하지 못했습니다. ${OWNER_ONLY_DELETE}` : "글을 삭제하지 못했습니다.");
       return;
     }
     setDeleteOpen(false);
@@ -407,6 +427,14 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
           </Button>
         ) : null}
       </div>
+
+      {!canModify ? (
+        <p id="post-owner-lock" role="note" className="flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium">
+          <LockIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          {contentLockReason(adminCtx)}
+          {adminCtx.status === "ready" ? " 이 글은 볼 수만 있고 저장·삭제는 할 수 없어요." : ""}
+        </p>
+      ) : null}
 
       {pendingDraft ? (
         <div
@@ -554,7 +582,11 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
         <div className="ml-auto flex items-center gap-2">
           {isEdit ? (
             <AlertDialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
-              <AlertDialogTrigger render={<Button type="button" variant="ghost" className="h-9 text-destructive" />}>
+              <AlertDialogTrigger
+                disabled={!canModify}
+                aria-describedby={canModify ? undefined : "post-owner-lock"}
+                render={<Button type="button" variant="ghost" className="h-9 text-destructive" />}
+              >
                 <Trash2Icon />
                 삭제
               </AlertDialogTrigger>
@@ -575,7 +607,12 @@ function PostEditor({ initial, onSaved }: { initial: Post | null; onSaved: (post
               </AlertDialogContent>
             </AlertDialog>
           ) : null}
-          <Button type="submit" className="h-9 px-4" disabled={saving}>
+          <Button
+            type="submit"
+            className="h-9 px-4"
+            disabled={saving || !canModify}
+            aria-describedby={canModify ? undefined : "post-owner-lock"}
+          >
             {saving ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
             {saving ? "저장 중…" : "저장"}
           </Button>

@@ -213,6 +213,42 @@ export function adminPermissions(ctx: Pick<AdminContextValue, "status" | "isSupe
   };
 }
 
+/** 과제·블로그 글 권한 안내(20260927030000_content_owner_only.sql — 2026-09-26 사용자 결정 "쓴 선생님과 총괄만"). */
+export const OWNER_ONLY_EDIT = "쓴 선생님과 총괄만 고칠 수 있어요.";
+export const OWNER_ONLY_DELETE = "쓴 선생님과 총괄만 지울 수 있어요.";
+
+/**
+ * 과제·블로그 글을 고치고(공개 전환 포함) 지울 수 있는가 — 화면 표시용. 실제 판단은 RLS(쓴 사람 = 나 또는 총괄).
+ * - 내가 쓴 것: 언제나 true(총괄 여부를 몰라도 된다).
+ * - 남이 쓴 것(쓴 사람이 비어 있는 것 포함): 총괄로 확인된 뒤에만 true — "loading" 동안은 잠시 막고, "error"면 막는다.
+ * - 학급 기능 전("missing"): 예전처럼 true(그때는 이 SQL도 적용할 수 없어 서버가 교사 누구나 허용한다).
+ */
+export function canModifyContent(
+  ctx: Pick<AdminContextValue, "status" | "isSuperAdmin" | "userId">,
+  ownerId: string | null | undefined,
+): boolean {
+  if (ctx.status === "missing") return true;
+  if (ownerId && ctx.userId && ownerId === ctx.userId) return true;
+  return ctx.status === "ready" && ctx.isSuperAdmin;
+}
+
+/** canModifyContent가 false일 때 버튼 옆에 보일 까닭(권한을 아직 모르면 그 사실을 말한다). */
+export function contentLockReason(ctx: Pick<AdminContextValue, "status">): string {
+  if (ctx.status === "loading") return "권한을 확인하는 중…";
+  if (ctx.status === "error") return "권한을 확인하지 못해 지금은 고칠 수 없어요. 화면을 새로 고쳐 주세요.";
+  return OWNER_ONLY_EDIT;
+}
+
+/**
+ * 서버가 권한으로 거부했는가(과제·글 고치기·지우기). RLS는 남의 행을 오류 없이 0행으로 거르고
+ * (src/lib/learning.ts의 "not-updated"·"not-deleted", 화면의 data 없음), with check·열 권한 위반은 42501로 알린다.
+ * 0행은 그사이 이미 지워진 경우일 수도 있다.
+ */
+export function isPermissionRejection(error: unknown): boolean {
+  if (error instanceof Error && (error.message === "not-updated" || error.message === "not-deleted")) return true;
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "42501";
+}
+
 /**
  * ClassScopeGate 안에서 쓰는 학생 범위.
  * - classIds: 학습 기록 화면의 학생 범위(학급을 골랐으면 그 학급만). null = 학급 기능 전(거르지 않음)

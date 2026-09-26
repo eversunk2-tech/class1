@@ -2,7 +2,18 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { CalendarClockIcon, EyeIcon, Loader2Icon, PencilIcon, PencilLineIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import {
+  CalendarClockIcon,
+  EyeIcon,
+  Loader2Icon,
+  LockIcon,
+  PencilIcon,
+  PencilLineIcon,
+  PlusIcon,
+  Trash2Icon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
@@ -16,7 +27,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useStudentScope } from "@/hooks/use-admin-context";
+import {
+  canModifyContent,
+  isPermissionRejection,
+  OWNER_ONLY_DELETE,
+  OWNER_ONLY_EDIT,
+  useAdminContext,
+  useStudentScope,
+} from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { formatCount, formatDateTime } from "@/lib/format";
 import {
@@ -24,6 +42,7 @@ import {
   deleteAssignment,
   errorMessage,
   fetchAssignments,
+  fetchProfileNames,
   fetchStudents,
   fromDateTimeLocal,
   isMissingSchemaError,
@@ -38,10 +57,17 @@ import { cn } from "@/lib/utils";
 
 const TITLE_MAX = 200;
 
-type Data = { assignments: AssignmentWithCount[]; studentCount: number | null };
+/** creatorNames: 다른 선생님이 만든 과제의 만든 사람 이름(id → 이름). 못 읽으면 null(목록은 그대로). */
+type Data = { assignments: AssignmentWithCount[]; studentCount: number | null; creatorNames: Map<string, string> | null };
 
-/** 학습 현황 > 과제 관리: 목록 · 새 과제 · 수정 · 공개 전환 · 삭제(spec §3.6). */
+/**
+ * 학습 현황 > 과제 관리: 목록 · 새 과제 · 수정 · 공개 전환 · 삭제(spec §3.6).
+ * 고치기·공개 전환·지우기는 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql — 남의 과제는 버튼을 끄고 까닭을 보인다).
+ * 새 과제 만들기는 교사 누구나(자기 이름으로).
+ */
 export function AssignmentManager() {
+  const ctx = useAdminContext();
+  const myId = ctx.userId;
   // 제출 수(서버 embed count)는 내 학급 전체 기준이라 학생 수도 내 학급 전체로 센다(학급 고르기와 무관).
   const { allClassIds } = useStudentScope();
   const load = useCallback(async (): Promise<Data> => {
@@ -50,8 +76,11 @@ export function AssignmentManager() {
       // 학생 수는 보조 정보라 실패해도 목록은 보여 준다.
       fetchStudents(allClassIds).catch(() => null),
     ]);
-    return { assignments, studentCount: students ? students.length : null };
-  }, [allClassIds]);
+    // 다른 선생님이 만든 과제가 있을 때만 이름을 읽는다(교사가 한 명이면 요청 없음). 보조 정보라 실패해도 목록은 보여 준다.
+    const others = assignments.map((a) => a.created_by).filter((id): id is string => !!id && id !== myId);
+    const creatorNames = others.length ? await fetchProfileNames(others).catch(() => null) : new Map<string, string>();
+    return { assignments, studentCount: students ? students.length : null, creatorNames };
+  }, [allClassIds, myId]);
   const { state, reload, setData } = useAsyncData(load);
 
   const [editing, setEditing] = useState<Assignment | null>(null);
@@ -84,8 +113,9 @@ export function AssignmentManager() {
     try {
       upsert(await updateAssignment(a.id, { published: next }));
       toast.success(next ? "과제를 공개했습니다." : "과제를 비공개로 바꿨습니다.");
-    } catch {
-      toast.error("공개 상태를 바꾸지 못했습니다.");
+    } catch (err) {
+      // 남의 과제(RLS 0행)면 까닭을 함께 알린다 — 버튼을 꺼 두지만 화면 정보가 늦었을 수 있다.
+      toast.error(isPermissionRejection(err) ? `공개 상태를 바꾸지 못했습니다. ${OWNER_ONLY_EDIT}` : "공개 상태를 바꾸지 못했습니다.");
     } finally {
       setBusyIds((prev) => {
         const s = new Set(prev);
@@ -104,11 +134,34 @@ export function AssignmentManager() {
       setData((d) => ({ ...d, assignments: d.assignments.filter((x) => x.id !== id) }));
       setDeleteOpen(false);
       toast.success("과제를 삭제했습니다.");
-    } catch {
-      toast.error("과제를 삭제하지 못했습니다.");
+    } catch (err) {
+      toast.error(isPermissionRejection(err) ? `과제를 삭제하지 못했습니다. ${OWNER_ONLY_DELETE}` : "과제를 삭제하지 못했습니다.");
     } finally {
       setDeleteBusy(false);
     }
+  }
+
+  /** 만든 선생님 이름(다른 선생님 과제만 — 이름을 못 읽었으면 null) */
+  function creatorName(a: Assignment, names: Map<string, string> | null): string | null {
+    return a.created_by ? (names?.get(a.created_by) ?? null) : null;
+  }
+
+  /**
+   * 지우기 확인 문구. 제출 수(submission_count)는 RLS가 거른 "내 학급" 수인데, 지우면 과제에 걸린 제출물이
+   * 반과 상관없이 모두 지워지므로(외래키 연쇄 삭제) 그 사실을 함께 적는다. 다른 선생님 과제(총괄)면 누가 만든 과제인지도.
+   */
+  function deleteDescription(a: AssignmentWithCount, names: Map<string, string> | null): string {
+    let owner = "";
+    if (a.created_by !== myId) {
+      const name = creatorName(a, names);
+      owner = a.created_by ? `${name ? `${name} 선생님` : "다른 선생님"}이 만든 과제예요. ` : "만든 선생님 정보가 없는 과제예요. ";
+    }
+    const scope =
+      ctx.status === "ready"
+        ? `학생 제출물(내 학급 ${formatCount(a.submission_count)}건, 다른 반 학생이 낸 것이 있으면 그것까지)도`
+        : `학생 제출물 ${formatCount(a.submission_count)}건도`;
+    // 조사가 제목 끝 글자에 따라 바뀌지 않게 "이 과제(“제목”)를"로 쓴다.
+    return `${owner}이 과제(“${a.title}”)를 지우면 ${scope} 함께 삭제되며 되돌릴 수 없습니다. 학생에게서 숨기기만 하려면 비공개로 바꾸세요.`;
   }
 
   return (
@@ -139,80 +192,105 @@ export function AssignmentManager() {
           />
         }
       >
-        {({ assignments, studentCount }) => (
+        {({ assignments, studentCount, creatorNames }) => (
           <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="과제 목록">
-            {assignments.map((a) => (
-              <li key={a.id} className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:gap-4">
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Badge variant={a.published ? "default" : "outline"} className="shrink-0">
-                      {a.published ? "공개" : "비공개"}
-                    </Badge>
-                    <Link
-                      href={`/admin/learning/?tab=assignments&assignment=${a.id}`}
-                      className="truncate font-medium hover:underline"
+            {assignments.map((a) => {
+              // 쓴 선생님과 총괄만 고치고 지운다(화면 표시용 — 실제 판단은 RLS). 남의 과제는 버튼을 끄고 까닭을 보인다.
+              const canEdit = canModifyContent(ctx, a.created_by);
+              const lockId = `assignment-lock-${a.id}`;
+              const describedBy = canEdit ? undefined : lockId;
+              const othersName = a.created_by !== myId ? creatorName(a, creatorNames) : null;
+              return (
+                <li key={a.id} className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:gap-4">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Badge variant={a.published ? "default" : "outline"} className="shrink-0">
+                        {a.published ? "공개" : "비공개"}
+                      </Badge>
+                      <Link
+                        href={`/admin/learning/?tab=assignments&assignment=${a.id}`}
+                        className="truncate font-medium hover:underline"
+                      >
+                        {a.title}
+                      </Link>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarClockIcon className="size-3.5" aria-hidden />
+                        {a.due_at ? `마감 ${formatDateTime(a.due_at)}` : "마감 없음"}
+                        {isPastDue(a.due_at) ? " (지남)" : ""}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <UsersIcon className="size-3.5" aria-hidden />
+                        제출 {formatCount(a.submission_count)}
+                        {studentCount != null ? ` / ${formatCount(studentCount)}명` : "건"}
+                      </span>
+                      {/* 교사가 여럿일 때 구분: 다른 선생님이 만든 과제에만 만든 사람을 보인다(내 과제는 표시 없음). */}
+                      {a.created_by !== myId ? (
+                        <span className="inline-flex items-center gap-1">
+                          <UserIcon className="size-3.5" aria-hidden />
+                          {a.created_by ? (othersName ? `만든 선생님 ${othersName}` : "다른 선생님이 만든 과제") : "만든 선생님 정보 없음"}
+                        </span>
+                      ) : null}
+                    </div>
+                    {!canEdit ? (
+                      <p id={lockId} role="note" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <LockIcon className="size-3.5 shrink-0" aria-hidden />
+                        {OWNER_ONLY_EDIT}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <label className="mr-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Switch
+                        checked={a.published}
+                        disabled={busyIds.has(a.id) || !canEdit}
+                        onCheckedChange={(v) => togglePublished(a, v)}
+                        aria-label={`${a.title} 공개`}
+                        aria-describedby={describedBy}
+                      />
+                      공개
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      render={<Link href={`/admin/learning/?tab=assignments&assignment=${a.id}`} />}
+                      nativeButton={false}
                     >
-                      {a.title}
-                    </Link>
+                      <EyeIcon />
+                      제출 현황
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!canEdit}
+                      aria-describedby={describedBy}
+                      onClick={() => {
+                        setEditing(a);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <PencilIcon />
+                      수정
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      disabled={!canEdit}
+                      aria-describedby={describedBy}
+                      onClick={() => {
+                        setDeleting(a);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2Icon />
+                      삭제
+                    </Button>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClockIcon className="size-3.5" aria-hidden />
-                      {a.due_at ? `마감 ${formatDateTime(a.due_at)}` : "마감 없음"}
-                      {isPastDue(a.due_at) ? " (지남)" : ""}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <UsersIcon className="size-3.5" aria-hidden />
-                      제출 {formatCount(a.submission_count)}
-                      {studentCount != null ? ` / ${formatCount(studentCount)}명` : "건"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  <label className="mr-2 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Switch
-                      checked={a.published}
-                      disabled={busyIds.has(a.id)}
-                      onCheckedChange={(v) => togglePublished(a, v)}
-                      aria-label={`${a.title} 공개`}
-                    />
-                    공개
-                  </label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    render={<Link href={`/admin/learning/?tab=assignments&assignment=${a.id}`} />}
-                    nativeButton={false}
-                  >
-                    <EyeIcon />
-                    제출 현황
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditing(a);
-                      setFormOpen(true);
-                    }}
-                  >
-                    <PencilIcon />
-                    수정
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => {
-                      setDeleting(a);
-                      setDeleteOpen(true);
-                    }}
-                  >
-                    <Trash2Icon />
-                    삭제
-                  </Button>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </AsyncView>
@@ -235,11 +313,7 @@ export function AssignmentManager() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="과제를 삭제할까요?"
-        description={
-          deleting
-            ? `“${deleting.title}”과 학생 제출물 ${formatCount(deleting.submission_count)}건이 함께 삭제되며 되돌릴 수 없습니다. 학생에게서 숨기기만 하려면 비공개로 바꾸세요.`
-            : ""
-        }
+        description={deleting ? deleteDescription(deleting, state.status === "ready" ? state.data.creatorNames : null) : ""}
         confirmLabel="삭제"
         destructive
         busy={deleteBusy}
@@ -283,7 +357,13 @@ export function AssignmentForm({
       toast.success(assignment ? "과제를 수정했습니다." : published ? "과제를 만들고 공개했습니다." : "과제를 비공개로 저장했습니다.");
       onDone(saved);
     } catch (err) {
-      setErrors({ form: isMissingSchemaError(err) ? errorMessage(true, "") : "과제를 저장하지 못했습니다." });
+      setErrors({
+        form: isMissingSchemaError(err)
+          ? errorMessage(true, "")
+          : assignment && isPermissionRejection(err)
+            ? `과제를 저장하지 못했습니다. ${OWNER_ONLY_EDIT}`
+            : "과제를 저장하지 못했습니다.",
+      });
     } finally {
       setSaving(false);
     }

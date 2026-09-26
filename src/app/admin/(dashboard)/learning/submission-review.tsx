@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, CalendarClockIcon, ChevronDownIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, CalendarClockIcon, ChevronDownIcon, LockIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useStudentScope } from "@/hooks/use-admin-context";
+import { canModifyContent, OWNER_ONLY_EDIT, useAdminContext, useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
@@ -68,6 +68,7 @@ function BackLink() {
 export function SubmissionReview({ assignmentId }: { assignmentId: string | null }) {
   // 학생 명단은 내 학급(학급을 골랐으면 그 학급)만 — 총괄도 다른 학급 학생은 "미제출"로 섞지 않는다(docs/classes/spec.md 개정 1-1).
   const { classIds, narrowed, ready: classMode } = useStudentScope();
+  const adminCtx = useAdminContext();
   const load = useCallback(async (): Promise<Data> => {
     if (!assignmentId) return { assignment: null, students: [], submissions: [] };
     const [assignment, students, submissions] = await Promise.all([
@@ -136,7 +137,11 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
           );
           return (
             <div className="flex flex-col gap-5">
-              <AssignmentHeader assignment={assignment} onEdit={() => setEditOpen(true)} />
+              <AssignmentHeader
+                assignment={assignment}
+                canEdit={canModifyContent(adminCtx, assignment.created_by)}
+                onEdit={() => setEditOpen(true)}
+              />
 
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="상태로 거르기">
                 {FILTERS.map((f) => (
@@ -192,7 +197,8 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
   );
 }
 
-function AssignmentHeader({ assignment, onEdit }: { assignment: Assignment; onEdit: () => void }) {
+/** canEdit: 과제 내용 고치기는 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql). 제출물 검토는 그대로 담임이 한다. */
+function AssignmentHeader({ assignment, canEdit, onEdit }: { assignment: Assignment; canEdit: boolean; onEdit: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <section className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-(--shadow-md) ring-1 ring-foreground/10 sm:p-5 dark:shadow-none">
@@ -209,11 +215,23 @@ function AssignmentHeader({ assignment, onEdit }: { assignment: Assignment; onEd
           <ChevronDownIcon className={open ? "rotate-180 transition-transform" : "transition-transform"} />
           과제 설명
         </Button>
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+          disabled={!canEdit}
+          aria-describedby={canEdit ? undefined : "assignment-edit-lock"}
+        >
           <PencilIcon />
           과제 수정
         </Button>
       </div>
+      {!canEdit ? (
+        <p id="assignment-edit-lock" role="note" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <LockIcon className="size-3.5 shrink-0" aria-hidden />
+          {OWNER_ONLY_EDIT}
+        </p>
+      ) : null}
       {open ? (
         assignment.description_md.trim() ? (
           <MarkdownViewer content={assignment.description_md} className="rounded-xl bg-muted/30 p-3 text-sm" />

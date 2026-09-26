@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { AdminContextProvider } from "@/hooks/use-admin-context";
 import { PostEditorLoader, PostEditorSkeleton } from "./post-editor";
 
 export const metadata: Metadata = { title: "글 작성", robots: { index: false, follow: false } };
@@ -11,10 +12,13 @@ export default function AdminWritePage() {
     // 기본 max-w-3xl, 넓은 화면(lg 이상)에서는 기존 에디터와 같이 72rem까지(나란히 보기용).
     // 사이드바를 뺀 본문 컬럼 안에서만 넓어지므로 화면 밖으로 넘치지 않는다.
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col lg:max-w-6xl">
-      {/* 관리자 가드는 상위 admin/layout.tsx가 담당한다. */}
-      <Suspense fallback={<PostEditorSkeleton />}>
-        <PostEditorLoader />
-      </Suspense>
+      {/* 관리자 가드는 상위 admin/layout.tsx가 담당한다.
+          AdminContextProvider: 총괄 여부 — 남의 글은 쓴 선생님과 총괄만 고친다(20260927030000_content_owner_only.sql). */}
+      <AdminContextProvider>
+        <Suspense fallback={<PostEditorSkeleton />}>
+          <PostEditorLoader />
+        </Suspense>
+      </AdminContextProvider>
     </div>
   );
 }

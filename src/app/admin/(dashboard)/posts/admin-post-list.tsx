@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, LockIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
@@ -22,13 +22,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import {
+  canModifyContent,
+  contentLockReason,
+  isPermissionRejection,
+  OWNER_ONLY_DELETE,
+  OWNER_ONLY_EDIT,
+  useAdminContext,
+} from "@/hooks/use-admin-context";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import type { Post } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type AdminRow = Pick<Post, "id" | "slug" | "title" | "published" | "published_at" | "updated_at">;
-const ADMIN_COLUMNS = "id,slug,title,published,published_at,updated_at";
+// author_id: 쓴 선생님과 총괄만 고치고 지운다(20260927030000_content_owner_only.sql) — 남의 글은 버튼을 끈다.
+type AdminRow = Pick<Post, "id" | "slug" | "title" | "published" | "published_at" | "updated_at" | "author_id">;
+const ADMIN_COLUMNS = "id,slug,title,published,published_at,updated_at,author_id";
 
 type State = { status: "loading" } | { status: "error" } | { status: "ready"; rows: AdminRow[] };
 
@@ -42,6 +51,7 @@ async function fetchAll(): Promise<AdminRow[]> {
 }
 
 export function AdminPostList() {
+  const ctx = useAdminContext();
   const [state, setState] = useState<State>({ status: "loading" });
   // 여러 행을 연달아 토글해도 각 행의 진행 상태가 서로 풀리지 않도록 id 집합으로 관리한다.
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
@@ -88,7 +98,8 @@ export function AdminPostList() {
       return next;
     });
     if (error || !data) {
-      toast.error("상태를 바꾸지 못했습니다.");
+      // 오류 없이 0행 = RLS가 남의 글을 걸렀다(또는 이미 지워짐).
+      toast.error(!error || isPermissionRejection(error) ? `상태를 바꾸지 못했습니다. ${OWNER_ONLY_EDIT}` : "상태를 바꾸지 못했습니다.");
       return;
     }
     replaceRow(data as AdminRow);
@@ -102,7 +113,7 @@ export function AdminPostList() {
     const { data, error } = await supabase.from("posts").delete().eq("id", deleting.id).select("id");
     setDeleteBusy(false);
     if (error || !data?.length) {
-      toast.error("글을 삭제하지 못했습니다.");
+      toast.error(!error || isPermissionRejection(error) ? `글을 삭제하지 못했습니다. ${OWNER_ONLY_DELETE}` : "글을 삭제하지 못했습니다.");
       return;
     }
     const id = deleting.id;
@@ -142,58 +153,80 @@ export function AdminPostList() {
         />
       ) : (
         <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="전체 글">
-          {state.rows.map((row) => (
-            <li key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Badge variant={row.published ? "default" : "outline"} className="shrink-0">
-                    {row.published ? "발행" : "초안"}
-                  </Badge>
-                  <Link href={postHref(row.slug)} className="truncate font-medium hover:underline">
-                    {row.title}
-                  </Link>
+          {state.rows.map((row) => {
+            // 쓴 선생님과 총괄만 고치고 지운다(화면 표시용 — 실제 판단은 RLS). 남의 글은 버튼을 끄고 까닭을 보인다.
+            const canEdit = canModifyContent(ctx, row.author_id);
+            const lockId = `post-lock-${row.id}`;
+            const describedBy = canEdit ? undefined : lockId;
+            return (
+              <li key={row.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Badge variant={row.published ? "default" : "outline"} className="shrink-0">
+                      {row.published ? "발행" : "초안"}
+                    </Badge>
+                    <Link href={postHref(row.slug)} className="truncate font-medium hover:underline">
+                      {row.title}
+                    </Link>
+                  </div>
+                  <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>발행 {row.published_at ? formatDateTime(row.published_at) : "—"}</span>
+                    <span>수정 {formatDateTime(row.updated_at)}</span>
+                  </p>
+                  {!canEdit ? (
+                    <p id={lockId} role="note" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <LockIcon className="size-3.5 shrink-0" aria-hidden />
+                      {contentLockReason(ctx)}
+                    </p>
+                  ) : null}
                 </div>
-                <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>발행 {row.published_at ? formatDateTime(row.published_at) : "—"}</span>
-                  <span>수정 {formatDateTime(row.updated_at)}</span>
-                </p>
-              </div>
-              <div className="flex items-center gap-3 sm:shrink-0">
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={row.published}
-                    disabled={busyIds.has(row.id)}
-                    onCheckedChange={(checked) => togglePublished(row, checked)}
-                    aria-label={`${row.title} 발행 여부`}
-                  />
-                  <span className="w-10 text-muted-foreground">{row.published ? "공개" : "비공개"}</span>
-                </label>
-                <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${row.title} 수정`}
-                    render={<Link href={editPostHref(row.slug)} />}
-                    nativeButton={false}
-                  >
-                    <PencilIcon />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive"
-                    aria-label={`${row.title} 삭제`}
-                    onClick={() => {
-                      setDeleting(row);
-                      setDeleteOpen(true);
-                    }}
-                  >
-                    <Trash2Icon />
-                  </Button>
+                <div className="flex items-center gap-3 sm:shrink-0">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={row.published}
+                      disabled={busyIds.has(row.id) || !canEdit}
+                      onCheckedChange={(checked) => togglePublished(row, checked)}
+                      aria-label={`${row.title} 발행 여부`}
+                      aria-describedby={describedBy}
+                    />
+                    <span className="w-10 text-muted-foreground">{row.published ? "공개" : "비공개"}</span>
+                  </label>
+                  <div className="ml-auto flex items-center gap-1">
+                    {canEdit ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${row.title} 수정`}
+                        render={<Link href={editPostHref(row.slug)} />}
+                        nativeButton={false}
+                      >
+                        <PencilIcon />
+                      </Button>
+                    ) : (
+                      // 링크 대신 꺼진 버튼(남의 글 — 편집 화면으로 보내지 않는다)
+                      <Button variant="ghost" size="icon-sm" aria-label={`${row.title} 수정`} aria-describedby={describedBy} disabled>
+                        <PencilIcon />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive"
+                      aria-label={`${row.title} 삭제`}
+                      aria-describedby={describedBy}
+                      disabled={!canEdit}
+                      onClick={() => {
+                        setDeleting(row);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
 

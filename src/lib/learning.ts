@@ -457,6 +457,10 @@ export async function createAssignment(input: AssignmentInput): Promise<Assignme
   return data as Assignment;
 }
 
+/**
+ * 과제 수정·공개 전환. 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql) — 남의 과제는 RLS가 0행으로 걸러
+ * "not-updated"를 던진다(화면은 isPermissionRejection으로 까닭을 알린다). 고칠 수 있는 열은 AssignmentInput 4개뿐(열 권한).
+ */
 export async function updateAssignment(id: string, patch: Partial<AssignmentInput>): Promise<Assignment> {
   const { data, error } = await supabase.from("assignments").update(patch).eq("id", id).select(ASSIGNMENT_COLUMNS).maybeSingle();
   if (error) throw error;
@@ -464,11 +468,31 @@ export async function updateAssignment(id: string, patch: Partial<AssignmentInpu
   return data as Assignment;
 }
 
-/** 과제 삭제(제출물도 cascade로 함께 삭제). 0건이면 실패로 본다. */
+/**
+ * 과제 삭제(제출물도 cascade로 함께 삭제 — 다른 반 학생이 낸 제출물 포함). 쓴 선생님과 총괄만(RLS).
+ * 0건이면 실패로 본다("not-deleted" — 남의 과제이거나 이미 지워짐).
+ */
 export async function deleteAssignment(id: string): Promise<void> {
   const { data, error } = await supabase.from("assignments").delete().eq("id", id).select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("not-deleted");
+}
+
+/**
+ * 과제를 만든 선생님 이름(id → 표시 이름). 과제 목록에서 "누가 만든 과제인지" 구분하는 보조 정보라,
+ * 부르는 쪽은 실패해도 목록을 그대로 보여 준다. profiles는 누구나 읽는 표이고 공개 열만 읽는다.
+ */
+export async function fetchProfileNames(ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const names = new Map<string, string>();
+  for (const part of chunk(unique, 100)) {
+    const { data, error } = await supabase.from("profiles").select("id,display_name").in("id", part);
+    if (error) throw error;
+    for (const p of (data ?? []) as { id: string; display_name: string | null }[]) {
+      names.set(p.id, p.display_name?.trim() || "이름 없음");
+    }
+  }
+  return names;
 }
 
 export async function fetchSubmissionsForAssignment(assignmentId: string): Promise<AssignmentSubmission[]> {
