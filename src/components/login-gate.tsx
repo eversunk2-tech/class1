@@ -3,9 +3,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LockIcon, LogInIcon } from "lucide-react";
+import { Loader2Icon, LockIcon, LogInIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { useLoginLocked } from "@/hooks/use-login-lock";
+import { useSession } from "@/hooks/use-session";
 import { loginHref } from "@/lib/community";
 import { cn } from "@/lib/utils";
 
@@ -19,16 +20,48 @@ import { cn } from "@/lib/utils";
 const LOCKED_PREFIXES = ["/post/", "/board/", "/games/", "/search/"];
 
 /**
+ * 스위치와 상관없이 **언제나** 로그인해야 볼 수 있는 경로 — 자유게시판(목록·글·글쓰기·고치기).
+ * 2026-09-26 사용자 결정: "자유게시판은 로그인하지 않으면 완전히 안 보여야 해". 실제 차단은 RLS
+ * (supabase/migrations/20260926000000_board_login_only.sql — 비로그인은 kind='board' 글·댓글·좋아요를 못 읽음)가 한다.
+ */
+const ALWAYS_LOGIN_PREFIXES = ["/board/"];
+
+/**
  * "로그인해야만 이용" 토글이 켜져 있으면, 잠금 대상 경로에서 비로그인 방문자에게 본문 대신 로그인 안내를 보여 준다
- * (docs/admin/admin-tools/spec.md §2.4 + scope-fix-instructions.md §3).
+ * (docs/admin/admin-tools/spec.md §2.4 + scope-fix-instructions.md §3). 자유게시판은 토글과 상관없이 늘 막는다.
  *
- * 실제 차단은 이 컴포넌트가 아니라 RLS(can_browse())가 한다 — 여기서는 "왜 비었는지" 설명할 뿐이다.
+ * 실제 차단은 이 컴포넌트가 아니라 RLS(can_browse(), 자유게시판은 로그인 여부)가 한다 — 여기서는 "왜 비었는지" 설명할 뿐이다.
  */
 export function LoginGate({ children }: { children: ReactNode }) {
   const locked = useLoginLocked();
+  const { loading, user } = useSession();
   const pathname = usePathname();
 
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  if (ALWAYS_LOGIN_PREFIXES.some((p) => path.startsWith(p))) {
+    // 로그인 상태를 확인하는 동안에도 글을 먼저 그리지 않는다(잠깐이라도 보이지 않게)
+    if (loading) {
+      return (
+        <div className="flex flex-1 items-center justify-center py-16" aria-busy="true">
+          <Loader2Icon className="size-6 animate-spin text-muted-foreground motion-reduce:animate-none" aria-label="로그인 상태를 확인하는 중" />
+        </div>
+      );
+    }
+    if (!user) {
+      return (
+        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center py-10">
+          <LockPanel
+            size="lg"
+            title="로그인이 필요해요"
+            description="자유게시판은 로그인한 우리 반 친구들만 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
+            href={loginHref(path)}
+            headingLevel="h1"
+          />
+        </div>
+      );
+    }
+    return <>{children}</>;
+  }
   const blocked = locked && LOCKED_PREFIXES.some((p) => path.startsWith(p));
   if (!blocked) return <>{children}</>;
 

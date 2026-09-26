@@ -6,6 +6,7 @@ import { scienceAppCount } from "@/components/dashboard/science-app-status";
 import { Icon3D, type Icon3DName } from "@/components/illustrations/icon-3d";
 import type { MenuColor } from "@/data/menu";
 import { useLoginLocked } from "@/hooks/use-login-lock";
+import { useSession } from "@/hooks/use-session";
 import { formatCount } from "@/lib/format";
 import { countCommunityPosts, isSetupMissing, type CommunityKind } from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
@@ -142,6 +143,7 @@ function PostCountTile({
   image,
   color,
   tone,
+  loginOnly = false,
 }: {
   label: string;
   tag?: string;
@@ -151,14 +153,20 @@ function PostCountTile({
   image?: Icon3DName;
   color: MenuColor;
   tone?: "default" | "vivid";
+  /** 로그인한 사용자에게만 센다(자유게시판 — 스위치와 상관없이 비로그인은 "로그인 필요", 2026-09-26 사용자 결정) */
+  loginOnly?: boolean;
 }) {
   const [count, setCount] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [attempt, setAttempt] = useState(0);
   // 잠금 중 비로그인이면 RLS가 0을 돌려준다 → "0개"가 아니라 "로그인 필요"로 보여 준다.
   const locked = useLoginLocked();
+  const { loading: sessionLoading, user } = useSession();
+  const userId = user?.id ?? null;
+  const guestHidden = loginOnly && !sessionLoading && !userId;
 
   useEffect(() => {
+    if (loginOnly && (sessionLoading || !userId)) return; // 비로그인이면 세지 않는다(RLS도 0을 돌려준다)
     let active = true;
     (community ? countCommunityPosts(community) : fetchPostCount(tag))
       .then((n) => {
@@ -172,7 +180,7 @@ function PostCountTile({
     return () => {
       active = false;
     };
-  }, [tag, community, attempt]);
+  }, [tag, community, attempt, loginOnly, sessionLoading, userId]);
 
   function retry() {
     setStatus("loading");
@@ -186,7 +194,7 @@ function PostCountTile({
       icon={icon}
       image={image}
       color={color}
-      status={locked ? "locked" : status}
+      status={locked || guestHidden ? "locked" : status}
       onRetry={retry}
       tone={tone}
     />
@@ -217,6 +225,7 @@ export function StatTiles() {
           <PostCountTile
             label="자유게시판 글"
             community="board"
+            loginOnly
             icon={MessageSquareIcon}
             image="speech-balloon"
             color="board"

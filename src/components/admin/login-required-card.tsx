@@ -110,8 +110,8 @@ export function LoginRequiredCard() {
           ) : (
             <p id="login-required-state" className="text-sm text-muted-foreground">
               {on
-                ? "켜짐 — 로그인하지 않은 방문자는 블로그 글·댓글, 자유게시판, 학습게임, 과학 앱을 볼 수 없습니다. 홈·메뉴·과학 차시 목록은 그대로 보입니다."
-                : "꺼짐 — 누구나 글을 읽을 수 있고, 과학 앱도 로그인 없이 체험할 수 있습니다(체험 기록은 저장되지 않습니다)."}
+                ? "켜짐 — 로그인하지 않은 방문자는 블로그 글·댓글, 학습게임, 과학 앱을 볼 수 없습니다. 홈·메뉴·과학 차시 목록은 그대로 보입니다. 자유게시판은 이 스위치와 상관없이 늘 로그인한 사람만 봅니다."
+                : "꺼짐 — 누구나 블로그 글과 학습게임을 읽을 수 있고, 과학 앱도 로그인 없이 체험할 수 있습니다(체험 기록은 저장되지 않습니다). 자유게시판은 이 스위치와 상관없이 늘 로그인한 사람만 봅니다."}
             </p>
           )}
         </div>
@@ -140,9 +140,10 @@ export function LoginRequiredCard() {
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>글과 게시판을 로그인 전용으로 바꿀까요?</AlertDialogTitle>
+            <AlertDialogTitle>글과 학습게임을 로그인 전용으로 바꿀까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              막히는 것: 블로그 글·댓글, 자유게시판, 학습게임, 과학 앱(로그인 안내만 보입니다). 그대로 열리는 것: 홈
+              막히는 것: 블로그 글·댓글, 학습게임, 과학 앱(로그인 안내만 보입니다). 자유게시판은 이 스위치와 상관없이 늘
+              로그인한 사람만 봅니다. 그대로 열리는 것: 홈
               화면과 메뉴, 과학 차시 목록, 로그인·비밀번호 재설정. 관리자와 로그인한 학생은 지금과 똑같이 이용할 수
               있고, 이 화면에서 스위치를 다시 끄면 즉시 원래대로 돌아옵니다.
             </AlertDialogDescription>
