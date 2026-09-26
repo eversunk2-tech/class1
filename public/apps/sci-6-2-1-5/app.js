@@ -1323,17 +1323,21 @@
           var deg = TILTS[sel.tilt].angleDeg;
           var spinEnd = noonSpin(POS[sel.pos].angle, deg);
           var turns = to === from ? 1 : 3; // 옮겨 가는 동안 자전(빨리 감기)
-          var spinFrom = spinEnd - turns * 2 * Math.PI;
           orbiting = true;
           placeDevLabel(); // 자전하는 동안 "우리나라" 이름표는 숨긴다(빙빙 돌지 않게)
           bits.ff(true);
           status.mode("orbit", sel.pos);
           bits.say(POS[sel.pos].name + " 위치로 공전하는 중(빨리 감기)");
           var startSpin = st.spin;
+          // 자전은 처음부터 끝까지 늘 서→동(북극 위에서 볼 때 시계 반대 방향 = spin 이 커지는 쪽)으로만 돈다(2026-09-26 사용자 지적 —
+          // 전에는 지금 각도에 잇는 보정이 처음 1/6 동안 빠르게 줄어 잠깐 동→서로 돌았다). 지금 각도에서 목표(남중) 각도까지
+          // 앞으로 가는 몫 + 빨리 감기 바퀴 수만큼, 지금 각도에서 곧장 이어서 돈다.
+          var TAU = 2 * Math.PI;
+          var spinAhead = (((spinEnd - startSpin) % TAU) + TAU) % TAU;
+          var spinTotal = spinAhead + turns * TAU;
           await v.tween(to === from ? 700 : 1500, function (e) {
             st.angle = from + (to - from) * e;
-            // 처음 한순간은 지금 자전 각도에서 이어지게
-            st.spin = spinFrom + (spinEnd - spinFrom) * e + (startSpin - spinFrom) * Math.max(0, 1 - e * 6);
+            st.spin = startSpin + spinTotal * e;
             apply();
           });
           orbiting = false;
