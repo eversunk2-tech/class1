@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
+import { LinkifiedText } from "@/components/linkified-text";
 import { LoginNeededNotice } from "@/components/login-gate";
 import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ const PAGE_SIZE = 5;
  *   · '로그인해야만 이용'이 켜져 있고 로그인하지 않았으면 → 불러오지 않고 로그인 안내(다른 공개 글과 같은 잠금 규칙)
  * 제목만 목록으로 보여 주고, 제목을 누르면 본문이 그 자리에서 펼쳐진다. **날짜는 보이지 않는다**(사용자 결정).
  * 본문은 **글자 그대로**(줄바꿈 유지, 마크다운·HTML을 해석하지 않는 React 텍스트) — `<script>`도 글자로만 보인다.
+ * 다만 인터넷 주소(http·https)는 누르면 새 창에서 열리는 링크로 바꾼다(2026-09-26 사용자 요청, `LinkifiedText`).
  * 조회수·읽음 기록은 남기지 않는다. 표가 아직 없으면(SQL 전) 오류 대신 "아직 선생님 글이 없어요".
  * 왼쪽 메뉴에는 없고 홈에서만 보인다(넓은 화면에서는 '최근 과학 수업' 옆 반 칸).
  */
@@ -179,8 +181,11 @@ export function TeacherPosts() {
                 </button>
               </h3>
               <div id={panelId} role="region" aria-label={p.title} hidden={!isOpen} className="border-t border-foreground/5 px-5 pt-4 pb-5">
-                {/* 글자 그대로: React 텍스트라 HTML·마크다운으로 해석되지 않는다. 줄바꿈·띄어쓰기는 그대로, 긴 주소는 칸 안에서 꺾는다. */}
-                <p className="text-[0.95rem] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{p.body}</p>
+                {/* 글자 그대로: React 텍스트라 HTML·마크다운으로 해석되지 않는다. 줄바꿈·띄어쓰기는 그대로, 긴 주소는 칸 안에서 꺾는다.
+                    인터넷 주소(http·https)만 누르면 새 창에서 열리는 링크로(2026-09-26 사용자 요청). */}
+                <p className="text-[0.95rem] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+                  <LinkifiedText text={p.body} />
+                </p>
               </div>
             </li>
           );

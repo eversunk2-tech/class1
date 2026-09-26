@@ -8,6 +8,7 @@ import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { ClassNameDialog } from "@/components/admin/class-card";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
 import { ListSkeleton, NativeSelect } from "@/components/learning/learning-ui";
+import { LinkifiedText } from "@/components/linkified-text";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +75,7 @@ function wasEdited(n: ClassNotice): boolean {
  * 블로그 편집기('글 관리'·'새 글 작성') 대신, 담임이 **자기 학급 학생에게 보일 글**을 제목·본문 두 칸만으로 쓴다.
  * - 내 학급이 여럿이면 학급을 고른다(글은 학급마다 따로). 학급이 없으면 "먼저 학급을 개설해 주세요".
  * - 새 글·고치기·지우기(확인 대화 상자 + 진한 빨강 버튼). 목록에는 쓴 날짜를 작게(관리용 — 학생 화면에는 날짜 없음).
- * - 본문은 학생 화면에 글자 그대로 보인다(마크다운·HTML 해석 없음).
+ * - 본문은 학생 화면에 글자 그대로 보인다(마크다운·HTML 해석 없음). 인터넷 주소(http·https)만 링크로(LinkifiedText, 2026-09-26 사용자 요청).
  * - 총괄 선생님이 쓴 글은 로그인하지 않은 방문자에게도 보인다(2026-09-26 사용자 결정) → 쓰기 칸에 안내.
  * 실제 권한은 RLS(그 학급 담임만 쓰기·고치기·지우기)가 판단한다. 이 화면의 검사는 편의다.
  */
@@ -411,7 +412,7 @@ export function NoticesView() {
                           id={`notice-body-${n.id}`}
                           className={cn("text-sm text-foreground/80 whitespace-pre-wrap [overflow-wrap:anywhere]", long && !open && "line-clamp-3")}
                         >
-                          {n.body}
+                          <LinkifiedText text={n.body} />
                         </p>
                         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>쓴 날 {formatDateTime(n.created_at)}</span>
@@ -608,7 +609,7 @@ function NoticeEditor({
           aria-describedby="notice-body-help"
         />
         <p id="notice-body-help" className={cn("flex justify-between gap-2 text-xs", bodyShown ? "text-destructive" : "text-muted-foreground")}>
-          <span>{bodyShown ?? `1~${formatCount(NOTICE_BODY_MAX)}자. 쓴 그대로(줄바꿈 포함) 보여요 — 굵게·링크 같은 꾸밈은 없어요.`}</span>
+          <span>{bodyShown ?? `1~${formatCount(NOTICE_BODY_MAX)}자. 쓴 그대로(줄바꿈 포함) 보여요. https://로 시작하는 주소는 누르면 열리는 링크가 돼요.`}</span>
           <span className="shrink-0 tabular-nums" aria-hidden>
             {formatCount(bodyLen)}/{formatCount(NOTICE_BODY_MAX)}
           </span>
