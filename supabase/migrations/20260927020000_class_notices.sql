@@ -246,6 +246,9 @@ grant select, insert, update, delete on public.class_notices to service_role;
 -- ═════════════════════════════════════════════
 -- 4. 정책 5개(이름은 모두 63바이트 안)
 --    (select …)로 감싼 함수는 요청마다 한 번만 계산된다(행마다 다시 부르지 않음). is_super_admin_id(author_id)는 행마다.
+--    배열을 돌려주는 my_class_ids()는 `= any (public.my_class_ids())`로 쓴다(①의 classes 정책과 같게, 작은 표라 행마다 불러도 된다).
+--    ⚠ `= any ((select public.my_class_ids()))`처럼 괄호를 겹치면 Postgres 가 "하위 쿼리의 각 줄과 비교"로 읽어
+--      uuid = uuid[] 오류(42883)가 난다 — 2026-09-26 첫 실행 때 이 오류로 이 파일 전체가 되돌려졌다(아무것도 바뀌지 않음).
 -- ═════════════════════════════════════════════
 
 -- 4-1. 로그인한 사람의 읽기: 학생 = 자기 학급, 담임(총괄 포함) = 자기 학급. 둘 다 아니면 0행.
@@ -255,7 +258,7 @@ create policy "class_notices: 학생·담임 조회"
   to authenticated
   using (
     class_id = (select public.my_student_class_id())
-    or class_id = any ((select public.my_class_ids()))
+    or class_id = any (public.my_class_ids())
   );
 
 -- 4-2. 비로그인 방문자의 읽기: 총괄 선생님이 쓴 글만(2026-09-26 추가 결정). 로그인 잠금이 켜져 있으면 0행(can_browse()).
@@ -273,7 +276,7 @@ create policy "class_notices: 담임만 쓰기"
   to authenticated
   with check (
     author_id = (select auth.uid())
-    and class_id = any ((select public.my_class_ids()))
+    and class_id = any (public.my_class_ids())
   );
 
 -- 4-4. 고치기: 그 학급의 담임만(같은 학급을 맡은 다른 담임의 글도 — 학급 단위 게시판). 제목·본문만 고칠 수 있다(열 권한).
@@ -281,15 +284,15 @@ drop policy if exists "class_notices: 담임만 고치기" on public.class_notic
 create policy "class_notices: 담임만 고치기"
   on public.class_notices for update
   to authenticated
-  using (class_id = any ((select public.my_class_ids())))
-  with check (class_id = any ((select public.my_class_ids())));
+  using (class_id = any (public.my_class_ids()))
+  with check (class_id = any (public.my_class_ids()));
 
 -- 4-5. 지우기: 그 학급의 담임만.
 drop policy if exists "class_notices: 담임만 지우기" on public.class_notices;
 create policy "class_notices: 담임만 지우기"
   on public.class_notices for delete
   to authenticated
-  using (class_id = any ((select public.my_class_ids())));
+  using (class_id = any (public.my_class_ids()));
 
 -- ═════════════════════════════════════════════
 -- 5. 맨 끝 점검 — 설계와 다르면 전부 되돌린다(아무것도 바뀌지 않음)

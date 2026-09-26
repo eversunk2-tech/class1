@@ -27,3 +27,8 @@
   * 쓰던 글 보호 **6/6**(묻기·취소하면 머묾+글 남음·확인하면 이동·쓰던 글 없으면 묻지 않음·콘솔 오류 0·외부 요청 0).
   * 잠금 중 비로그인 `class_notices` 요청 0건·통계 칸 "로그인 필요"·확인 창 버튼 44px **5/5**.
   * 반별 구분 관리자 화면 시험(화면 Build 도구) **109/109**.
+
+## 덧붙임 — ④ 첫 실행 오류(2026-09-26, 사용자 실행)
+* 사용자가 ①②③ 다음 ④ `20260927020000_class_notices.sql`을 실행하자 `ERROR: 42883: operator does not exist: uuid = uuid[]`. SQL Editor 한 번 실행 = 한 트랜잭션이라 ④는 아무것도 바뀌지 않았다.
+* 원인: 정책 5곳의 `class_id = any ((select public.my_class_ids()))` — 괄호를 겹치면 Postgres 문법상 `ANY (하위 쿼리)`로 읽혀 하위 쿼리의 각 줄(uuid[] 하나)과 `uuid =` 비교를 한다. Build·Review·Claude 모두 읽어서만 검토해 놓쳤다(로컬 Postgres 없음).
+* 고침: `class_id = any (public.my_class_ids())`(①의 classes 정책과 같은 모양). 같은 모양이 다른 새 SQL(①·③·②·되돌리기)에는 없음을 확인. CLAUDE.md SQL 규칙에 한 줄 추가. 사용자는 ④ 파일 전체를 다시 Run 하면 된다(재실행 안전).
