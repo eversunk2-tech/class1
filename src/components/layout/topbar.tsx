@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 
-export const SITE_NAME = "우리 반 배움터";
+export const SITE_NAME = "모두의 배움터";
 
 /** 로고 옆 작은 마스코트(웃는 새싹 얼굴). 장식용. */
 function LogoMark() {

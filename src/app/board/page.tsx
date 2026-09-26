@@ -9,7 +9,7 @@ import { primaryPillClass } from "@/lib/pill";
 
 export const metadata: Metadata = {
   title: "자유게시판",
-  description: "우리 반 친구들과 자유롭게 이야기를 나눠요.",
+  description: "친구들과 자유롭게 이야기를 나눠요.",
 };
 
 /** 자유게시판 히어로 무대: 큰 말풍선 + 반짝이·별·전구 */

@@ -41,7 +41,7 @@ const HEADING_FONT_SCRIPT = `(function(){try{var d=document,l=d.createElement("l
 
 export const metadata: Metadata = {
   title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
-  description: "우리 반이 함께 배우고 만든 것을 모아 둔 곳이에요. 과학 수업 이야기, 자유게시판, 직접 만든 학습 게임을 만나 보세요.",
+  description: "친구들과 함께 배우고 탐구하는 공간이에요. 과학 수업 이야기, 자유게시판, 직접 만든 학습 게임을 만나 보세요.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

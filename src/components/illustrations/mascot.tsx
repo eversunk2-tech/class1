@@ -2,7 +2,7 @@ import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/utils";
 
 /**
- * 우리 반 마스코트 "부엉이 과학자"(public/illustrations/mascot/, 투명 배경 WebP).
+ * 배움터 마스코트 "부엉이 과학자"(public/illustrations/mascot/, 투명 배경 WebP).
  * - wave: 홈 히어로(인사) · tablet: 과학수업 히어로 · think: 빈 화면·오류 안내 · cheer: 완료·축하
  *   (spec 개정 1. 1단계에서는 wave만 쓴다.)
  * - 장식용 그림이라 alt="" + aria-hidden. 화면의 뜻은 제목·설명 글자가 전한다.

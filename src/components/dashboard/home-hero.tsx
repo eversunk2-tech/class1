@@ -114,8 +114,8 @@ export function HomeHero() {
             </span>
           </h1>
           <p className="max-w-xl text-base leading-relaxed text-foreground/75 @2xl:text-lg">
-            우리 반이 <strong className="font-semibold text-primary">함께</strong> 배우고 만든 것을 모아 둔 곳이에요. 궁금한
-            메뉴를 눌러 구경해 봐요!
+            친구들과 <strong className="font-semibold text-primary">함께</strong> 배우고 탐구하는 공간이에요. 궁금한 메뉴를 눌러
+            시작해 봐요!
           </p>
           <div className="mt-1 flex flex-wrap items-center justify-center gap-3 @2xl:justify-start">
             {/* 화면에서 가장 중요한 버튼 하나만 보라 그라데이션(spec §1.3) */}

@@ -53,7 +53,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
           <LockPanel
             size="lg"
             title="로그인이 필요해요"
-            description="자유게시판은 로그인한 우리 반 친구들만 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
+            description="자유게시판은 로그인한 친구들만 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
             href={loginHref(path)}
             headingLevel="h1"
           />
@@ -71,7 +71,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       <LockPanel
         size="lg"
         title="로그인이 필요해요"
-        description="지금은 로그인한 우리 반 친구들만 글과 게시판을 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
+        description="지금은 로그인한 친구들만 글과 게시판을 볼 수 있어요. 아이디와 비밀번호로 로그인한 뒤 다시 열어 주세요."
         href={loginHref(path)}
         headingLevel="h1"
       />
@@ -146,7 +146,7 @@ export function LoginNeededNotice({ what, description, className }: { what: stri
     <LockPanel
       size="sm"
       title="로그인하면 볼 수 있어요"
-      description={description ?? `지금은 로그인한 우리 반 친구들만 ${what}을 볼 수 있어요.`}
+      description={description ?? `지금은 로그인한 친구들만 ${what}을 볼 수 있어요.`}
       href={loginHref(path)}
       className={className}
     />

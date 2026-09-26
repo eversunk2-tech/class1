@@ -96,7 +96,7 @@ export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: Co
 
   if (locked) return <LoginNeededNotice what={meta.label} className="py-8" />;
   if (hiddenForGuest) {
-    return <LoginNeededNotice what={meta.label} description={`최근 ${meta.label} 글은 로그인한 우리 반 친구들에게만 보여요.`} className="py-8" />;
+    return <LoginNeededNotice what={meta.label} description={`최근 ${meta.label} 글은 로그인한 친구들에게만 보여요.`} className="py-8" />;
   }
 
   if (status === "loading") {

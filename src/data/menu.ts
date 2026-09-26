@@ -48,7 +48,7 @@ export const menuItems: MenuItem[] = [
     image3d: "house",
     illustration: HomeIllustration,
     color: "home",
-    description: "우리 반 소식을 한눈에 봐요",
+    description: "새 소식을 한눈에 봐요",
   },
   {
     id: "games",

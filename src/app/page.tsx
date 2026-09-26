@@ -109,7 +109,7 @@ export default function Home() {
       </section>
 
       <section aria-labelledby="glance-heading" className="flex flex-col gap-5">
-        <SectionTitle id="glance-heading">우리 반 한눈에 보기</SectionTitle>
+        <SectionTitle id="glance-heading">배움터 한눈에 보기</SectionTitle>
         <StatTiles />
       </section>
 
