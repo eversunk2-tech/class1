@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { findResponseApp, getResponseSchema, responseApps, type ResponseSchema } from "@/data/app-responses";
+import { useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { accountLabel, adminDisplayName } from "@/lib/admin";
 import { extractResponses, groupByStage, progressInfo, questionIdentity, stageLabel, versionLabel } from "@/lib/app-responses";
@@ -66,8 +67,13 @@ type Data = {
   progressMissing: boolean;
   /** 학생 명단(member_directory)을 못 불러와 기록이 있는 학생만 보여 주는지 */
   rosterMissing: boolean;
+  /** 명단을 불러왔는데 (내 학급) 학생이 한 명도 없는지 */
+  rosterEmpty: boolean;
   feedbackStatusMissing: boolean;
 };
+
+/** 학생 범위(docs/classes/spec.md 개정 1-1): classIds = 내 학급(또는 고른 학급), narrowed = 학급을 하나 골랐는지 */
+type Scope = { classIds: string[] | null; narrowed: boolean };
 
 /** 결과 목록 → 학생 id별 선생님 메시지 수(그 학생의 이 앱 결과 전부 합계) */
 async function teacherCountsByStudent(results: { id: string; user_id: string }[]): Promise<Map<string, number>> {
@@ -86,13 +92,18 @@ async function recheckTeacherCounts(appId: string): Promise<Map<string, number>>
   return teacherCountsByStudent(await fetchAllAppResults(appId));
 }
 
-async function loadResponses(appId: string): Promise<Data> {
-  const [results, progress, students] = await Promise.all([
+async function loadResponses(appId: string, scope: Scope): Promise<Data> {
+  const [allResults, progressRes, students] = await Promise.all([
     fetchAllAppResults(appId),
     fetchAppProgressRows(appId),
     // 명단은 "아직 시작하지 않은 학생"을 보여 주는 보조 정보라 실패해도 기록은 보여 준다.
-    fetchStudents().catch(() => null),
+    // 명단은 내 학급 학생만 — 총괄도 다른 학급 학생을 "시작 안 함"으로 섞지 않는다(기록 자체는 RLS가 내 학급만 돌려준다).
+    fetchStudents(scope.classIds).catch(() => null),
   ]);
+  // 학급을 하나 골랐으면 그 학급 학생의 기록만 남긴다(명단을 못 읽었으면 거를 수 없으니 그대로).
+  const roster = students && scope.narrowed ? new Set(students.map((st) => st.id)) : null;
+  const results = roster ? allResults.filter((r) => roster.has(r.user_id)) : allResults;
+  const progress = roster ? { ...progressRes, rows: progressRes.rows.filter((p) => roster.has(p.user_id)) } : progressRes;
 
   const byUser = new Map<string, AppResultWithStudent[]>();
   for (const r of results) {
@@ -138,7 +149,13 @@ async function loadResponses(appId: string): Promise<Data> {
     };
   });
   entries.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  return { entries, progressMissing: progress.missing, rosterMissing: students == null, feedbackStatusMissing };
+  return {
+    entries,
+    progressMissing: progress.missing,
+    rosterMissing: students == null,
+    rosterEmpty: students != null && students.length === 0,
+    feedbackStatusMissing,
+  };
 }
 
 const STATUS_ORDER: Record<Status, number> = { done: 0, progress: 1, none: 2 };
@@ -518,7 +535,8 @@ export function ResponsesView({ appParam, viewParam, questionParam }: { appParam
     [router, appId, view, questionParam],
   );
 
-  const load = useCallback(() => loadResponses(appId), [appId]);
+  const { classIds, narrowed, ready: classMode } = useStudentScope();
+  const load = useCallback(() => loadResponses(appId, { classIds, narrowed }), [appId, classIds, narrowed]);
   const { state, reload, refresh, setData } = useAsyncData(load);
 
   // 피드백을 쓰거나 읽으면 "피드백 보냄" 표시를 조용히 갱신한다.
@@ -642,6 +660,7 @@ export function ResponsesView({ appParam, viewParam, questionParam }: { appParam
             ) : (
               <StudentList
                 entries={data.entries}
+                emptyRoster={classMode && data.rosterEmpty}
                 search={search}
                 onSearch={setSearch}
                 filter={filter}
@@ -677,6 +696,7 @@ export function ResponsesView({ appParam, viewParam, questionParam }: { appParam
 
 function StudentList({
   entries,
+  emptyRoster,
   search,
   onSearch,
   filter,
@@ -688,6 +708,8 @@ function StudentList({
   schema,
 }: {
   entries: StudentEntry[];
+  /** 내 학급 학생이 한 명도 없는지(학급 기능 사용 중) */
+  emptyRoster: boolean;
   search: string;
   onSearch: (v: string) => void;
   filter: Filter;
@@ -727,7 +749,11 @@ function StudentList({
         ) : null}
       </div>
       {!entries.length ? (
-        <EmptyState title="이 앱을 완료하거나 시작한 학생이 없습니다" description="학생이 로그인한 상태로 앱을 하면 여기에 모여요." />
+        emptyRoster ? (
+          <EmptyState title="내 학급 학생이 아직 없어요" description="‘회원 관리’에서 학생을 등록하면 여기에 모여요." />
+        ) : (
+          <EmptyState title="이 앱을 완료하거나 시작한 학생이 없습니다" description="학생이 로그인한 상태로 앱을 하면 여기에 모여요." />
+        )
       ) : !shown.length ? (
         <EmptyState title="조건에 맞는 학생이 없습니다" />
       ) : (

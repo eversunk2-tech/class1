@@ -10,10 +10,18 @@ import { EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { findResponseApp } from "@/data/app-responses";
 import { webApps } from "@/data/apps";
+import { useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
-import { appLabel, appLabelAdmin, fetchAppResultsWithStudents, formatDuration, formatScore } from "@/lib/learning";
+import {
+  appLabel,
+  appLabelAdmin,
+  fetchAppResultsWithStudents,
+  fetchStudents,
+  formatDuration,
+  formatScore,
+} from "@/lib/learning";
 
 const ALL = "__all__";
 
@@ -23,7 +31,17 @@ const ALL = "__all__";
  */
 export function AppResultsView({ initialApp }: { initialApp: string | null }) {
   const [app, setApp] = useState<string>(initialApp || webApps[0]?.id || ALL);
-  const load = useCallback(() => fetchAppResultsWithStudents({ appId: app === ALL ? undefined : app, limit: 1000 }), [app]);
+  // 기록은 RLS가 내 학급 학생 것만 돌려준다. 학급을 하나 골랐으면(내 학급 2개 이상) 그 학급 학생 것만 남긴다.
+  const { classIds, narrowed } = useStudentScope();
+  const load = useCallback(async () => {
+    const [rows, roster] = await Promise.all([
+      fetchAppResultsWithStudents({ appId: app === ALL ? undefined : app, limit: 1000 }),
+      narrowed ? fetchStudents(classIds) : null,
+    ]);
+    if (!roster) return rows;
+    const ids = new Set(roster.map((st) => st.id));
+    return rows.filter((r) => ids.has(r.user_id));
+  }, [app, classIds, narrowed]);
   const { state, reload } = useAsyncData(load);
 
   // 선택지: 등록된 앱 + (전체 보기일 때 발견한) 등록되지 않은 app_id

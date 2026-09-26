@@ -80,6 +80,20 @@ export function parseRole(raw: string): DraftRole | null {
   return ROLE_ALIASES[raw.replace(/\s+/g, "").toLowerCase()] ?? null;
 }
 
+/** 교사 계정 만들기는 총괄만(docs/classes/spec.md 개정 1-1). Edge Function도 같은 규칙으로 거부한다. */
+export const TEACHER_SUPER_ONLY_MESSAGE = "교사 계정은 총괄 선생님만 만들 수 있어요. 역할을 학생으로 적어 주세요.";
+
+/**
+ * 역할 권한을 목록에 반영한다: 교사를 만들 수 없는 사람(담임)이면 "교사" 줄을 고쳐야 할 줄로 표시한다.
+ * 파일을 읽은 뒤 권한 정보가 늦게 와도 맞게 보이도록 화면이 그릴 때마다 적용한다(원본 목록은 그대로 둔다).
+ */
+export function applyRolePolicy(drafts: MemberDraft[], allowTeacher: boolean): MemberDraft[] {
+  if (allowTeacher) return drafts;
+  return drafts.map((d) =>
+    !d.error && d.role === "admin" ? { ...d, error: TEACHER_SUPER_ONLY_MESSAGE, warning: null } : d,
+  );
+}
+
 // ─────────────────────────────────────────────
 // 엑셀/CSV → 만들 목록
 // ─────────────────────────────────────────────
@@ -242,30 +256,40 @@ type InvokeResult = {
 async function invokeCreate(
   rows: { id: string; password: string; role: DraftRole }[],
   source: CreateSource,
+  classId: string | null,
 ): Promise<InvokeResult> {
-  const { data, error } = await supabase.functions.invoke("admin-create-member", { body: { rows, source } });
+  // classId: 학생 줄을 넣을 학급(호출자가 담임인 학급만 — Edge Function이 확인한다). 교사 줄에는 쓰이지 않는다.
+  const requestBody = classId ? { rows, source, classId } : { rows, source };
+  const { data, error } = await supabase.functions.invoke("admin-create-member", { body: requestBody });
   if (error) {
     if (error instanceof FunctionsHttpError) {
       const res = error.context as Response | undefined;
       const status = res?.status;
 
-      // ① 상태 코드가 원인을 분명히 알려 주는 경우에는 **본문보다 상태 코드를 먼저** 본다(review M2).
-      //    함수가 배포되지 않았을 때 Supabase 게이트웨이가 {"error": "..."} 모양의 영어 본문을 내려주면,
-      //    본문을 우선하던 이전 코드는 "함수를 배포하세요" 안내 대신 뜻 모를 영어 문구를 보여 줬다.
-      //    아래 네 가지는 우리 함수가 내는 문구와도 뜻이 같아서 잃는 정보가 없다.
-      if (status === 404) throw new AdminActionError(NOT_DEPLOYED_MESSAGE);
-      if (status === 401) throw new AdminActionError("로그인이 만료되었습니다. 다시 로그인해 주세요.");
-      if (status === 403) throw new AdminActionError("관리자만 사용할 수 있습니다. 관리자 계정으로 로그인해 주세요.");
-      if (status === 413) throw new AdminActionError("한 번에 보낸 내용이 너무 큽니다. 파일을 나눠서 만들어 주세요.");
-
-      // ② 그 밖의 상태(400·500 등)는 우리 함수가 담아 보낸 한국어 사유가 가장 정확하다.
+      // 우리 함수가 담아 보낸 사유(본문의 error 문자열)
       let message: string | null = null;
       try {
-        const body = (await res?.clone().json()) as { error?: unknown } | undefined;
-        if (typeof body?.error === "string" && body.error.trim()) message = body.error;
+        const payload = (await res?.clone().json()) as { error?: unknown } | undefined;
+        if (typeof payload?.error === "string" && payload.error.trim()) message = payload.error;
       } catch {
         // 본문이 JSON이 아니면 아래 기본 문구를 쓴다.
       }
+
+      // ① 상태 코드가 원인을 분명히 알려 주는 경우에는 **본문보다 상태 코드를 먼저** 본다(review M2).
+      //    함수가 배포되지 않았을 때 Supabase 게이트웨이가 {"error": "..."} 모양의 영어 본문을 내려주면,
+      //    본문을 우선하던 이전 코드는 "함수를 배포하세요" 안내 대신 뜻 모를 영어 문구를 보여 줬다.
+      //    아래 세 가지는 우리 함수가 내는 문구와도 뜻이 같아서 잃는 정보가 없다.
+      if (status === 404) throw new AdminActionError(NOT_DEPLOYED_MESSAGE);
+      if (status === 401) throw new AdminActionError("로그인이 만료되었습니다. 다시 로그인해 주세요.");
+      if (status === 413) throw new AdminActionError("한 번에 보낸 내용이 너무 큽니다. 파일을 나눠서 만들어 주세요.");
+      // 403: 학급 권한 사유("내 학급에만 등록할 수 있어요" 등)는 우리 함수만 한국어로 보낸다 → 한국어면 그대로 보여 준다.
+      if (status === 403) {
+        throw new AdminActionError(
+          message && /[가-힣]/.test(message) ? message : "관리자만 사용할 수 있습니다. 관리자 계정으로 로그인해 주세요.",
+        );
+      }
+
+      // ② 그 밖의 상태(400·500 등)는 우리 함수가 담아 보낸 한국어 사유가 가장 정확하다.
       if (message) throw new AdminActionError(message);
       throw new AdminActionError(`회원을 만들지 못했습니다. (HTTP ${status ?? "오류"}) ${NOT_DEPLOYED_HINT}`);
     }
@@ -293,9 +317,15 @@ async function invokeCreate(
  */
 export async function createMembers(
   drafts: MemberDraft[],
-  options: { source: CreateSource; onProgress?: (done: number, total: number) => void },
+  options: {
+    source: CreateSource;
+    /** 학생 줄을 넣을 학급 id(docs/classes/spec.md 개정 1-4 요청 필드 classId). 학급 기능 전이거나 교사만 만들 때는 비움. */
+    classId?: string | null;
+    onProgress?: (done: number, total: number) => void;
+  },
 ): Promise<CreateRunResult> {
   const { source, onProgress } = options;
+  const classId = options.classId ?? null;
   const targets = drafts.filter((d) => !d.error && d.role);
   const outcomes: CreateOutcome[] = [];
   const notices = new Set<string>();
@@ -308,6 +338,7 @@ export async function createMembers(
       const { results, warning } = await invokeCreate(
         chunk.map((d) => ({ id: d.id, password: d.password, role: d.role as DraftRole })),
         source,
+        classId,
       );
       if (warning) notices.add(warning);
       const byIndex = new Map(results.map((r) => [r.index, r]));

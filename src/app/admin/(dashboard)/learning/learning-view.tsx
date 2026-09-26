@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3Icon, ClipboardListIcon, Gamepad2Icon, LayoutGridIcon, MessageSquareQuoteIcon } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminTabPanelClass } from "@/components/admin/admin-styles";
+import { ClassScopeGate, ClassScopePicker, WholeScopeNote } from "@/components/admin/class-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UUID_RE } from "@/lib/admin";
@@ -38,7 +39,11 @@ export function LearningViewSkeleton() {
   );
 }
 
-/** 학습 현황(관리자). 탭은 ?tab= 으로 전환해 정적 export와 호환된다. */
+/**
+ * 학습 현황(관리자). 탭은 ?tab= 으로 전환해 정적 export와 호환된다.
+ * 기록은 RLS가 내 학급 학생 것만 돌려준다(총괄도 같음 — docs/classes/spec.md 개정 1-1).
+ * 학생 명단을 쓰는 탭은 ClassScopeGate로 내 학급을 안 뒤에 불러온다. 내 학급이 2개 이상이면 머리에 학급 고르기가 보인다.
+ */
 export function LearningView() {
   const params = useSearchParams();
   const router = useRouter();
@@ -49,7 +54,11 @@ export function LearningView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminPageHeader title="학습 현황" description="웹앱 결과 · 과제 · 참여를 한눈에 보고 학생과 피드백을 주고받습니다." />
+      <AdminPageHeader
+        title="학습 현황"
+        description="웹앱 결과 · 과제 · 참여를 한눈에 보고 학생과 피드백을 주고받습니다."
+        actions={<ClassScopePicker />}
+      />
       <Tabs
         value={tab}
         onValueChange={(v) => router.replace(`/admin/learning/?tab=${String(v)}`, { scroll: false })}
@@ -69,29 +78,41 @@ export function LearningView() {
           </TabsList>
         </div>
         <TabsContent value="overview" className={adminTabPanelClass}>
+          <WholeScopeNote className="mb-4" />
           <LearningOverview />
         </TabsContent>
         <TabsContent value="apps" className={adminTabPanelClass}>
-          <AppResultsView initialApp={params.get("app")} />
+          <ClassScopeGate>
+            <AppResultsView initialApp={params.get("app")} />
+          </ClassScopeGate>
         </TabsContent>
         <TabsContent value="responses" className={adminTabPanelClass}>
           {tab === "responses" ? (
-            <ResponsesView appParam={params.get("app")} viewParam={params.get("view")} questionParam={params.get("q")} />
+            <ClassScopeGate>
+              <ResponsesView appParam={params.get("app")} viewParam={params.get("view")} questionParam={params.get("q")} />
+            </ClassScopeGate>
           ) : null}
         </TabsContent>
         <TabsContent value="assignments" className={adminTabPanelClass}>
-          {assignmentId ? (
-            UUID_RE.test(assignmentId) ? (
-              <SubmissionReview key={assignmentId} assignmentId={assignmentId} />
+          <ClassScopeGate>
+            {assignmentId ? (
+              UUID_RE.test(assignmentId) ? (
+                <SubmissionReview key={assignmentId} assignmentId={assignmentId} />
+              ) : (
+                <SubmissionReview key="invalid" assignmentId={null} />
+              )
             ) : (
-              <SubmissionReview key="invalid" assignmentId={null} />
-            )
-          ) : (
-            <AssignmentManager />
-          )}
+              <>
+                <WholeScopeNote className="mb-4" />
+                <AssignmentManager />
+              </>
+            )}
+          </ClassScopeGate>
         </TabsContent>
         <TabsContent value="engagement" className={adminTabPanelClass}>
-          <EngagementTable />
+          <ClassScopeGate>
+            <EngagementTable />
+          </ClassScopeGate>
         </TabsContent>
       </Tabs>
     </div>

@@ -16,6 +16,7 @@ import {
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { adminPermissions, useAdminContext } from "@/hooks/use-admin-context";
 import {
   AdminActionError,
   fetchSiteSettings,
@@ -31,8 +32,12 @@ import { cn } from "@/lib/utils";
  * "로그인해야만 이용" 토글 (docs/admin/admin-tools/spec.md §2.4).
  * 켤 때만 확인 다이얼로그를 거치고, 끄는 방향(원복)은 바로 반영한다 — 실수로 켜는 것만 막는다.
  * 설정을 읽지 못하면 "꺼짐"으로 보여 준다(절대 잠긴 것처럼 굴지 않는다).
+ * 사이트 전체 설정이라 **총괄만** 켜고 끈다(docs/classes/spec.md 개정 1-1 — admin_set_login_required도 총괄만).
+ * 담임에게는 지금 상태만 읽기 전용으로 보여 준다.
  */
 export function LoginRequiredCard() {
+  const ctx = useAdminContext();
+  const { canToggleLogin } = adminPermissions(ctx);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -76,7 +81,7 @@ export function LoginRequiredCard() {
   }
 
   function onToggle(next: boolean) {
-    if (busy) return;
+    if (busy || !canToggleLogin) return;
     if (next) setConfirmOpen(true); // 켜기 = 파급이 큰 방향이라 한 번 더 확인
     else void apply(false); // 끄기 = 원복이라 바로 반영
   }
@@ -117,12 +122,23 @@ export function LoginRequiredCard() {
         </div>
         <Switch
           checked={on}
-          disabled={loading || busy}
+          disabled={loading || busy || !canToggleLogin}
           onCheckedChange={onToggle}
           aria-label="로그인해야만 이용"
-          aria-describedby="login-required-state"
+          aria-describedby={canToggleLogin ? "login-required-state" : "login-required-state login-required-readonly"}
         />
       </div>
+
+      {!canToggleLogin ? (
+        <p id="login-required-readonly" className="flex items-center gap-1.5 text-sm font-medium" role="note">
+          <LockIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          {ctx.status === "loading"
+            ? "권한을 확인하는 중…"
+            : ctx.status === "error"
+              ? "권한을 확인하지 못해 지금은 바꿀 수 없어요. 화면을 새로 고쳐 주세요."
+              : "총괄 선생님만 바꿀 수 있어요. 지금 상태만 보여 드려요."}
+        </p>
+      ) : null}
 
       <p className="text-xs text-muted-foreground">
         {settings?.updated_at

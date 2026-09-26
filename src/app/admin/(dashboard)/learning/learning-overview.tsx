@@ -17,6 +17,7 @@ import {
   UnreadCount,
 } from "@/components/learning/learning-ui";
 import { EmptyState } from "@/components/states";
+import { useAdminContext } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useSession } from "@/hooks/use-session";
 import { adminDisplayName } from "@/lib/admin";
@@ -50,6 +51,8 @@ export function LearningOverview() {
 
 function AppSummarySection() {
   // 서버 집계(app_result_stats RPC)라 기록 수와 관계없이 전체 기준이다(review #4).
+  // 학급 기능이 켜지면 RLS가 내 학급 학생 기록만 세게 한다(총괄도 자기 반 — docs/classes/spec.md 개정 1-1).
+  const { status: classStatus } = useAdminContext();
   const load = useCallback(() => fetchAppSummaries(), []);
   const { state, reload } = useAsyncData(load);
 
@@ -67,7 +70,7 @@ function AppSummarySection() {
             <p className="text-sm text-muted-foreground">
               전체 웹앱 시도{" "}
               <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{formatCount(total)}</span>회
-              <span className="ml-2 text-xs">(전체 기록 기준)</span>
+              <span className="ml-2 text-xs">{classStatus === "ready" ? "(내 학급 학생 기록 기준)" : "(전체 기록 기준)"}</span>
             </p>
             {!apps.length ? (
               <EmptyState

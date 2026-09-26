@@ -6,6 +6,10 @@
 //        401/403/400/404/405/500 { "error": "한국어 메시지" }
 //
 // 보안 메모
+// - 누가 초기화할 수 있나(docs/classes/spec.md 개정 1-1): 총괄(profiles.role 'admin' + is_super_admin)은 모든 학생,
+//   담임은 자기 학급 학생만(대상의 profiles.class_id 가 호출자의 class_teachers 에 있을 때). 그 밖에는 403.
+//   서비스 롤에는 auth.uid()가 없어 DB 함수 can_manage_member()를 부를 수 없으므로 profiles · class_teachers 를 직접 읽어
+//   같은 규칙으로 판단한다. 학급 SQL(20260927000000_classes_schema.sql)이 없으면 "DB 설정 필요"로 거부한다(500).
 // - 관리자 계정(자기 자신 포함)은 초기화할 수 없다. 다른 관리자를 초기화하려면 먼저 관리자 해제를 한다(review #2).
 // - 순서: ① 비밀번호 변경 → (DB 트리거 on_auth_user_password_changed가 must_change_password를 false로 만듦)
 //         ② admin_finalize_password_reset RPC(서비스 롤 전용): must_change_password = true + 기존 세션 삭제 + 감사 로그.
@@ -78,6 +82,21 @@ function randomTempPassword(): string {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const MISSING_CLASSES_SQL_MESSAGE =
+  "학급 기능용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 " +
+  "20260927000000_classes_schema.sql을 먼저 실행해 주세요.";
+const NOT_HOMEROOM_MESSAGE = "이 학생의 담임 선생님이나 총괄 관리자만 비밀번호를 초기화할 수 있습니다.";
+
+/** 학급 SQL(20260927000000)이 아직 실행되지 않아 난 오류인지(열·표 없음). */
+function isMissingClassesSql(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (["42703", "PGRST204", "42P01", "PGRST205"].includes(error.code ?? "")) return true;
+  const m = (error.message ?? "").toLowerCase();
+  return m.includes("could not find the table") ||
+    (m.includes("could not find the") && m.includes("column")) ||
+    /(column|relation) .* does not exist/.test(m);
+}
+
 Deno.serve(async (req: Request) => {
   const headers = corsHeaders(req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response("ok", { headers });
@@ -106,17 +125,20 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // ② 관리자 확인 (서비스 롤로 profiles.role 조회)
+  // ② 관리자·총괄 확인 (서비스 롤로 profiles.role · is_super_admin 조회)
   const { data: callerProfile, error: profileErr } = await admin
     .from("profiles")
-    .select("role")
+    .select("role,is_super_admin")
     .eq("id", callerId)
     .maybeSingle();
   if (profileErr) {
+    if (isMissingClassesSql(profileErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 500, headers);
     console.error("admin-reset-password: 관리자 확인 실패", profileErr.message);
     return json({ error: "관리자 권한을 확인하지 못했습니다." }, 500, headers);
   }
   if (callerProfile?.role !== "admin") return json({ error: "관리자만 사용할 수 있습니다." }, 403, headers);
+  // 총괄 = role 'admin' + is_super_admin (DB 함수 is_super_admin()과 같은 규칙)
+  const callerIsSuper = callerProfile?.is_super_admin === true;
 
   // ③ 대상 확인
   const body = await req.json().catch(() => null);
@@ -131,10 +153,11 @@ Deno.serve(async (req: Request) => {
   }
   const { data: targetProfile, error: targetProfileErr } = await admin
     .from("profiles")
-    .select("role")
+    .select("role,class_id")
     .eq("id", targetId)
     .maybeSingle();
   if (targetProfileErr) {
+    if (isMissingClassesSql(targetProfileErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 500, headers);
     console.error("admin-reset-password: 대상 역할 확인 실패", targetProfileErr.message);
     return json({ error: "대상 계정 정보를 확인하지 못했습니다." }, 500, headers);
   }
@@ -145,6 +168,27 @@ Deno.serve(async (req: Request) => {
       403,
       headers,
     );
+  }
+
+  // ③-2 담임 확인(개정 1-1): 총괄은 모든 학생, 담임은 자기 학급 학생만. 학급이 없는 학생은 총괄만.
+  if (!callerIsSuper) {
+    const targetClassId = typeof targetProfile.class_id === "string" ? targetProfile.class_id : null;
+    let isHomeroom = false;
+    if (targetClassId) {
+      const { data: link, error: linkErr } = await admin
+        .from("class_teachers")
+        .select("class_id")
+        .eq("teacher_id", callerId)
+        .eq("class_id", targetClassId)
+        .maybeSingle();
+      if (linkErr) {
+        if (isMissingClassesSql(linkErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 500, headers);
+        console.error("admin-reset-password: 담임 확인 실패", linkErr.message);
+        return json({ error: "담임 여부를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, 500, headers);
+      }
+      isHomeroom = !!link;
+    }
+    if (!isHomeroom) return json({ error: NOT_HOMEROOM_MESSAGE }, 403, headers);
   }
 
   const { data: target, error: targetErr } = await admin.auth.admin.getUserById(targetId);

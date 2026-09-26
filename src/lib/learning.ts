@@ -897,23 +897,34 @@ export type StudentMini = {
   avatar_url: string | null;
   withdrawn_at: string | null;
   email: string | null;
+  /** 학급 id(학급 범위로 읽었을 때만). 관리자 화면 전용 */
+  class_id?: string | null;
 };
 
-export async function fetchStudents(): Promise<StudentMini[]> {
-  const data = await fetchAllPages<unknown>((from, to) =>
-    supabase
+/**
+ * 학생 명단(학습 기록 화면의 "미제출·시작 안 함" 행과 학생 수).
+ * classIds — 학급 범위(docs/classes/spec.md 개정 1-1: 학습 기록은 **자기 학급 학생만** 본다, 총괄도 같음):
+ *   - 배열이면 그 학급 학생만. 총괄은 member_directory에서 모든 회원을 읽을 수 있으므로(명단 관리용) 반드시 걸러야
+ *     다른 학급 학생이 "시작 안 함·미제출"로 섞여 보이지 않는다. 빈 배열이면 학생 없음.
+ *   - null이면 거르지 않는다(학급 기능 SQL 적용 전의 예전 동작).
+ */
+export async function fetchStudents(classIds: readonly string[] | null = null): Promise<StudentMini[]> {
+  if (classIds && classIds.length === 0) return [];
+  const data = await fetchAllPages<unknown>((from, to) => {
+    let q = supabase
       .from("member_directory")
-      .select(`id,email,profiles!inner(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
-      .eq("profiles.role", "user")
-      .order("id")
-      .range(from, to),
-  );
-  return (data as { id: string; email: string; profiles: ProfileMini | null }[]).map((m) => ({
+      .select(`id,email,${classIds ? "class_id," : ""}profiles!inner(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
+      .eq("profiles.role", "user");
+    if (classIds) q = q.in("class_id", [...classIds]);
+    return q.order("id").range(from, to);
+  });
+  return (data as { id: string; email: string; class_id?: string | null; profiles: ProfileMini | null }[]).map((m) => ({
     id: m.id,
     email: m.email,
     display_name: m.profiles?.display_name ?? null,
     avatar_url: m.profiles?.avatar_url ?? null,
     withdrawn_at: m.profiles?.withdrawn_at ?? null,
+    ...(classIds ? { class_id: m.class_id ?? null } : {}),
   }));
 }
 

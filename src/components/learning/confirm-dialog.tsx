@@ -62,10 +62,13 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>취소</AlertDialogCancel>
+          {/* 누르는 곳 44px 이상(CLAUDE.md 접근성 — 교사도 태블릿에서 누른다) */}
+          <AlertDialogCancel disabled={busy} className="h-11 px-4">
+            취소
+          </AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
-            className={destructive ? dangerSolidClass : undefined}
+            className={destructive ? `h-11 px-4 ${dangerSolidClass}` : "h-11 px-4"}
             disabled={busy}
             onClick={confirm}
           >

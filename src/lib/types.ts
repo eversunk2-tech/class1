@@ -89,12 +89,21 @@ export type MemberDirectory = {
 /** 회원 목록 1행: member_directory + profiles 조인 */
 export type MemberRow = MemberDirectory & {
   profiles: Pick<Profile, "display_name" | "avatar_url" | "role" | "must_change_password" | "withdrawn_at"> | null;
+  /**
+   * 학생의 학급(member_directory.class_id — profiles.class_id를 트리거로 복사, docs/classes/spec.md 개정 1-4).
+   * null = 학급 없음(교사·아직 배정 안 된 계정). undefined = 학급 기능 SQL 적용 전이라 읽지 않음.
+   * 학급 이름은 관리자 화면에서만 보여 준다(학생 화면에는 소속 정보를 보이지 않음 — 개정 1).
+   */
+  class_id?: string | null;
 };
 
 /** must_change_password는 컬럼 권한으로 막혀 있어(20260922000000) embed하지 않는다 → admin.ts가 RPC로 채운다.
  *  withdrawn_at은 20260923000000에서 공개 컬럼으로 열어 두었다. */
 export const MEMBER_ROW_COLUMNS =
   "id,email,provider,providers,signed_up_at,last_sign_in_at,updated_at,profiles(display_name,avatar_url,role,withdrawn_at)";
+
+/** 학급 기능 SQL(20260927000000_classes_schema.sql) 적용 뒤의 회원 행 컬럼: 위 + 학급 id. 이름은 classes 목록으로 붙인다. */
+export const MEMBER_ROW_COLUMNS_WITH_CLASS = `${MEMBER_ROW_COLUMNS},class_id`;
 
 /** profiles에서 클라이언트가 읽을 수 있는 컬럼(select("*")는 컬럼 권한 때문에 실패한다). */
 export const PROFILE_COLUMNS = "id,display_name,avatar_url,role,created_at,updated_at,withdrawn_at";

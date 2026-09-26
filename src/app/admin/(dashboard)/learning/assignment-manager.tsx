@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { formatCount, formatDateTime } from "@/lib/format";
 import {
@@ -41,14 +42,16 @@ type Data = { assignments: AssignmentWithCount[]; studentCount: number | null };
 
 /** 학습 현황 > 과제 관리: 목록 · 새 과제 · 수정 · 공개 전환 · 삭제(spec §3.6). */
 export function AssignmentManager() {
+  // 제출 수(서버 embed count)는 내 학급 전체 기준이라 학생 수도 내 학급 전체로 센다(학급 고르기와 무관).
+  const { allClassIds } = useStudentScope();
   const load = useCallback(async (): Promise<Data> => {
     const [assignments, students] = await Promise.all([
       fetchAssignments(),
       // 학생 수는 보조 정보라 실패해도 목록은 보여 준다.
-      fetchStudents().catch(() => null),
+      fetchStudents(allClassIds).catch(() => null),
     ]);
     return { assignments, studentCount: students ? students.length : null };
-  }, []);
+  }, [allClassIds]);
   const { state, reload, setData } = useAsyncData(load);
 
   const [editing, setEditing] = useState<Assignment | null>(null);

@@ -149,7 +149,7 @@ export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: Co
             </p>
           ) : null}
           {hasMore ? (
-            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-2 h-10")} onClick={loadMore} disabled={loadingMore}>
+            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-2 h-11")} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? <Loader2Icon className="animate-spin" /> : null}더 보기
             </Button>
           ) : null}

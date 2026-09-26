@@ -2,7 +2,7 @@ import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError, type User
 import { LOGIN_EMAIL_DOMAIN } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { fetchAllPages } from "@/lib/paging";
-import { MEMBER_ROW_COLUMNS, type MemberRow, type Role } from "@/lib/types";
+import { MEMBER_ROW_COLUMNS, MEMBER_ROW_COLUMNS_WITH_CLASS, type MemberRow, type Role } from "@/lib/types";
 
 /**
  * 관리자 화면 공용 쿼리/표시 헬퍼 (docs/admin/spec.md §3.4~3.5).
@@ -53,17 +53,32 @@ function withFlags(rows: MemberRow[], ids: Set<string> | null): MemberRow[] {
   return rows.map((r) => (r.profiles ? { ...r, profiles: { ...r.profiles, must_change_password: ids.has(r.id) } } : r));
 }
 
+/**
+ * 회원 행을 학급 id(class_id)까지 읽는다. 학급 기능 SQL(20260927000000_classes_schema.sql) 적용 전이라
+ * 컬럼이 없으면 예전 컬럼으로 한 번 더 읽는다 — 회원 관리 화면 전체가 막히지 않게(자물쇠 방지, use-session의 withdrawn_at 대비와 같은 방식).
+ * 누가 어떤 행을 읽을 수 있는지는 RLS가 정한다: 담임은 자기 학급 학생, 총괄은 모든 회원(개정 1-1).
+ */
+async function withClassColumns<T>(run: (columns: string) => Promise<T>): Promise<T> {
+  try {
+    return await run(MEMBER_ROW_COLUMNS_WITH_CLASS);
+  } catch (e) {
+    if (!isMissingSchemaError(e)) throw e;
+    return run(MEMBER_ROW_COLUMNS);
+  }
+}
+
 /** 전체 회원(한 번에 전부 가져와 클라이언트에서 검색/정렬). 1000명이 넘어도 페이지로 나눠 모두 받는다. */
 export async function fetchMembers(): Promise<MemberRow[]> {
   const [rows, ids] = await Promise.all([
-    fetchAllPages<MemberRow>(
-      (from, to) =>
+    withClassColumns((columns) =>
+      fetchAllPages<MemberRow>((from, to) =>
         supabase
           .from("member_directory")
-          .select(MEMBER_ROW_COLUMNS, { count: "exact" })
+          .select(columns, { count: "exact" })
           .order("signed_up_at", { ascending: false })
           .order("id")
           .range(from, to),
+      ),
     ),
     fetchMustChangeIds(),
   ]);
@@ -72,22 +87,31 @@ export async function fetchMembers(): Promise<MemberRow[]> {
 
 /** 최근 가입 회원 n명 */
 export async function fetchRecentMembers(limit: number): Promise<MemberRow[]> {
-  const [res, ids] = await Promise.all([
-    supabase.from("member_directory").select(MEMBER_ROW_COLUMNS).order("signed_up_at", { ascending: false }).limit(limit),
+  const [rows, ids] = await Promise.all([
+    withClassColumns(async (columns) => {
+      const res = await supabase
+        .from("member_directory")
+        .select(columns)
+        .order("signed_up_at", { ascending: false })
+        .limit(limit);
+      if (res.error) throw res.error;
+      return (res.data ?? []) as unknown as MemberRow[];
+    }),
     fetchMustChangeIds(),
   ]);
-  if (res.error) throw res.error;
-  return withFlags((res.data ?? []) as unknown as MemberRow[], ids);
+  return withFlags(rows, ids);
 }
 
-/** 회원 1명. 없으면 null */
+/** 회원 1명. 없으면 null(담임에게 다른 학급 학생은 RLS로 "없음"이 된다). */
 export async function fetchMember(id: string): Promise<MemberRow | null> {
-  const [res, ids] = await Promise.all([
-    supabase.from("member_directory").select(MEMBER_ROW_COLUMNS).eq("id", id).maybeSingle(),
+  const [row, ids] = await Promise.all([
+    withClassColumns(async (columns) => {
+      const res = await supabase.from("member_directory").select(columns).eq("id", id).maybeSingle();
+      if (res.error) throw res.error;
+      return (res.data as unknown as MemberRow | null) ?? null;
+    }),
     fetchMustChangeIds(),
   ]);
-  if (res.error) throw res.error;
-  const row = (res.data as unknown as MemberRow | null) ?? null;
   return row ? withFlags([row], ids)[0] : null;
 }
 
@@ -190,8 +214,8 @@ export function passwordResetBlockReason(
   }
   if (member.profiles?.role === "admin") {
     return {
-      short: "관리자 계정",
-      long: "관리자 계정의 비밀번호는 초기화할 수 없습니다. 꼭 필요하면 먼저 관리자 권한을 해제한 뒤 초기화하세요.",
+      short: "교사 계정",
+      long: "교사(관리자) 계정의 비밀번호는 초기화할 수 없습니다. 꼭 필요하면 총괄 선생님이 먼저 담임교사 지정을 해제한 뒤 초기화하세요.",
     };
   }
   if (isWithdrawnMember(member)) {
@@ -217,8 +241,8 @@ export function withdrawBlockReason(
   }
   if (member.profiles?.role === "admin") {
     return {
-      short: "관리자 계정",
-      long: "관리자 계정은 탈퇴 처리할 수 없습니다. 꼭 필요하면 먼저 관리자 권한을 해제한 뒤 처리하세요.",
+      short: "교사 계정",
+      long: "교사(관리자) 계정은 탈퇴 처리할 수 없습니다. 꼭 필요하면 총괄 선생님이 먼저 담임교사 지정을 해제한 뒤 처리하세요.",
     };
   }
   if (isWithdrawnMember(member)) {

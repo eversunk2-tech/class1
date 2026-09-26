@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { FlagIcon, GraduationCapIcon, LayoutDashboardIcon, NewspaperIcon, ShieldCheckIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { UnreadCount } from "@/components/learning/learning-ui";
 import type { MenuColor } from "@/data/menu";
+import { useAdminContext } from "@/hooks/use-admin-context";
 import { useUnreadFeedback } from "@/hooks/use-unread-feedback";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,8 @@ export type AdminNavItem = {
 /** 관리자 대시보드 메뉴. 존재하는 화면만 넣는다. */
 export const adminNavItems: AdminNavItem[] = [
   { id: "overview", label: "개요", href: "/admin/", icon: LayoutDashboardIcon, color: "home" },
-  { id: "posts", label: "글 관리", href: "/admin/posts/", icon: NewspaperIcon, color: "science" },
+  // 학급별 '선생님 글'(docs/classes/spec.md 개정 2). 블로그 '글 관리'·'새 글 작성'은 메뉴에서만 뺐다(/admin/posts/·/admin/write/ 화면은 그대로 있음).
+  { id: "notices", label: "선생님 글", href: "/admin/notices/", icon: NewspaperIcon, color: "science" },
   { id: "members", label: "회원 관리", href: "/admin/members/", icon: UsersIcon, color: "games" },
   { id: "learning", label: "학습 현황", href: "/admin/learning/", icon: GraduationCapIcon, color: "board" },
   { id: "community", label: "커뮤니티", href: "/admin/community/", icon: FlagIcon, color: "games" },
@@ -47,13 +49,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   // 학생이 보낸 안 읽은 피드백 수 → "학습 현황" 메뉴에 배지
   const unread = useUnreadFeedback();
+  // 총괄 계정이면 메뉴 머리에 표시(docs/classes/spec.md 개정 1 — 총괄 = 전체 관리 + 자기 학급 담임)
+  const { status, isSuperAdmin } = useAdminContext();
+  const superAdmin = status === "ready" && isSuperAdmin;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 lg:flex-row lg:gap-8">
       <aside className="lg:sticky lg:top-20 lg:w-52 lg:shrink-0 lg:self-start">
         <p className="mb-2 hidden items-center gap-1.5 px-2.5 text-xs font-medium text-muted-foreground lg:flex">
           <ShieldCheckIcon className="size-3.5" aria-hidden />
-          관리자
+          관리자{superAdmin ? " · 총괄" : ""}
         </p>
         <nav aria-label="관리자 메뉴">
           <ul className="relative -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:flex-col lg:overflow-visible lg:py-0">

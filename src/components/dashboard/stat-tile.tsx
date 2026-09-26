@@ -7,10 +7,11 @@ import { Icon3D, type Icon3DName } from "@/components/illustrations/icon-3d";
 import type { MenuColor } from "@/data/menu";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
+import { fetchLoginRequired } from "@/lib/admin";
 import { formatCount } from "@/lib/format";
 import { countCommunityPosts, isSetupMissing, type CommunityKind } from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
-import { supabase } from "@/lib/supabase";
+import { countVisibleNotices } from "@/lib/notices";
 import { cn } from "@/lib/utils";
 
 // "locked" = "로그인해야만 이용"이 켜져 있고 로그인하지 않음 → 0이 아니라 잠김 표시를 보여 준다.
@@ -125,20 +126,15 @@ export function StatTile({
   );
 }
 
-/** 발행된 글 수. head:true로 본문 없이 개수만 받는다. tag가 있으면 그 태그가 달린 글만 센다. */
-async function fetchPostCount(tag?: string): Promise<number> {
-  let query = supabase.from("posts").select("id", { count: "exact", head: true }).eq("published", true);
-  if (tag) query = query.contains("tags", [tag]);
-  const { count, error } = await query;
-  if (error) throw error;
-  return count ?? 0;
-}
-
-/** 개수를 스스로 불러오는 통계 타일. 타일마다 독립적으로 로딩/오류 상태를 갖는다. */
-function PostCountTile({
+/**
+ * 개수를 스스로 불러오는 통계 타일. 타일마다 독립적으로 로딩/오류 상태를 갖는다.
+ * source: 자유게시판·학습게임 = community_posts(kind)의 숨기지 않은 글 수,
+ *         "notices" = 학급별 선생님 글(class_notices) 중 지금 보이는 글 수 — 몇 개가 보이는지는 RLS가 정한다
+ *         (로그인한 학생 = 자기 학급 글, 담임 = 자기 학급 글, 방문자 = 총괄 선생님 글, docs/classes/spec.md 개정 2).
+ */
+function CountTile({
   label,
-  tag,
-  community,
+  source,
   icon,
   image,
   color,
@@ -146,9 +142,7 @@ function PostCountTile({
   loginOnly = false,
 }: {
   label: string;
-  tag?: string;
-  /** 있으면 posts 대신 community_posts(kind)의 숨기지 않은 글 수를 센다. */
-  community?: CommunityKind;
+  source: CommunityKind | "notices";
   icon: LucideIcon;
   image?: Icon3DName;
   color: MenuColor;
@@ -164,23 +158,36 @@ function PostCountTile({
   const { loading: sessionLoading, user } = useSession();
   const userId = user?.id ?? null;
   const guestHidden = loginOnly && !sessionLoading && !userId;
+  // 선생님 글은 보는 사람마다 개수가 달라서(RLS) 로그인 상태를 안 뒤에 센다.
+  const waitForSession = loginOnly || source === "notices";
 
   useEffect(() => {
-    if (loginOnly && (sessionLoading || !userId)) return; // 비로그인이면 세지 않는다(RLS도 0을 돌려준다)
+    if (locked) return; // 잠금 중인 방문자는 세지 않는다("로그인 필요" — RLS도 0을 돌려준다)
+    if (waitForSession && sessionLoading) return;
+    if (loginOnly && !userId) return; // 비로그인이면 세지 않는다(RLS도 0을 돌려준다)
     let active = true;
-    (community ? countCommunityPosts(community) : fetchPostCount(tag))
+    (async () => {
+      // 방문자는 잠금 여부를 먼저 확인한다(홈 '선생님 글' 목록과 같게, Review L5): 켜져 있으면 세지 않고 "로그인 필요".
+      // 공용 훅(useLoginLocked)은 설정을 늦게 알 수 있어, 그 사이에 개수 요청이 먼저 나가지 않게 한다.
+      if (!sessionLoading && !userId && (await fetchLoginRequired())) return null;
+      return source === "notices" ? countVisibleNotices() : countCommunityPosts(source);
+    })()
       .then((n) => {
         if (!active) return;
+        if (n == null) {
+          setStatus("locked");
+          return;
+        }
         setCount(n);
         setStatus("ready");
       })
       .catch((error: unknown) => {
-        if (active) setStatus(community && isSetupMissing(error) ? "setup" : "error");
+        if (active) setStatus(source !== "notices" && isSetupMissing(error) ? "setup" : "error");
       });
     return () => {
       active = false;
     };
-  }, [tag, community, attempt, loginOnly, sessionLoading, userId]);
+  }, [source, attempt, locked, loginOnly, waitForSession, sessionLoading, userId]);
 
   function retry() {
     setStatus("loading");
@@ -222,9 +229,9 @@ export function StatTiles() {
           />
         </li>
         <li>
-          <PostCountTile
+          <CountTile
             label="자유게시판 글"
-            community="board"
+            source="board"
             loginOnly
             icon={MessageSquareIcon}
             image="speech-balloon"
@@ -233,10 +240,11 @@ export function StatTiles() {
           />
         </li>
         <li>
-          <PostCountTile label="학습게임" community="game" icon={Gamepad2Icon} image="video-game" color="games" tone="vivid" />
+          <CountTile label="학습게임" source="game" icon={Gamepad2Icon} image="video-game" color="games" tone="vivid" />
         </li>
         <li>
-          <PostCountTile label="선생님 글" icon={NewspaperIcon} image="newspaper" color="home" tone="vivid" loginOnly />
+          {/* 선생님 글: 누구에게나 "지금 보이는 글 수"(방문자 = 총괄 선생님 글, 학생 = 우리 반 글 — RLS, 2026-09-26 사용자 결정) */}
+          <CountTile label="선생님 글" source="notices" icon={NewspaperIcon} image="newspaper" color="home" tone="vivid" />
         </li>
       </ul>
     </div>

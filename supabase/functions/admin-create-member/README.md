@@ -8,6 +8,19 @@
 - 역할은 **학생 → `profiles.role = 'user'`**, **교사 → `'admin'`** 두 가지뿐입니다.
 - 화면은 한 번에 **20명씩 나눠** 보냅니다. 함수는 한 요청에 최대 **100행**까지 받습니다.
 
+## 학급(반) 규칙 — 2026-09-27 (`docs/classes/spec.md` 개정 1)
+
+- **학생**은 요청의 `classId` 학급에 등록됩니다. 그 학급은 **호출한 선생님이 담임인 학급**이어야 합니다
+  (`class_teachers`). **총괄도 자기 학급에만** 학생을 등록할 수 있습니다. 만든 뒤 `profiles.class_id`가 그 학급이 되고,
+  DB 트리거가 `member_directory.class_id`에도 복사합니다.
+- `classId`를 보내지 않으면: 호출자의 (보관되지 않은) 학급이 **하나일 때만** 그 학급으로 넣습니다.
+  학급이 없으면 "먼저 학급을 개설해 주세요", 여럿이면 "학생을 등록할 학급을 골라 주세요"(400).
+- **교사 계정**(`role: "admin"`)은 **총괄**(`profiles.role = 'admin'` + `is_super_admin = true`)만 만들 수 있고, 학급이 없습니다.
+  총괄이 아닌 선생님이 보낸 교사 줄은 **그 줄만** `invalid`("교사 계정은 총괄 관리자만 만들 수 있습니다…")로 돌려주고 나머지 줄은 만듭니다.
+- 학급 확인은 **계정을 하나라도 만들기 전에** 끝납니다. 학급에 문제가 있으면 아무 계정도 만들지 않습니다.
+- 서비스 롤에는 `auth.uid()`가 없어 DB 함수(`is_super_admin()` 등)를 부르지 않고, `profiles`·`class_teachers`·`classes`를
+  서비스 롤로 직접 읽어 같은 규칙으로 판단합니다.
+
 ## 먼저 할 일: SQL 1개 (감사 로그용)
 
 **`supabase/migrations/20260923030000_member_create_log.sql`을 Supabase SQL Editor에서 먼저 실행**하세요.
@@ -20,6 +33,18 @@
   (`20260921000000_init_blog.sql`의 `revoke`는 `anon`/`authenticated`만 대상이라 서비스 롤에는 영향이 없습니다).
 
 순서: **① SQL 실행 → ② 이 함수 배포 → ③ 사이트 push.**
+
+### 학급 기능(2026-09-27) 배포 순서
+
+1. SQL Editor: `supabase/migrations/20260927000000_classes_schema.sql`
+2. SQL Editor: `docs/classes/setup-owl-class.sql`(부엉이반 + 총괄 지정 — 이메일을 바꿔서)
+3. SQL Editor: `supabase/migrations/20260927010000_classes_rls.sql`
+4. SQL Editor: `supabase/migrations/20260927020000_class_notices.sql`(학급별 '선생님 글')
+5. **이 함수와 `admin-reset-password`·`admin-delete-member`를 다시 배포**(아래 방법 A 또는 B)
+6. 사이트 push
+
+1번 SQL 전에 새 코드를 배포하면 "학급 기능용 DB 설정이 아직 적용되지 않았습니다"로 거부합니다(계정을 만들지 않음).
+5번과 6번 사이(예전 화면 + 새 함수)에도 학급이 하나인 선생님은 그대로 학생을 만들 수 있습니다(학급 자동 선택).
 
 ## 환경·설정
 
@@ -55,11 +80,34 @@ npx supabase functions deploy admin-create-member
 1. 관리자 계정으로 로그인 → **회원 관리**(`/admin/members/`) → **회원 추가**.
 2. **한 명 만들기** 탭에서 시험용 아이디(예: `test0001`)·비밀번호(6자 이상)·학생을 넣고 만듭니다.
 3. 확인할 것:
-   - 목록에 새 회원이 **"비밀번호 변경 필요"** 상태로 나타난다.
+   - 목록에 새 회원이 **"비밀번호 변경 필요"** 상태로, **고른 학급** 이름과 함께 나타난다.
    - 그 아이디로 로그인하면 `/reset-password/`로 이동해 새 비밀번호를 설정하게 된다.
-   - 역할을 **교사**로 만들면 목록의 역할이 **관리자**로 보인다.
+   - (총괄만) 역할을 **교사**로 만들면 목록의 역할이 **관리자**로 보이고 학급은 비어 있다.
+   - (두 번째 담임이 생긴 뒤) 그 담임 계정으로는 자기 학급에만 학생이 만들어지고, 교사 역할 줄은 거부된다.
 4. **엑셀로 여러 명** 탭에서 **서식 내려받기**로 받은 파일을 그대로 다시 올려 미리보기가 나오는지 봅니다.
 5. 시험용 계정은 `⋮` → **탈퇴 처리**로 지웁니다.
+
+SQL Editor에서 학급이 제대로 들어갔는지 보려면:
+
+```sql
+select d.email, c.name as 학급, p.role, p.must_change_password
+from public.member_directory d
+join public.profiles p on p.id = d.id
+left join public.classes c on c.id = d.class_id
+order by d.signed_up_at desc
+limit 20;
+```
+
+## 요청 형식
+
+```jsonc
+// POST (Authorization: Bearer <로그인한 관리자 access token> — supabase-js가 자동으로 붙인다)
+{
+  "rows": [{ "id": "60101", "password": "…", "role": "user" }],
+  "source": "single",            // 또는 "bulk"(감사 로그 구분용)
+  "classId": "<학급 uuid>"       // 학생 줄을 넣을 학급(호출자가 담임인 학급). 교사 줄만 보낼 때는 없어도 된다.
+}
+```
 
 ## 응답 형식
 
@@ -85,6 +133,14 @@ npx supabase functions deploy admin-create-member
 |---|---|
 | "회원 추가 기능이 아직 준비되지 않았습니다" | 함수가 배포되지 않았거나 이름이 다릅니다. `admin-create-member`로 배포하세요. |
 | "관리자만 사용할 수 있습니다" | 로그인한 계정의 `profiles.role`이 `admin`이 아닙니다. |
+| "학급 기능용 DB 설정이 아직 적용되지 않았습니다" (500) | `20260927000000_classes_schema.sql`을 아직 실행하지 않았습니다. 위 "학급 기능 배포 순서"대로 실행하세요. |
+| "먼저 학급을 개설해 주세요…" (400) | 호출한 선생님이 담임인 학급이 없습니다. 관리자 화면에서 학급을 개설하세요. |
+| "학생을 등록할 학급을 골라 주세요." (400) | 학급이 여럿인데 화면이 `classId`를 보내지 않았습니다(예전 화면). 새로고침하세요. |
+| "학급 정보(classId)가 올바르지 않습니다…" (400) | `classId`가 uuid 형식이 아닙니다. |
+| "선생님이 담임인 학급에만 학생을 등록할 수 있습니다." (403) | 보낸 `classId`가 호출자의 학급이 아닙니다(없는 학급도 같은 문구). 총괄도 자기 학급에만 등록합니다. |
+| "보관된 학급에는 학생을 등록할 수 없습니다…" (403) | 그 학급이 보관(`archived_at`)되었습니다. |
+| 줄마다 "교사 계정은 총괄 관리자만 만들 수 있습니다…" | 총괄이 아닌 선생님이 교사 역할 줄을 보냈습니다. 그 줄의 역할을 학생으로 바꾸세요. |
+| "계정은 만들었지만 학급 배정과 … 설정에 실패했습니다" | 계정은 생겼지만 `profiles` 설정이 두 번 모두 실패했습니다. 그 학생이 명단에 안 보이면 총괄이 SQL로 학급을 정합니다: `update public.profiles set class_id = '<학급 id>', must_change_password = true where id = '<학생 id>';` |
 | "이미 있는 아이디입니다" | 같은 아이디의 계정이 이미 있습니다(비밀번호는 바뀌지 않습니다). 비밀번호를 바꾸려면 **비밀번호 초기화**를 쓰세요. |
 | "비밀번호가 너무 쉬워 거부되었습니다" | Supabase의 비밀번호 정책(유출 비밀번호 차단 등)에 걸렸습니다. 다른 비밀번호로 바꾸세요. |
 | "요청이 너무 많습니다" | GoTrue 요청 제한입니다. 잠시 뒤 **실패한 행만 다시 시도**를 누르세요. |

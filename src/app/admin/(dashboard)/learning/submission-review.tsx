@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { adminDisplayName } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
@@ -65,15 +66,19 @@ function BackLink() {
  * 제출 내용 펼쳐 보기 · 상태 변경 · 연결된 피드백 대화 · 삭제(spec §3.6).
  */
 export function SubmissionReview({ assignmentId }: { assignmentId: string | null }) {
+  // 학생 명단은 내 학급(학급을 골랐으면 그 학급)만 — 총괄도 다른 학급 학생은 "미제출"로 섞지 않는다(docs/classes/spec.md 개정 1-1).
+  const { classIds, narrowed, ready: classMode } = useStudentScope();
   const load = useCallback(async (): Promise<Data> => {
     if (!assignmentId) return { assignment: null, students: [], submissions: [] };
     const [assignment, students, submissions] = await Promise.all([
       fetchAssignment(assignmentId),
-      fetchStudents(),
+      fetchStudents(classIds),
       fetchSubmissionsForAssignment(assignmentId),
     ]);
-    return { assignment, students, submissions };
-  }, [assignmentId]);
+    // 학급을 하나 골랐으면 그 학급 학생의 제출만(제출 기록은 RLS가 내 학급 전체를 돌려준다).
+    const roster = new Set(students.map((st) => st.id));
+    return { assignment, students, submissions: narrowed ? submissions.filter((sub) => roster.has(sub.user_id)) : submissions };
+  }, [assignmentId, classIds, narrowed]);
   const { state, reload, setData } = useAsyncData(load);
   const [filter, setFilter] = useState<Filter>("all");
   const [editOpen, setEditOpen] = useState(false);
@@ -149,7 +154,10 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
               </div>
 
               {!visible.length ? (
-                <EmptyState title={rows.length ? "해당하는 학생이 없습니다" : "등록된 학생이 없습니다"} />
+                <EmptyState
+                  title={rows.length ? "해당하는 학생이 없습니다" : classMode ? "내 학급 학생이 아직 없어요" : "등록된 학생이 없습니다"}
+                  description={!rows.length && classMode ? "‘회원 관리’에서 학생을 등록하면 여기에 나타나요." : undefined}
+                />
               ) : (
                 <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="학생별 제출 현황">
                   {visible.map((r) => (

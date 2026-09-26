@@ -6,6 +6,10 @@
 //        401/403/400/404/405/500 { "error": "한국어 메시지" }
 //
 // 보안·동작 메모
+// - 누가 탈퇴 처리할 수 있나(docs/classes/spec.md 개정 1-1): 총괄(profiles.role 'admin' + is_super_admin)은 모든 학생,
+//   담임은 자기 학급 학생만(대상의 profiles.class_id 가 호출자의 class_teachers 에 있을 때). 그 밖에는 403.
+//   서비스 롤에는 auth.uid()가 없어 DB 함수 can_manage_member()를 부를 수 없으므로 profiles · class_teachers 를 직접 읽어
+//   같은 규칙으로 판단한다. 이 확인은 계정을 지우기(⑤) 전에 끝난다. 학급 SQL이 없으면 "DB 설정 필요"로 거부한다.
 // - 관리자 계정(자기 자신 포함)은 탈퇴시킬 수 없다. 다른 관리자를 지우려면 먼저 관리자 권한을 해제한다.
 // - 되돌릴 수 없다: auth.users 행을 실제로 지운다(복구 기능 없음). 화면에서 이름 재입력으로 한 번 더 확인한다.
 // - 학습 기록은 남는다: 20260923000000_member_withdrawal.sql 이 profiles ↛ auth.users 외래키를 끊고
@@ -55,6 +59,21 @@ const MISSING_SQL_MESSAGE =
   "탈퇴 기능용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 " +
   "20260923000000_member_withdrawal.sql을 먼저 실행해 주세요. (그 전에 계정을 지우면 학습 기록까지 사라집니다.)";
 
+const MISSING_CLASSES_SQL_MESSAGE =
+  "학급 기능용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 " +
+  "20260927000000_classes_schema.sql을 먼저 실행해 주세요.";
+const NOT_HOMEROOM_MESSAGE = "이 학생의 담임 선생님이나 총괄 관리자만 탈퇴 처리할 수 있습니다.";
+
+/** 학급 SQL(20260927000000)이 아직 실행되지 않아 난 오류인지(열·표 없음). */
+function isMissingClassesSql(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (["42703", "PGRST204", "42P01", "PGRST205"].includes(error.code ?? "")) return true;
+  const m = (error.message ?? "").toLowerCase();
+  return m.includes("could not find the table") ||
+    (m.includes("could not find the") && m.includes("column")) ||
+    /(column|relation) .* does not exist/.test(m);
+}
+
 /** 대상이 이미 없을 때 나는 오류인지(재시도를 멱등하게 만들기 위해). */
 function isUserNotFound(error: { message?: string; status?: number } | null): boolean {
   if (!error) return false;
@@ -93,17 +112,20 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // ② 관리자 확인 (서비스 롤로 profiles.role 조회)
+  // ② 관리자·총괄 확인 (서비스 롤로 profiles.role · is_super_admin 조회)
   const { data: callerProfile, error: profileErr } = await admin
     .from("profiles")
-    .select("role")
+    .select("role,is_super_admin")
     .eq("id", callerId)
     .maybeSingle();
   if (profileErr) {
+    if (isMissingClassesSql(profileErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 400, headers);
     console.error("admin-delete-member: 관리자 확인 실패", profileErr.message);
     return json({ error: "관리자 권한을 확인하지 못했습니다." }, 500, headers);
   }
   if (callerProfile?.role !== "admin") return json({ error: "관리자만 사용할 수 있습니다." }, 403, headers);
+  // 총괄 = role 'admin' + is_super_admin (DB 함수 is_super_admin()과 같은 규칙)
+  const callerIsSuper = callerProfile?.is_super_admin === true;
 
   // ③ 대상 확인
   const body = await req.json().catch(() => null);
@@ -115,16 +137,17 @@ Deno.serve(async (req: Request) => {
     return json({ error: "자기 자신의 계정은 탈퇴 처리할 수 없습니다." }, 400, headers);
   }
 
-  // withdrawn_at 컬럼까지 함께 읽어, 마이그레이션이 실행됐는지도 여기서 확인한다.
+  // withdrawn_at · class_id 컬럼까지 함께 읽어, 마이그레이션이 실행됐는지도 여기서 확인한다.
   const { data: targetProfile, error: targetProfileErr } = await admin
     .from("profiles")
-    .select("role,withdrawn_at")
+    .select("role,withdrawn_at,class_id")
     .eq("id", targetId)
     .maybeSingle();
   if (targetProfileErr) {
-    // 42703 / PGRST204: withdrawn_at 컬럼 없음 = 마이그레이션 미실행 → 절대 계정을 지우지 않는다.
+    // 42703 / PGRST204: 컬럼 없음 = 마이그레이션 미실행 → 절대 계정을 지우지 않는다. 어느 SQL인지 문구로 가린다.
     const code = (targetProfileErr as { code?: string }).code ?? "";
     const msg = (targetProfileErr.message ?? "").toLowerCase();
+    if (msg.includes("class_id")) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 400, headers);
     if (code === "42703" || code === "PGRST204" || msg.includes("withdrawn_at")) {
       return json({ error: MISSING_SQL_MESSAGE }, 400, headers);
     }
@@ -138,6 +161,28 @@ Deno.serve(async (req: Request) => {
       403,
       headers,
     );
+  }
+
+  // ③-2 담임 확인(개정 1-1): 총괄은 모든 학생, 담임은 자기 학급 학생만. 학급이 없는 회원은 총괄만.
+  //      계정을 지우기(⑤) 전에 확인한다. 이미 탈퇴한 학생(재시도)도 profiles 행·학급이 남아 있어 같은 담임이 다시 할 수 있다.
+  if (!callerIsSuper) {
+    const targetClassId = typeof targetProfile.class_id === "string" ? targetProfile.class_id : null;
+    let isHomeroom = false;
+    if (targetClassId) {
+      const { data: link, error: linkErr } = await admin
+        .from("class_teachers")
+        .select("class_id")
+        .eq("teacher_id", callerId)
+        .eq("class_id", targetClassId)
+        .maybeSingle();
+      if (linkErr) {
+        if (isMissingClassesSql(linkErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 400, headers);
+        console.error("admin-delete-member: 담임 확인 실패", linkErr.message);
+        return json({ error: "담임 여부를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, 500, headers);
+      }
+      isHomeroom = !!link;
+    }
+    if (!isHomeroom) return json({ error: NOT_HOMEROOM_MESSAGE }, 403, headers);
   }
 
   // ④ 마이그레이션 확인: 탈퇴 마무리 RPC가 있어야 한다(없으면 기록만 남기지 못한 채 계정이 사라진다).

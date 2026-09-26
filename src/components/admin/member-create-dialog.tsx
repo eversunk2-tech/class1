@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -9,6 +9,7 @@ import {
   EyeOffIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
+  SchoolIcon,
   UserPlusIcon,
   XCircleIcon,
 } from "lucide-react";
@@ -23,13 +24,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { adminTabPanelClass } from "@/components/admin/admin-styles";
+import { NO_CLASS_MESSAGE } from "@/components/admin/class-card";
+import { ClassSelectField } from "@/components/admin/class-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { adminPermissions, useAdminContext, type AdminContextValue } from "@/hooks/use-admin-context";
 import { AdminActionError } from "@/lib/admin";
 import { withBasePath } from "@/lib/base-path";
+import type { AdminClass } from "@/lib/classes";
 import {
+  applyRolePolicy,
   buildDrafts,
   createMembers,
   MAX_IMPORT_ROWS,
@@ -47,8 +53,10 @@ import { readSheetFile, SpreadsheetError } from "@/lib/spreadsheet";
 import { cn } from "@/lib/utils";
 
 /**
- * 회원 추가 모달 (docs/admin/create-members/build-instructions.md).
+ * 회원 추가 모달 (docs/admin/create-members/build-instructions.md, 학급: docs/classes/spec.md 개정 1).
  * 탭 두 개: "한 명 만들기" / "엑셀로 여러 명".
+ * - 학생은 **내 학급 중에서** 고른 학급에 등록된다(학급이 하나면 자동). 엑셀은 파일 하나 = 학급 하나.
+ * - 역할 '교사'는 총괄에게만 보인다(교사 계정은 학급 없이 만들어진다).
  *
  * ⚠ 비밀번호는 이 컴포넌트 state에만 두고 **어디에도 저장하지 않는다**(localStorage·로그·미리보기 표 모두 금지).
  *   미리보기에는 길이만 보여 주고, 모달이 완전히 닫히면 state에서도 지운다.
@@ -111,23 +119,93 @@ export function MemberCreateDialog({
 }
 
 // ─────────────────────────────────────────────
+// 학급 칸(두 탭 공용)
+// ─────────────────────────────────────────────
+
+/** 학생을 넣을 학급: 내 학급이 하나면 자동, 여럿이면 고른 값(목록에 없는 값이면 빈 값). */
+function effectiveClassId(classes: AdminClass[], picked: string): string {
+  if (classes.length === 1) return classes[0].id;
+  return classes.some((c) => c.id === picked) ? picked : "";
+}
+
+/** 학급이 하나도 없을 때(담임: 학생 등록 불가, 총괄: 교사 계정만 가능). */
+function NoClassNote({ superAdmin }: { superAdmin: boolean }) {
+  return (
+    <div className="flex gap-2 rounded-xl border border-foreground/10 bg-muted/50 p-3 text-sm" role="note">
+      <SchoolIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="flex flex-col gap-0.5">
+        <p className="font-medium">{NO_CLASS_MESSAGE}</p>
+        <p className="text-xs text-muted-foreground">
+          이 창을 닫고 ‘내 학급’ 카드의 <strong>학급 개설</strong>을 눌러 주세요.
+          {superAdmin ? " 교사 계정은 학급 없이도 만들 수 있어요." : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** 학급 칸: 불러오는 중 / 못 읽음 / 학급 없음 / 고르기(하나면 자동). */
+function ClassArea({
+  ctx,
+  value,
+  onChange,
+  disabled,
+  help,
+}: {
+  ctx: AdminContextValue;
+  value: string;
+  onChange: (classId: string) => void;
+  disabled?: boolean;
+  help?: string;
+}) {
+  if (ctx.status === "loading") {
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+        <Loader2Icon className="size-4 animate-spin" aria-hidden />
+        학급 정보를 불러오는 중…
+      </p>
+    );
+  }
+  if (ctx.status === "error") {
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <span className="min-w-0 flex-1">학급 정보를 불러오지 못해 학생을 등록할 수 없습니다.</span>
+        <Button type="button" variant="outline" className="h-11 px-4" onClick={ctx.retry}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+  if (!ctx.classes.length) return <NoClassNote superAdmin={ctx.isSuperAdmin} />;
+  return <ClassSelectField classes={ctx.classes} value={value} onChange={onChange} disabled={disabled} help={help} />;
+}
+
+// ─────────────────────────────────────────────
 // 한 명 만들기
 // ─────────────────────────────────────────────
 function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: () => void }) {
   const idFieldId = useId();
   const pwFieldId = useId();
   const roleFieldId = useId();
+  const ctx = useAdminContext();
+  const perms = adminPermissions(ctx);
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<DraftRole>("user");
+  const [pickedClassId, setPickedClassId] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
 
+  // 교사 역할은 총괄만(학급 기능 전에는 예전처럼 누구나). 권한이 없으면 언제나 학생.
+  const effectiveRole: DraftRole = perms.canCreateTeacher ? role : "user";
+  const classId = effectiveClassId(ctx.classes, pickedClassId);
+  const needsClass = !perms.legacy && effectiveRole === "user";
+  const contextReady = perms.legacy || ctx.status === "ready";
   const idError = id ? validateLoginId(id) : null;
   const pwError = password ? validatePassword(password) : null;
-  const ready = !!id && !!password && !idError && !pwError;
+  const ready = contextReady && !!id && !!password && !idError && !pwError && (!needsClass || !!classId);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -136,6 +214,7 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
     setBusy(true);
     setError(null);
     const normalized = normalizeLoginId(id);
+    const className = needsClass ? (ctx.classes.find((c) => c.id === classId)?.name ?? null) : null;
     try {
       const draft: MemberDraft = {
         key: normalized,
@@ -143,18 +222,27 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         id: normalized,
         rawId: id.trim(),
         password,
-        role,
-        rawRole: roleLabel(role),
+        role: effectiveRole,
+        rawRole: roleLabel(effectiveRole),
         error: null,
         warning: null,
       };
-      const { outcomes, notices } = await createMembers([draft], { source: "single" });
+      const { outcomes, notices } = await createMembers([draft], {
+        source: "single",
+        classId: needsClass ? classId : null,
+      });
       const [outcome] = outcomes;
       if (outcome?.status === "created") {
         onCreated?.();
         for (const notice of notices) toast.warning(notice, { duration: 12000 });
         if (outcome.warning) toast.warning(outcome.warning, { duration: 12000 });
-        else toast.success(`${normalized} 계정을 만들었습니다. 첫 로그인 때 비밀번호를 바꾸게 됩니다.`);
+        else if (effectiveRole === "admin" && !perms.legacy) {
+          toast.success(`${normalized} 교사 계정을 만들었습니다. 그 선생님이 로그인해 학급을 개설하면 학생을 등록할 수 있어요.`);
+        } else {
+          toast.success(
+            `${normalized} 계정을 ${className ? `‘${className}’에 ` : ""}만들었습니다. 첫 로그인 때 비밀번호를 바꾸게 됩니다.`,
+          );
+        }
         setPassword("");
         setId("");
         onClose();
@@ -182,6 +270,7 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
           autoCapitalize="none"
           spellCheck={false}
           placeholder="예: 60101"
+          className="h-11"
           aria-invalid={!!idError}
           aria-describedby={`${idFieldId}-help`}
         />
@@ -201,6 +290,7 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
             disabled={busy}
             autoComplete="new-password"
             placeholder={`${MIN_PASSWORD_LENGTH}자 이상`}
+            className="h-11"
             aria-invalid={!!pwError}
             aria-describedby={`${pwFieldId}-help`}
           />
@@ -208,6 +298,7 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
             type="button"
             variant="outline"
             size="icon"
+            className="size-11"
             onClick={() => setShow((v) => !v)}
             aria-label={show ? "비밀번호 가리기" : "비밀번호 보기"}
             aria-pressed={show}
@@ -220,22 +311,39 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         </p>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={roleFieldId}>역할</Label>
-        <select
-          id={roleFieldId}
-          value={role}
-          onChange={(e) => setRole(e.target.value as DraftRole)}
+      {/* 역할 '교사'는 총괄에게만 보인다(개정 1-1). 담임에게는 칸 자체가 없고 언제나 학생 계정을 만든다. */}
+      {perms.canCreateTeacher ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={roleFieldId}>역할</Label>
+          <select
+            id={roleFieldId}
+            value={role}
+            onChange={(e) => setRole(e.target.value as DraftRole)}
+            disabled={busy}
+            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          >
+            <option value="user">학생</option>
+            <option value="admin">교사(담임)</option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            {perms.legacy
+              ? "교사는 관리자 대시보드를 모두 쓸 수 있습니다. 꼭 필요한 사람만 교사로 만들어 주세요."
+              : effectiveRole === "admin"
+                ? "교사 계정은 학급 없이 만들어져요. 그 선생님이 로그인해 직접 학급을 개설하고 학생을 등록합니다."
+                : "교사로 만들면 관리자 대시보드에서 자기 학급을 개설하고 학생을 등록할 수 있어요. 꼭 필요한 사람만 교사로 만들어 주세요."}
+          </p>
+        </div>
+      ) : null}
+
+      {needsClass ? (
+        <ClassArea
+          ctx={ctx}
+          value={classId}
+          onChange={setPickedClassId}
           disabled={busy}
-          className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-        >
-          <option value="user">학생</option>
-          <option value="admin">교사(관리자)</option>
-        </select>
-        <p className="text-xs text-muted-foreground">
-          교사는 관리자 대시보드를 모두 쓸 수 있습니다. 꼭 필요한 사람만 교사로 만들어 주세요.
-        </p>
-      </div>
+          help={ctx.classes.length === 1 ? "내 학급이 하나라서 이 학급에 등록돼요." : undefined}
+        />
+      ) : null}
 
       {error ? (
         <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm" role="alert">
@@ -244,8 +352,8 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
       ) : null}
 
       <DialogFooter>
-        <DialogClose render={<Button variant="outline" disabled={busy} />}>취소</DialogClose>
-        <Button type="submit" disabled={!ready || busy}>
+        <DialogClose render={<Button variant="outline" className="h-11 px-4" disabled={busy} />}>취소</DialogClose>
+        <Button type="submit" className="h-11 px-4" disabled={!ready || busy}>
           {busy ? <Loader2Icon className="animate-spin" /> : <UserPlusIcon />}
           만들기
         </Button>
@@ -266,6 +374,8 @@ type FilePhase =
 
 function FileForm({ onCreated }: { onCreated?: () => void }) {
   const fileFieldId = useId();
+  const ctx = useAdminContext();
+  const perms = adminPermissions(ctx);
   const [fileName, setFileName] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<MemberDraft[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -273,10 +383,23 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   const [serverNotices, setServerNotices] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<FilePhase>({ kind: "idle" });
+  const [pickedClassId, setPickedClassId] = useState("");
   const working = useRef(false);
 
-  const okCount = drafts.filter((d) => !d.error).length;
-  const badCount = drafts.length - okCount;
+  // 담임에게는 "교사" 줄을 고쳐야 할 줄로 보여 준다(교사 계정은 총괄만 — 서버도 거부한다).
+  const checked = useMemo(() => applyRolePolicy(drafts, perms.canCreateTeacher), [drafts, perms.canCreateTeacher]);
+  const okCount = checked.filter((d) => !d.error).length;
+  const badCount = checked.length - okCount;
+  const studentCount = checked.filter((d) => !d.error && d.role === "user").length;
+  const teacherCount = okCount - studentCount;
+
+  // 파일 하나 = 학급 하나: 학생 줄은 모두 이 학급에 등록된다(개정 1 — 서식 파일은 바꾸지 않음).
+  const classId = effectiveClassId(ctx.classes, pickedClassId);
+  const className = ctx.classes.find((c) => c.id === classId)?.name ?? null;
+  const classMissing = !perms.legacy && studentCount > 0 && !classId;
+  const contextReady = perms.legacy || ctx.status === "ready";
+  // 학급이 없는 담임은 만들 수 있는 것이 없다(학생은 학급 필요, 교사는 총괄만).
+  const nothingAllowed = ctx.status === "ready" && !ctx.classes.length && !perms.canCreateTeacher;
 
   async function onPick(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -315,6 +438,7 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
     try {
       const { outcomes, notices } = await createMembers(rows, {
         source: "bulk",
+        classId: perms.legacy ? null : classId || null,
         onProgress: (done, total) => setPhase({ kind: "working", done, total }),
       });
       const { created, failed } = summarize(outcomes);
@@ -336,14 +460,28 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
     // 다시 보낼 값이 있는 행만 보낸다(review L3).
     // "이미 있음"은 다시 해도 같은 결과이고, "형식 오류"는 파일을 고쳐야 하므로 호출을 낭비하지 않는다.
     const retryKeys = new Set(retryable(outcomes).map((o) => o.key));
-    run(drafts.filter((d) => retryKeys.has(d.key)));
+    run(checked.filter((d) => !d.error && retryKeys.has(d.key)));
   }
 
   const busy = phase.kind === "working" || phase.kind === "parsing";
 
   return (
     <div className="flex flex-col gap-4">
-      <SpecGuide />
+      <SpecGuide allowTeacher={perms.canCreateTeacher} classMode={!perms.legacy} />
+
+      {!perms.legacy ? (
+        <ClassArea
+          ctx={ctx}
+          value={classId}
+          onChange={setPickedClassId}
+          disabled={busy || phase.kind === "done"}
+          help={
+            ctx.classes.length === 1
+              ? "내 학급이 하나라서 파일의 학생은 모두 이 학급에 등록돼요."
+              : "파일의 학생은 모두 고른 학급에 등록돼요(파일 하나에 학급 하나)."
+          }
+        />
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={fileFieldId}>엑셀(.xlsx) 또는 CSV 파일</Label>
@@ -352,8 +490,8 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
           type="file"
           accept=".xlsx,.csv,.txt,text/csv"
           onChange={onPick}
-          disabled={busy}
-          className="h-auto py-1.5"
+          disabled={busy || nothingAllowed}
+          className="h-auto min-h-11 py-2"
         />
         {fileName ? <p className="text-xs text-muted-foreground">고른 파일: {fileName}</p> : null}
       </div>
@@ -378,9 +516,9 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
         </p>
       ) : null}
 
-      {drafts.length > 0 && phase.kind !== "done" ? (
+      {checked.length > 0 && phase.kind !== "done" ? (
         <>
-          <PreviewTable drafts={drafts} />
+          <PreviewTable drafts={checked} />
           <p className="text-sm" aria-live="polite">
             만들 수 있는 행 <strong>{okCount}</strong>개
             {badCount > 0 ? (
@@ -389,6 +527,21 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
               </>
             ) : null}
           </p>
+          {!perms.legacy && okCount > 0 ? (
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground" aria-live="polite">
+              {studentCount > 0 ? (
+                <span>
+                  학생 <strong className="text-foreground">{studentCount}</strong>명 →{" "}
+                  {className ? <strong className="text-foreground">‘{className}’</strong> : <span className="text-foreground">학급을 골라 주세요</span>}
+                </span>
+              ) : null}
+              {teacherCount > 0 ? (
+                <span>
+                  교사 <strong className="text-foreground">{teacherCount}</strong>명(학급 없이 만들어져요)
+                </span>
+              ) : null}
+            </p>
+          ) : null}
         </>
       ) : null}
 
@@ -415,11 +568,15 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
       ) : null}
 
       <DialogFooter>
-        <DialogClose render={<Button variant="outline" disabled={busy} />}>
+        <DialogClose render={<Button variant="outline" className="h-11 px-4" disabled={busy} />}>
           {phase.kind === "done" ? "닫기" : "취소"}
         </DialogClose>
         {phase.kind !== "done" ? (
-          <Button disabled={busy || okCount === 0} onClick={() => run(drafts.filter((d) => !d.error))}>
+          <Button
+            className="h-11 px-4"
+            disabled={busy || okCount === 0 || classMissing || !contextReady}
+            onClick={() => run(checked.filter((d) => !d.error))}
+          >
             {phase.kind === "working" ? <Loader2Icon className="animate-spin" /> : <UserPlusIcon />}
             {okCount > 0 ? `${okCount}명 만들기` : "만들기"}
           </Button>
@@ -445,7 +602,7 @@ function downloadCsvTemplate() {
   URL.revokeObjectURL(url);
 }
 
-function SpecGuide() {
+function SpecGuide({ allowTeacher, classMode }: { allowTeacher: boolean; classMode: boolean }) {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-foreground/10 bg-muted/40 p-3 text-sm">
       <p className="font-medium">엑셀 규격</p>
@@ -453,9 +610,17 @@ function SpecGuide() {
         <li>
           첫 줄은 제목 줄: <strong>아이디 · 비밀번호 · 역할</strong> (순서는 달라도 됩니다)
         </li>
-        <li>
-          역할은 <strong>학생</strong> 또는 <strong>교사</strong>
-        </li>
+        {allowTeacher ? (
+          <li>
+            역할은 <strong>학생</strong> 또는 <strong>교사</strong>
+            {classMode ? " (교사는 학급 없이 만들어져요)" : ""}
+          </li>
+        ) : (
+          <li>
+            역할은 <strong>학생</strong> (교사 계정은 총괄 선생님만 만들 수 있어요)
+          </li>
+        )}
+        {classMode ? <li>학생은 아래에서 고른 학급에 모두 등록돼요 — 파일 하나에 학급 하나</li> : null}
         <li>비밀번호는 {MIN_PASSWORD_LENGTH}자 이상, 앞뒤 공백 없이</li>
         <li>아이디는 영문·숫자와 . _ - (한글·공백 불가)</li>
         <li>한 번에 최대 {MAX_IMPORT_ROWS}명까지</li>

@@ -7,7 +7,6 @@ import {
   GraduationCapIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
-  LayoutListIcon,
   LogOutIcon,
   PenSquareIcon,
   SproutIcon,
@@ -113,12 +112,10 @@ export function UserMenu() {
                   <LayoutDashboardIcon />
                   관리자 대시보드
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/admin/posts/")}>
-                  <LayoutListIcon />
-                  글 관리
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/admin/write/")}>
-                  <PenSquareIcon />새 글 작성
+                {/* 블로그 '글 관리'·'새 글 작성' 대신 학급별 '선생님 글'(docs/classes/spec.md 개정 2) */}
+                <DropdownMenuItem onClick={() => router.push("/admin/notices/")}>
+                  <PenSquareIcon />
+                  선생님 글
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/admin/members/")}>
                   <UsersIcon />

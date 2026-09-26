@@ -6,7 +6,6 @@ import {
   ArrowRightIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
-  FilePenLineIcon,
   Gamepad2Icon,
   GraduationCapIcon,
   MessageCircleIcon,
@@ -17,12 +16,14 @@ import {
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
+import { MyClassesCard } from "@/components/admin/class-card";
 import { LoginRequiredCard } from "@/components/admin/login-required-card";
 import { MemberAvatar, ProviderBadges } from "@/components/admin/member-badges";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuColor } from "@/data/menu";
+import { useAdminContext } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { useSession } from "@/hooks/use-session";
 import { accountLabel, fetchRecentMembers, isMissingSchemaError, memberName, MISSING_SCHEMA_MESSAGE } from "@/lib/admin";
@@ -38,6 +39,8 @@ import { RecentActivitySection } from "./learning/learning-overview";
  * 한 번의 호출이라 로딩/오류는 네 카드가 함께 바뀌고, 오류 시 카드마다 다시 시도 버튼이 있다.
  */
 function LearningStatTiles() {
+  // 학급 기능이 켜지면 admin_dashboard_stats()가 내 학급 학생 기준으로 센다(총괄도 자기 학급 — docs/classes/spec.md 개정 1-4).
+  const { status: classStatus } = useAdminContext();
   const load = useCallback(() => fetchLearningStats(), []);
   const { state, reload, refresh } = useAsyncData(load);
 
@@ -50,7 +53,13 @@ function LearningStatTiles() {
   const status = state.status;
   const v = state.status === "ready" ? state.data : null;
   const tiles: { label: string; unit: string; icon: LucideIcon; color: MenuColor; value: number | null }[] = [
-    { label: "전체 회원", unit: "명", icon: UsersIcon, color: "games", value: v?.totalMembers ?? null },
+    {
+      label: classStatus === "ready" ? "내 학급 학생" : "전체 회원",
+      unit: "명",
+      icon: UsersIcon,
+      color: "games",
+      value: v?.totalMembers ?? null,
+    },
     { label: "오늘 학습 결과", unit: "건", icon: Gamepad2Icon, color: "home", value: v?.resultsToday ?? null },
     { label: "검토 대기 제출", unit: "건", icon: ClipboardCheckIcon, color: "board", value: v?.pendingSubmissions ?? null },
     { label: "안 읽은 피드백", unit: "개", icon: MessageCircleIcon, color: "science", value: v?.unreadFeedback ?? null },
@@ -77,6 +86,7 @@ function LearningStatTiles() {
 type RecentState = { status: "loading" } | { status: "error"; missing: boolean } | { status: "ready"; rows: MemberRow[] };
 
 function RecentMembers() {
+  const ctx = useAdminContext();
   const [state, setState] = useState<RecentState>({ status: "loading" });
 
   const load = useCallback(async () => {
@@ -116,7 +126,14 @@ function RecentMembers() {
       <ErrorState message={state.missing ? MISSING_SCHEMA_MESSAGE : "최근 가입 회원을 불러오지 못했습니다."} onRetry={retry} />
     );
   }
-  if (!state.rows.length) return <EmptyState title="아직 가입한 회원이 없습니다" />;
+  if (!state.rows.length) {
+    // 담임에게는 자기 학급 학생만 보인다(RLS) — 빈 목록의 까닭을 그에 맞게.
+    return ctx.status === "ready" && !ctx.isSuperAdmin ? (
+      <EmptyState title="아직 내 학급 학생이 없어요" description="‘회원 관리’에서 학생을 등록하면 여기에 나타나요." />
+    ) : (
+      <EmptyState title="아직 가입한 회원이 없습니다" />
+    );
+  }
   return (
     <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)}>
       {state.rows.map((m) => (
@@ -128,7 +145,13 @@ function RecentMembers() {
             <MemberAvatar member={m} />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-medium">{memberName(m)}</span>
-              <span className="truncate text-xs text-muted-foreground">{accountLabel(m.email)}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {accountLabel(m.email)}
+                {/* 학급 이름은 관리자 화면에서만(총괄은 모든 학급, 담임은 자기 학급) */}
+                {ctx.status === "ready" && m.profiles?.role !== "admin"
+                  ? ` · ${m.class_id ? (ctx.classNameOf(m.class_id) ?? "다른 학급") : "학급 없음"}`
+                  : ""}
+              </span>
             </span>
             <span className="hidden sm:block">
               <ProviderBadges member={m} />
@@ -189,6 +212,8 @@ export function AdminOverview() {
     <div className="flex flex-col gap-8">
       <AdminPageHeader title="관리자 대시보드" description={`${greeting} 오늘의 반 현황을 확인하세요.`} />
 
+      <MyClassesCard />
+
       <LoginRequiredCard />
 
       <section aria-label="현황 숫자">
@@ -237,10 +262,8 @@ export function AdminOverview() {
               />
             </li>
             <li>
-              <ShortcutLink href="/admin/posts/" label="글 관리" description="발행 · 수정 · 삭제" icon={FilePenLineIcon} color="science" />
-            </li>
-            <li>
-              <ShortcutLink href="/admin/write/" label="새 글 작성" description="마크다운 에디터 열기" icon={PenSquareIcon} color="home" />
+              {/* 블로그 '글 관리'·'새 글 작성' 대신 학급별 '선생님 글'(docs/classes/spec.md 개정 2) */}
+              <ShortcutLink href="/admin/notices/" label="선생님 글" description="내 학급 학생에게 보일 글 쓰기" icon={PenSquareIcon} color="home" />
             </li>
           </ul>
         </section>

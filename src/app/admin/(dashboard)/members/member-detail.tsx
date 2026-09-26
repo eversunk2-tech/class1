@@ -2,28 +2,17 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, KeyRoundIcon, Loader2Icon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from "lucide-react";
-import { toast } from "sonner";
-import { dangerSolidClass } from "@/components/admin/admin-styles";
+import { ArrowLeftIcon, KeyRoundIcon, LockKeyholeIcon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from "lucide-react";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
+import { RoleChangeDialog } from "@/components/admin/role-change-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { adminPermissions, useAdminContext } from "@/hooks/use-admin-context";
 import { useSession } from "@/hooks/use-session";
 import {
-  AdminActionError,
   accountLabel,
   canResetPassword,
   fetchLatestWithdrawal,
@@ -34,7 +23,6 @@ import {
   isMissingSchemaError,
   memberName,
   MISSING_SCHEMA_MESSAGE,
-  setMemberRole,
   UUID_RE,
   withdrawBlockReason,
 } from "@/lib/admin";
@@ -58,16 +46,18 @@ function BackLink() {
 }
 
 /**
- * 회원 상세(/admin/members/?id=): 프로필 요약 · 비밀번호 초기화 · 관리자 지정/해제 +
+ * 회원 상세(/admin/members/?id=): 프로필 요약 · 학급 · 비밀번호 초기화 · 담임교사 지정/해제(총괄만) +
  * 학습활동 탭(웹앱 결과/읽은 글/댓글·좋아요/과제 제출/피드백 대화, docs/admin/spec.md §3.5).
+ * 학습 기록은 내 학급 학생만 본다(총괄도 같음 — docs/classes/spec.md 개정 1-1). 다른 학급 학생이면 탭 대신 안내를 보여 준다.
  */
 export function MemberDetail({ id }: { id: string }) {
   const { user } = useSession();
+  const ctx = useAdminContext();
+  const perms = adminPermissions(ctx);
   const validId = UUID_RE.test(id);
   const [state, setState] = useState<State>(validId ? { status: "loading" } : { status: "not-found" });
   const [resetOpen, setResetOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
-  const [roleBusy, setRoleBusy] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawInfo, setWithdrawInfo] = useState<{ created_at: string; actor_name: string | null } | null>(null);
 
@@ -150,26 +140,33 @@ export function MemberDetail({ id }: { id: string }) {
   const isWithdrawn = isWithdrawnMember(member);
   const isAdmin = member.profiles?.role === "admin";
   const isSelf = user?.id === member.id;
-  const nextRole: Role = isAdmin ? "user" : "admin";
   const resetBlock = passwordResetBlockReason(member, user?.id);
   const withdrawBlock = withdrawBlockReason(member, user?.id);
+  const classMode = ctx.status === "ready";
+  // 학급 표시(관리자 화면에서만): 학생은 소속 학급, 교사는 담임 학급(총괄만 알 수 있음)
+  const taught = isAdmin ? (ctx.teacherClasses?.get(member.id) ?? []).map((cid) => ctx.classNameOf(cid) ?? "이름 없는 학급") : [];
+  const classText = isAdmin
+    ? taught.length
+      ? `담임: ${taught.join(", ")}`
+      : "없음(교사 계정)"
+    : member.class_id
+      ? (ctx.classNameOf(member.class_id) ?? "다른 학급")
+      : "없음 — 어느 담임 화면에도 보이지 않아요";
+  // 학습 기록을 볼 수 있는 학생인가: 내가 담임인 학급의 학생만(총괄 예외 없음). 학급 기능 전·정보를 못 읽었으면 예전처럼 보여 준다.
+  const inMyClass = !!member.class_id && ctx.classes.some((c) => c.id === member.class_id);
+  const learningHidden = classMode && !inMyClass;
 
   function patchMember(patch: (m: MemberRow) => MemberRow) {
     setState((s) => (s.status === "ready" ? { ...s, member: patch(s.member) } : s));
   }
 
-  async function onChangeRole() {
-    setRoleBusy(true);
-    try {
-      await setMemberRole(member.id, nextRole);
-      patchMember((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, role: nextRole } } : m));
-      setRoleOpen(false);
-      toast.success(nextRole === "admin" ? `${name}님을 관리자로 지정했습니다.` : `${name}님의 관리자 권한을 해제했습니다.`);
-    } catch (e) {
-      toast.error(e instanceof AdminActionError ? e.message : "역할을 바꾸지 못했습니다.");
-    } finally {
-      setRoleBusy(false);
-    }
+  function onRoleChanged(_id: string, role: Role) {
+    // 담임으로 지정하면 서버가 학생 소속(class_id)을 비운다 — 화면도 같이 비운다.
+    patchMember((m) =>
+      m.profiles
+        ? { ...m, profiles: { ...m.profiles, role }, ...(role === "admin" && m.class_id !== undefined ? { class_id: null } : {}) }
+        : m,
+    );
   }
 
   return (
@@ -203,7 +200,8 @@ export function MemberDetail({ id }: { id: string }) {
           <Field label="마지막 로그인">
             {member.last_sign_in_at ? formatDateTime(member.last_sign_in_at) : "로그인 기록 없음"}
           </Field>
-          <Field label="역할">{isAdmin ? "관리자" : "학생(일반 회원)"}</Field>
+          <Field label="역할">{isAdmin ? "교사(관리자)" : "학생(일반 회원)"}</Field>
+          {classMode ? <Field label="학급">{classText}</Field> : null}
           <Field label="비밀번호">
             {isWithdrawn
               ? "없음(계정 삭제됨)"
@@ -243,10 +241,11 @@ export function MemberDetail({ id }: { id: string }) {
               비밀번호 초기화
             </Button>
           )}
-          {isAdmin && isSelf ? (
-            <Button variant="outline" disabled title="자기 자신의 관리자 권한은 해제할 수 없습니다.">
+          {/* 담임교사 지정/해제는 총괄만(admin_set_role — 개정 1-2). 담임에게는 버튼을 보이지 않는다. */}
+          {!perms.canChangeRole ? null : isAdmin && isSelf ? (
+            <Button variant="outline" disabled title="자기 자신의 담임교사 지정은 해제할 수 없습니다.">
               <ShieldOffIcon />
-              관리자 해제(본인 불가)
+              담임 해제(본인 불가)
             </Button>
           ) : (
             <Button
@@ -256,7 +255,7 @@ export function MemberDetail({ id }: { id: string }) {
               onClick={() => setRoleOpen(true)}
             >
               {isAdmin ? <ShieldOffIcon /> : <ShieldCheckIcon />}
-              {isAdmin ? "관리자 해제" : "관리자로 지정"}
+              {isAdmin ? "담임 해제" : "담임교사로 지정"}
             </Button>
           )}
           {withdrawBlock ? (
@@ -276,8 +275,26 @@ export function MemberDetail({ id }: { id: string }) {
         </div>
       </section>
 
-      {/* 학습활동 영역: 웹앱 결과 / 읽은 글 / 댓글·좋아요 / 과제 제출 / 피드백 대화 (탈퇴해도 그대로 남는다) */}
-      <MemberLearning memberId={member.id} memberName={name} memberWithdrawn={isWithdrawn} />
+      {/* 학습활동 영역: 웹앱 결과 / 읽은 글 / 댓글·좋아요 / 과제 제출 / 피드백 대화 (탈퇴해도 그대로 남는다).
+          다른 학급 학생·교사 계정이면 RLS가 기록을 돌려주지 않으므로 빈 탭 대신 까닭을 알려 준다. */}
+      {ctx.status === "loading" ? (
+        <Skeleton className="h-40 w-full rounded-2xl" />
+      ) : learningHidden ? (
+        <section aria-label="학습활동" className="flex flex-col gap-3">
+          <h2 className="font-heading text-xl font-normal">학습활동</h2>
+          <p className="flex gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm text-muted-foreground" role="note">
+            <LockKeyholeIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              {isAdmin
+                ? "교사 계정이라 학습 기록을 모아 보여 주지 않아요."
+                : "내 학급 학생이 아니어서 학습 기록(웹앱 결과·학생 응답·과제·피드백)을 볼 수 없어요. 학습 기록은 그 학생의 담임 선생님만 볼 수 있어요."}
+              {!isAdmin && perms.superAdmin ? " 비밀번호 초기화와 탈퇴 처리는 총괄 선생님이 할 수 있어요." : ""}
+            </span>
+          </p>
+        </section>
+      ) : (
+        <MemberLearning memberId={member.id} memberName={name} memberWithdrawn={isWithdrawn} />
+      )}
 
       <PasswordResetDialog
         target={member}
@@ -297,35 +314,7 @@ export function MemberDetail({ id }: { id: string }) {
         }
       />
 
-      <AlertDialog
-        open={roleOpen}
-        onOpenChange={(open) => {
-          if (!roleBusy) setRoleOpen(open);
-        }}
-      >
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{isAdmin ? "관리자 권한을 해제할까요?" : "관리자로 지정할까요?"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {isAdmin
-                ? `${name}님은 더 이상 글 관리·회원 관리 화면을 쓸 수 없게 됩니다.`
-                : `${name}님이 글 작성·삭제, 회원 비밀번호 초기화 등 모든 관리자 기능을 쓸 수 있게 됩니다.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={roleBusy}>취소</AlertDialogCancel>
-            <AlertDialogAction
-              variant={isAdmin ? "destructive" : "default"}
-              className={isAdmin ? dangerSolidClass : undefined}
-              disabled={roleBusy}
-              onClick={onChangeRole}
-            >
-              {roleBusy ? <Loader2Icon className="animate-spin" /> : null}
-              {isAdmin ? "해제" : "지정"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RoleChangeDialog target={member} open={roleOpen} onOpenChange={setRoleOpen} onChanged={onRoleChanged} />
     </div>
   );
 }

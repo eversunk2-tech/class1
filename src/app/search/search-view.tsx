@@ -355,7 +355,7 @@ function CommunityResults({ kind, q }: { kind: "board" | "game"; q: string }) {
             </p>
           ) : null}
           {state.hasMore ? (
-            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-1 h-10")} onClick={loadMore} disabled={loadingMore}>
+            <Button variant="outline" className={cn(outlinePillClass, "mx-auto mt-1 h-11")} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? <Loader2Icon className="animate-spin" /> : null}더 보기
             </Button>
           ) : null}

@@ -7,11 +7,13 @@ import { AsyncView, SectionTitle, StudentLink, TableWrap, tdClass, thClass } fro
 import { postHref } from "@/components/post-card";
 import { EmptyState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
+import { useStudentScope } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import { formatCount } from "@/lib/format";
 import {
   fetchPostEngagement,
   fetchStudentEngagement,
+  fetchStudents,
   type PostEngagementRow,
   type StudentEngagementRow,
 } from "@/lib/learning";
@@ -132,7 +134,15 @@ function SortedPosts({ rows, sort, onSort }: { rows: PostEngagementRow[]; sort: 
 }
 
 function StudentEngagement() {
-  const load = useCallback(() => fetchStudentEngagement(), []);
+  // 학생별 참여는 내 학급(학급을 골랐으면 그 학급) 학생만 보여 준다(docs/classes/spec.md 개정 1-1).
+  // profiles는 이름 표시용으로 모두 읽히므로 명단(member_directory, 학급으로 거름)과 맞춰 거른다. 학급 기능 전에는 예전처럼 전체.
+  const { classIds, ready: classMode } = useStudentScope();
+  const load = useCallback(async () => {
+    const [rows, roster] = await Promise.all([fetchStudentEngagement(), classIds ? fetchStudents(classIds) : null]);
+    if (!roster) return rows;
+    const ids = new Set(roster.map((st) => st.id));
+    return rows.filter((r) => ids.has(r.id));
+  }, [classIds]);
   const { state, reload } = useAsyncData(load);
   const [sort, setSort] = useState<StudentSort>("reads");
 
@@ -149,7 +159,13 @@ function StudentEngagement() {
         onRetry={reload}
         errorText="학생별 참여를 불러오지 못했습니다."
         isEmpty={(rows) => !rows.length}
-        empty={<EmptyState title="아직 회원이 없습니다" />}
+        empty={
+          classMode ? (
+            <EmptyState title="내 학급 학생이 아직 없어요" description="‘회원 관리’에서 학생을 등록하면 여기에 나타나요." />
+          ) : (
+            <EmptyState title="아직 회원이 없습니다" />
+          )
+        }
       >
         {(rows) => <SortedStudents rows={rows} sort={sort} onSort={setSort} />}
       </AsyncView>

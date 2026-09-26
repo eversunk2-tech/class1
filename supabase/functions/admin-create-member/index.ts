@@ -1,28 +1,38 @@
 // admin-create-member — 관리자가 새 계정(학생·교사)을 한 번에 여러 개 만든다.
-// docs/admin/create-members/build-instructions.md. 배포 방법은 같은 폴더의 README.md 참고.
+// docs/admin/create-members/build-instructions.md + docs/classes/spec.md 개정 1(학급). 배포 방법은 같은 폴더의 README.md 참고.
 //
 // 요청:  POST { "rows": [{ "id": "60101", "password": "…", "role": "user" | "admin" }],
-//                "source"?: "single" | "bulk" }
+//                "source"?: "single" | "bulk", "classId"?: "<학급 uuid>" }
 //        (Authorization: Bearer <호출자 access token> — supabase-js가 자동 첨부)
+//        classId: 학생 줄(role "user")을 넣을 학급. 호출자가 담임인 학급만 된다(총괄도 자기 학급만 — 개정 1-1).
+//                 보내지 않으면 호출자의 (보관 안 된) 학급이 하나일 때만 그 학급으로 넣고, 없거나 여럿이면 400.
 // 응답:  200 { "results": [{ "index": 0, "id": "60101", "status": "created" | "exists" | "invalid" | "failed",
 //                            "message"?: "…", "warning"?: "…" }],
 //              "warning"?: "감사 로그를 남기지 못했습니다 …" }
 //        401/403/400/405/413/500 { "error": "한국어 메시지" }
+//        (학급 문제: 학급 없음·학급 고르기 필요·classId 형식 오류 = 400, 내 학급이 아님·보관된 학급 = 403)
 //
 // 보안 메모
 // - 서비스 롤 키는 이 함수 안에서만 쓰고 응답에 포함하지 않는다.
-// - **비밀번호는 응답·로그 어디에도 남기지 않는다.** console.error에도 아이디까지만 적는다.
+// - **비밀번호는 응답·로그 어디에도 남기지 않는다.** console.error에도 아이디까지만 적는다(이메일·비밀번호 없음).
 //   (createUser 실패 메시지는 GoTrue가 만든 문구라 비밀번호를 담지 않는다. 그래도 길이만 검사하고 값은 찍지 않는다.)
 // - 호출자가 관리자인지 함수 안에서 확인한다(화면 가드를 믿지 않는다).
-// - 계정 생성은 auth admin API, 역할·강제 변경 플래그는 service_role의 profiles UPDATE로 처리한다
+// - 학급 권한(개정 1-1·1-4): 학생 줄은 호출자가 담임인 학급(class_teachers)에만, 교사 줄(role "admin")은 총괄
+//   (profiles.role 'admin' + is_super_admin)만 — 교사 계정에는 학급이 없다(class_id null).
+//   총괄이 아닌 교사가 보낸 교사 줄은 그 줄만 "invalid"(사유 포함)로 돌려주고 나머지 줄은 만든다.
+//   서비스 롤에는 auth.uid()가 없어 DB 함수 is_super_admin()/teaches_student()를 부를 수 없으므로,
+//   서비스 롤로 profiles · class_teachers · classes 를 직접 읽어 같은 규칙으로 판단한다.
+// - 계정 생성은 auth admin API, 역할·강제 변경 플래그·학급은 service_role의 profiles UPDATE로 처리한다
 //   (20260921000000의 revoke는 anon/authenticated 대상이라 service_role에는 영향이 없다).
+//   profiles.class_id 가 바뀌면 DB 트리거(20260927000000)가 member_directory.class_id 에도 복사한다.
 // - 감사 로그(member_create_log)는 20260923030000_member_create_log.sql이 필요하다.
 //   **그 SQL을 실행하지 않아도 계정 생성은 그대로 동작한다** — 로그만 못 남기고 응답에 warning을 붙인다(review M1).
+// - 학급 SQL(20260927000000_classes_schema.sql)이 없으면 계정을 만들지 않고 "DB 설정 필요"로 거부한다(500).
 //
 // 동작
-//   ① 호출자 확인(JWT) → ② 관리자 확인 → ③ 입력 검사(행별) →
+//   ① 호출자 확인(JWT) → ② 관리자·총괄 확인 → ③ 입력 검사(행별) → ③-2 교사 줄 권한 → ③-3 학생 줄 학급 확인 →
 //   ④ 행마다 auth.admin.createUser({ email_confirm: true }) →
-//   ⑤ 트리거(handle_new_user)가 만든 profiles 행에 role + must_change_password = true 반영 →
+//   ⑤ 트리거(handle_new_user)가 만든 profiles 행에 role + must_change_password = true + class_id 반영 →
 //   ⑥ 만들어진 계정 1개당 감사 로그 1행(admin_log_member_create RPC, 서비스 롤 전용).
 //   부분 실패를 허용한다: 성공한 행은 그대로 두고 실패 행만 사유와 함께 돌려준다.
 
@@ -128,6 +138,32 @@ const MISSING_LOG_SQL_WARNING =
   "계정은 만들었지만 '누가 언제 만들었는지' 기록은 남지 않았습니다. " +
   "Supabase SQL Editor에서 20260923030000_member_create_log.sql을 실행하면 다음부터 기록됩니다.";
 
+// ─────────────────────────────────────────────
+// 학급(반) — docs/classes/spec.md 개정 1-1·1-4
+// 화면(src/lib/member-import.ts)은 400·403·500 본문의 한국어 error 문구를 그대로 보여 준다.
+// ─────────────────────────────────────────────
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const MISSING_CLASSES_SQL_MESSAGE =
+  "학급 기능용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 " +
+  "20260927000000_classes_schema.sql을 먼저 실행해 주세요.";
+const TEACHER_ROW_SUPER_ONLY_MESSAGE = "교사 계정은 총괄 관리자만 만들 수 있습니다. 역할을 '학생'으로 바꿔 주세요.";
+const NO_CLASS_MESSAGE = "먼저 학급을 개설해 주세요. 학급이 있어야 학생을 등록할 수 있습니다.";
+const PICK_CLASS_MESSAGE = "학생을 등록할 학급을 골라 주세요.";
+const BAD_CLASS_ID_MESSAGE = "학급 정보(classId)가 올바르지 않습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.";
+const NOT_MY_CLASS_MESSAGE = "선생님이 담임인 학급에만 학생을 등록할 수 있습니다.";
+const ARCHIVED_CLASS_MESSAGE = "보관된 학급에는 학생을 등록할 수 없습니다. 다른 학급을 골라 주세요.";
+
+/** 학급 SQL(20260927000000)이 아직 실행되지 않아 난 오류인지(열·표 없음). */
+function isMissingClassesSql(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (["42703", "PGRST204", "42P01", "PGRST205"].includes(error.code ?? "")) return true;
+  const m = (error.message ?? "").toLowerCase();
+  return m.includes("could not find the table") ||
+    (m.includes("could not find the") && m.includes("column")) ||
+    /(column|relation) .* does not exist/.test(m);
+}
+
 function isEmailExistsError(error: { code?: string; message?: string; status?: number } | null): boolean {
   if (!error) return false;
   if (error.code === "email_exists" || error.code === "user_already_exists") return true;
@@ -182,17 +218,20 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // ② 관리자 확인 (서비스 롤로 profiles.role 조회)
+  // ② 관리자·총괄 확인 (서비스 롤로 profiles.role · is_super_admin 조회)
   const { data: callerProfile, error: profileErr } = await admin
     .from("profiles")
-    .select("role")
+    .select("role,is_super_admin")
     .eq("id", callerId)
     .maybeSingle();
   if (profileErr) {
+    if (isMissingClassesSql(profileErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 500, headers);
     console.error("admin-create-member: 관리자 확인 실패", profileErr.message);
     return json({ error: "관리자 권한을 확인하지 못했습니다." }, 500, headers);
   }
   if (callerProfile?.role !== "admin") return json({ error: "관리자만 사용할 수 있습니다." }, 403, headers);
+  // 총괄 = role 'admin' + is_super_admin (DB 함수 is_super_admin()과 같은 규칙)
+  const callerIsSuper = callerProfile?.is_super_admin === true;
 
   // ③ 입력 검사
   const bodyText = await req.text().catch(() => "");
@@ -207,6 +246,7 @@ Deno.serve(async (req: Request) => {
   }
   const rawSource = (body as { source?: unknown } | null)?.source;
   const source: "single" | "bulk" = rawSource === "single" || rawSource === "bulk" ? rawSource : "bulk";
+  const rawClassId = (body as { classId?: unknown } | null)?.classId;
   const rawRows = (body as { rows?: unknown } | null)?.rows;
   if (!Array.isArray(rawRows)) return json({ error: "만들 계정 목록(rows)이 없습니다." }, 400, headers);
   if (rawRows.length === 0) return json({ error: "만들 계정이 없습니다." }, 400, headers);
@@ -235,8 +275,69 @@ Deno.serve(async (req: Request) => {
     prepared.push({ index, row: checked.row, email: checked.email });
   });
 
+  // ③-2 교사 줄(role "admin")은 총괄만 만든다(개정 1-4). 총괄이 아니면 그 줄만 거부하고 나머지는 계속 만든다.
+  //      "invalid"로 돌려준다 — 다시 시도해도 같은 결과라 화면의 "다시 시도" 대상에서 빠진다.
+  const allowed: typeof prepared = [];
+  for (const p of prepared) {
+    if (p.row.role === "admin" && !callerIsSuper) {
+      results.push({ index: p.index, id: p.row.id, status: "invalid", message: TEACHER_ROW_SUPER_ONLY_MESSAGE });
+    } else {
+      allowed.push(p);
+    }
+  }
+
+  // ③-3 학생 줄을 넣을 학급 확인(개정 1-1·1-4): 호출자가 담임인 학급만 — 총괄도 자기 학급만.
+  //      계정을 하나라도 만들기 전에 확인한다(학급 문제면 아무 계정도 만들지 않는다).
+  let classId: string | null = null;
+  if (allowed.some((p) => p.row.role === "user")) {
+    const { data: links, error: linkErr } = await admin
+      .from("class_teachers")
+      .select("class_id")
+      .eq("teacher_id", callerId);
+    if (linkErr) {
+      if (isMissingClassesSql(linkErr)) return json({ error: MISSING_CLASSES_SQL_MESSAGE }, 500, headers);
+      console.error("admin-create-member: 담임 학급 확인 실패", linkErr.message);
+      return json({ error: "담임 학급을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, 500, headers);
+    }
+    const myClassIds = ((links ?? []) as { class_id?: unknown }[])
+      .map((l) => (typeof l.class_id === "string" ? l.class_id.toLowerCase() : ""))
+      .filter((v) => v !== "");
+
+    // 보관(archived_at)된 학급에는 새 학생을 넣지 않는다.
+    let activeClassIds: string[] = [];
+    if (myClassIds.length > 0) {
+      const { data: classRows, error: classErr } = await admin
+        .from("classes")
+        .select("id,archived_at")
+        .in("id", myClassIds);
+      if (classErr) {
+        console.error("admin-create-member: 학급 확인 실패", classErr.message);
+        return json({ error: "학급 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, 500, headers);
+      }
+      activeClassIds = ((classRows ?? []) as { id?: unknown; archived_at?: unknown }[])
+        .filter((c) => typeof c.id === "string" && !c.archived_at)
+        .map((c) => String(c.id).toLowerCase());
+    }
+
+    if (rawClassId === undefined || rawClassId === null || rawClassId === "") {
+      // 화면이 학급을 보내지 않으면(학급 기능 전 화면 등) 학급이 하나일 때만 그 학급으로 넣는다(개정 1-2 "하나면 자동").
+      if (activeClassIds.length === 1) classId = activeClassIds[0];
+      else if (activeClassIds.length === 0) return json({ error: NO_CLASS_MESSAGE }, 400, headers);
+      else return json({ error: PICK_CLASS_MESSAGE }, 400, headers);
+    } else {
+      if (typeof rawClassId !== "string" || !UUID_RE.test(rawClassId.trim())) {
+        return json({ error: BAD_CLASS_ID_MESSAGE }, 400, headers);
+      }
+      const wanted = rawClassId.trim().toLowerCase();
+      // 없는 학급과 남의 학급을 구분하지 않는다(다른 학급 id를 알아내는 데 쓰이지 않게).
+      if (!myClassIds.includes(wanted)) return json({ error: NOT_MY_CLASS_MESSAGE }, 403, headers);
+      if (!activeClassIds.includes(wanted)) return json({ error: ARCHIVED_CLASS_MESSAGE }, 403, headers);
+      classId = wanted;
+    }
+  }
+
   // ④~⑤ 한 행씩 만든다(부분 실패 허용). 순서를 지켜야 진행 표시가 자연스럽고, GoTrue 부하도 적다.
-  for (const { index, row, email } of prepared) {
+  for (const { index, row, email } of allowed) {
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password: row.password,
@@ -263,11 +364,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // 트리거 handle_new_user 가 같은 트랜잭션에서 profiles 행을 만들어 두었다.
-    // 여기서 역할과 "첫 로그인 때 비밀번호 변경" 플래그만 덮어쓴다(service_role은 RLS·컬럼 권한 제한을 받지 않는다).
-    const { error: profileUpdateErr } = await admin
-      .from("profiles")
-      .update({ role: row.role, must_change_password: true })
-      .eq("id", newId);
+    // 여기서 역할 · "첫 로그인 때 비밀번호 변경" 플래그 · 학급을 덮어쓴다(service_role은 RLS·컬럼 권한 제한을 받지 않는다).
+    // 학생은 ③-3에서 확인한 학급, 교사는 학급 없음(개정 1-4). class_id 는 DB 트리거가 member_directory 에도 복사한다.
+    const profilePatch = {
+      role: row.role,
+      must_change_password: true,
+      class_id: row.role === "user" ? classId : null,
+    };
+    let { error: profileUpdateErr } = await admin.from("profiles").update(profilePatch).eq("id", newId);
+    if (profileUpdateErr) {
+      // 한 번만 다시 시도한다 — 학생이 학급 없이 남으면 담임의 회원 명단에 보이지 않는다.
+      ({ error: profileUpdateErr } = await admin.from("profiles").update(profilePatch).eq("id", newId));
+    }
 
     // ⑥ 감사 로그(만들어진 계정 1개당 1행). 실패해도 **계정 생성은 그대로 둔다**(review M1).
     //    profiles UPDATE가 실패했다면 실제 역할은 기본값 'user'이므로 그대로 기록한다(있는 그대로 남긴다).
@@ -300,7 +408,8 @@ Deno.serve(async (req: Request) => {
         warning:
           row.role === "admin"
             ? "계정은 만들었지만 교사(관리자) 지정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. 회원 관리에서 직접 지정해 주세요."
-            : "계정은 만들었지만 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. 필요하면 비밀번호 초기화를 한 번 실행해 주세요.",
+            : "계정은 만들었지만 학급 배정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. " +
+              "이 학생이 회원 명단에 보이지 않으면 총괄 관리자에게 알려 주세요.",
       });
       continue;
     }

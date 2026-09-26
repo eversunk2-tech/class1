@@ -48,9 +48,9 @@ export function RoleBadge({ member }: { member: MemberRow }) {
     <span className="flex flex-wrap gap-1">
       {isWithdrawnMember(member) ? <WithdrawnBadge /> : null}
       {isAdmin ? (
-        <Badge>
+        <Badge title="교사(관리자) 계정 — 관리자 대시보드를 쓸 수 있어요">
           <ShieldCheckIcon aria-hidden />
-          관리자
+          교사
         </Badge>
       ) : (
         <Badge variant="outline">학생</Badge>
