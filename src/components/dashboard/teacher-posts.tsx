@@ -5,11 +5,11 @@ import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import { ErrorFaceIllustration } from "@/components/illustrations/error-face-illustration";
 import { LoginNeededNotice } from "@/components/login-gate";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { PostReadRecorder } from "@/components/post-read-recorder";
 import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLoginLocked } from "@/hooks/use-login-lock";
+import { useSession } from "@/hooks/use-session";
 import { outlinePillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -34,11 +34,14 @@ async function fetchTeacherPosts(offset: number, size: number): Promise<TeacherP
  * 홈 '선생님 글'(2026-09-26 사용자 결정): 관리자 화면에서 쓴 공개 글(posts)을 **제목만** 목록으로 보여 주고,
  * 제목을 누르면 접혀 있던 본문이 그 자리에서 펼쳐진다. 날짜는 보이지 않는다(사용자 결정 — 제목과 본문만).
  * 왼쪽 메뉴에는 없고 홈에서만 보인다. 본문은 처음 펼칠 때 그린다(marked + DOMPurify — MarkdownViewer).
- * 조회수는 세지 않는다(사용자 결정). 로그인 학생이 펼치면 읽음 기록(post_reads — 관리자 학습 현황의 '글 읽음')만 세션당 한 번 남긴다.
- * "로그인해야만 이용"이 켜져 있으면 RLS가 글을 돌려주지 않으므로 까닭을 알려 준다.
+ * 조회수·읽음 기록은 남기지 않는다(사용자 결정). **로그인한 사람에게만** 보이고, 로그인하지 않았으면 "로그인하면 확인할 수 있어요" 안내만
+ * (사용자 결정 — 학급별 '선생님 글'(자기 담임 선생님 글만)은 반별 구분 기능과 함께 바뀐다: docs/classes/spec.md 개정 2).
  */
 export function TeacherPosts() {
   const locked = useLoginLocked();
+  const { loading: sessionLoading, user } = useSession();
+  const userId = user?.id ?? null;
+  const guest = !sessionLoading && !userId;
   const [posts, setPosts] = useState<TeacherPost[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [hasMore, setHasMore] = useState(false);
@@ -50,7 +53,7 @@ export function TeacherPosts() {
   const baseId = useId();
 
   useEffect(() => {
-    if (locked) return;
+    if (locked || sessionLoading || !userId) return; // 로그인하지 않았으면 불러오지 않는다
     let active = true;
     fetchTeacherPosts(0, PAGE_SIZE).then(
       (page) => {
@@ -66,7 +69,7 @@ export function TeacherPosts() {
     return () => {
       active = false;
     };
-  }, [attempt, locked]);
+  }, [attempt, locked, sessionLoading, userId]);
 
   const retry = useCallback(() => {
     setStatus("loading");
@@ -99,7 +102,9 @@ export function TeacherPosts() {
     if (willOpen && !opened.has(post.id)) setOpened((prev) => new Set(prev).add(post.id));
   }
 
-  if (locked) return <LoginNeededNotice what="선생님 글" className="py-8" />;
+  if (locked || guest) {
+    return <LoginNeededNotice what="선생님 글" description="로그인하면 담임 선생님 글을 확인할 수 있어요." className="py-8" />;
+  }
 
   if (status === "loading") {
     return (
@@ -164,12 +169,7 @@ export function TeacherPosts() {
                 </button>
               </h3>
               <div id={panelId} role="region" aria-label={p.title} hidden={!isOpen} className="border-t border-foreground/5 px-5 pt-4 pb-5">
-                {opened.has(p.id) ? (
-                  <>
-                    <MarkdownViewer content={p.content_md} />
-                    <PostReadRecorder postId={p.id} published />
-                  </>
-                ) : null}
+                {opened.has(p.id) ? <MarkdownViewer content={p.content_md} /> : null}
               </div>
             </li>
           );

@@ -236,7 +236,7 @@ export function StatTiles() {
           <PostCountTile label="학습게임" community="game" icon={Gamepad2Icon} image="video-game" color="games" tone="vivid" />
         </li>
         <li>
-          <PostCountTile label="선생님 글" icon={NewspaperIcon} image="newspaper" color="home" tone="vivid" />
+          <PostCountTile label="선생님 글" icon={NewspaperIcon} image="newspaper" color="home" tone="vivid" loginOnly />
         </li>
       </ul>
     </div>
