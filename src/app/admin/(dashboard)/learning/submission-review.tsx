@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, CalendarClockIcon, ChevronDownIcon, LockIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, CalendarClockIcon, ChevronDownIcon, LockIcon, PencilIcon, SchoolIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { FeedbackDialogButton } from "@/components/feedback/feedback-center";
@@ -26,13 +26,31 @@ import {
   isLate,
   SUBMISSION_STATUS_LABELS,
   updateSubmissionStatus,
+  type AdminAssignment,
   type StudentMini,
 } from "@/lib/learning";
 import type { Assignment, AssignmentSubmission, SubmissionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AssignmentForm } from "./assignment-manager";
 
-type Data = { assignment: Assignment | null; students: StudentMini[]; submissions: AssignmentSubmission[] };
+type Data = {
+  assignment: AdminAssignment | null;
+  /** 명단("미제출" 포함): 학급별 과제면 그 과제의 학급 학생, 예전 과제면 학습 현황의 학급 범위 학생 */
+  students: StudentMini[];
+  /** 내 다른 학급 학생(학급별 과제만) — 반을 옮기기 전에 이 과제를 낸 학생에게 이름을 붙이는 데만 쓴다 */
+  others: StudentMini[];
+  submissions: AssignmentSubmission[];
+  /**
+   * 학급별 과제인데 내 학급 과제가 아님(총괄이 주소로 연 다른 학급 과제, 담임을 넘긴 뒤의 내 과제 등).
+   * 그 학급 학생의 제출물은 그 학급 담임만 본다(개정 1-1 — 총괄도) → 학생 명단·제출 현황을 보이지 않는다.
+   */
+  outsideClass: boolean;
+};
+
+/** 과제의 학급 id(학급별 과제일 때만 — 학급 열이 없던 예전 과제는 null) */
+function classIdOf(a: AdminAssignment): string | null {
+  return typeof a.class_id === "string" && a.class_id ? a.class_id : null;
+}
 
 type Row = { studentId: string; student: StudentMini | null; submission: AssignmentSubmission | null };
 
@@ -66,32 +84,55 @@ function BackLink() {
  * 제출 내용 펼쳐 보기 · 상태 변경 · 연결된 피드백 대화 · 삭제(spec §3.6).
  */
 export function SubmissionReview({ assignmentId }: { assignmentId: string | null }) {
-  // 학생 명단은 내 학급(학급을 골랐으면 그 학급)만 — 총괄도 다른 학급 학생은 "미제출"로 섞지 않는다(docs/classes/spec.md 개정 1-1).
-  const { classIds, narrowed, ready: classMode } = useStudentScope();
+  // 학생 명단은 내 학급 학생만 — 총괄도 다른 학급 학생은 "미제출"로 섞지 않는다(docs/classes/spec.md 개정 1-1).
+  //  - 학급별 과제(⑥ 뒤): 그 과제의 학급 학생(학급 고르기와 상관없이 — 과제가 한 학급 것이다). 내 학급 과제가 아니면 명단 없음.
+  //  - 학급 없는 예전 과제(⑥ 전): 학습 현황의 학급 범위(학급을 골랐으면 그 학급).
+  const { classIds, allClassIds, narrowed, ready: classMode } = useStudentScope();
   const adminCtx = useAdminContext();
   const load = useCallback(async (): Promise<Data> => {
-    if (!assignmentId) return { assignment: null, students: [], submissions: [] };
-    const [assignment, students, submissions] = await Promise.all([
+    if (!assignmentId) return { assignment: null, students: [], others: [], submissions: [], outsideClass: false };
+    const [assignment, submissions] = await Promise.all([
       fetchAssignment(assignmentId),
-      fetchStudents(classIds),
       fetchSubmissionsForAssignment(assignmentId),
     ]);
+    if (!assignment) return { assignment: null, students: [], others: [], submissions, outsideClass: false };
+    const cls = classIdOf(assignment);
+    if (cls && allClassIds) {
+      if (!allClassIds.includes(cls)) return { assignment, students: [], others: [], submissions: [], outsideClass: true };
+      const mine = await fetchStudents(allClassIds);
+      return {
+        assignment,
+        students: mine.filter((st) => st.class_id === cls),
+        others: mine.filter((st) => st.class_id !== cls),
+        submissions,
+        outsideClass: false,
+      };
+    }
+    const students = await fetchStudents(classIds);
     // 학급을 하나 골랐으면 그 학급 학생의 제출만(제출 기록은 RLS가 내 학급 전체를 돌려준다).
     const roster = new Set(students.map((st) => st.id));
-    return { assignment, students, submissions: narrowed ? submissions.filter((sub) => roster.has(sub.user_id)) : submissions };
-  }, [assignmentId, classIds, narrowed]);
+    return {
+      assignment,
+      students,
+      others: [],
+      submissions: narrowed ? submissions.filter((sub) => roster.has(sub.user_id)) : submissions,
+      outsideClass: false,
+    };
+  }, [assignmentId, classIds, allClassIds, narrowed]);
   const { state, reload, setData } = useAsyncData(load);
   const [filter, setFilter] = useState<Filter>("all");
   const [editOpen, setEditOpen] = useState(false);
 
   const rows = useMemo<Row[]>(() => {
     if (state.status !== "ready") return [];
-    const { students, submissions } = state.data;
+    const { students, others, submissions } = state.data;
     const byUser = new Map(submissions.map((s) => [s.user_id, s]));
     const list: Row[] = students.map((st) => ({ studentId: st.id, student: st, submission: byUser.get(st.id) ?? null }));
-    // 학생 목록에 없는 제출자(관리자 계정 등)도 빠뜨리지 않는다.
+    // 학생 목록에 없는 제출자(관리자 계정, 내 다른 학급으로 옮긴 학생 등)도 빠뜨리지 않는다.
     for (const s of submissions) {
-      if (!students.some((st) => st.id === s.user_id)) list.push({ studentId: s.user_id, student: null, submission: s });
+      if (!students.some((st) => st.id === s.user_id)) {
+        list.push({ studentId: s.user_id, student: others.find((st) => st.id === s.user_id) ?? null, submission: s });
+      }
     }
     return list.sort((a, b) => {
       const an = adminDisplayName(a.student, a.student?.email || "");
@@ -111,7 +152,7 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
     <div className="flex flex-col gap-5">
       <BackLink />
       <AsyncView state={state} onRetry={reload} errorText="제출 현황을 불러오지 못했습니다.">
-        {({ assignment }) => {
+        {({ assignment, outsideClass }) => {
           if (!assignment) {
             return (
               <EmptyState
@@ -135,45 +176,68 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
           const visible = rows.filter((r) =>
             filter === "all" ? true : filter === "none" ? !r.submission : r.submission?.status === filter,
           );
+          const cls = classIdOf(assignment);
+          // 과제의 학급 이름: 내 학급이 여럿이거나 내 학급 과제가 아닐 때(관리자 화면에서만)
+          const myClassCount = adminCtx.status === "ready" ? adminCtx.classes.length : 0;
+          const classLabel = cls && (myClassCount > 1 || outsideClass) ? (adminCtx.classNameOf(cls) ?? "다른 학급") : null;
           return (
             <div className="flex flex-col gap-5">
               <AssignmentHeader
                 assignment={assignment}
+                classLabel={classLabel}
                 canEdit={canModifyContent(adminCtx, assignment.created_by)}
                 onEdit={() => setEditOpen(true)}
               />
 
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="상태로 거르기">
-                {FILTERS.map((f) => (
-                  <Button
-                    key={f.id}
-                    size="sm"
-                    variant={filter === f.id ? "secondary" : "ghost"}
-                    aria-pressed={filter === f.id}
-                    onClick={() => setFilter(f.id)}
-                  >
-                    {f.label}
-                    <span className="text-muted-foreground">{formatCount(counts[f.id])}</span>
-                  </Button>
-                ))}
-              </div>
-
-              {!visible.length ? (
-                <EmptyState
-                  title={rows.length ? "해당하는 학생이 없습니다" : classMode ? "내 학급 학생이 아직 없어요" : "등록된 학생이 없습니다"}
-                  description={!rows.length && classMode ? "‘회원 관리’에서 학생을 등록하면 여기에 나타나요." : undefined}
-                />
+              {outsideClass ? (
+                <p role="note" className="rounded-2xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">내 학급 과제가 아니에요 · </span>
+                  {classLabel && classLabel !== "다른 학급" ? `‘${classLabel}’` : "다른 학급"} 과제의 제출 현황은 그 학급 담임
+                  선생님만 볼 수 있어요.
+                </p>
               ) : (
-                <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="학생별 제출 현황">
-                  {visible.map((r) => (
-                    <SubmissionRow
-                      key={r.studentId}
-                      row={r}
-                      assignment={assignment}
-                      onChange={(next, id) => replaceSubmission(next, id)}
+                <>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="상태로 거르기">
+                    {FILTERS.map((f) => (
+                      <Button
+                        key={f.id}
+                        size="sm"
+                        variant={filter === f.id ? "secondary" : "ghost"}
+                        aria-pressed={filter === f.id}
+                        onClick={() => setFilter(f.id)}
+                      >
+                        {f.label}
+                        <span className="text-muted-foreground">{formatCount(counts[f.id])}</span>
+                      </Button>
+                    ))}
+                  </div>
+
+                  {!visible.length ? (
+                    <EmptyState
+                      title={
+                        rows.length
+                          ? "해당하는 학생이 없습니다"
+                          : cls
+                            ? "이 학급에 학생이 아직 없어요"
+                            : classMode
+                              ? "내 학급 학생이 아직 없어요"
+                              : "등록된 학생이 없습니다"
+                      }
+                      description={!rows.length && classMode ? "‘회원 관리’에서 학생을 등록하면 여기에 나타나요." : undefined}
                     />
-                  ))}
-                </ul>
+                  ) : (
+                    <ul className={cn("flex flex-col divide-y rounded-xl", adminSurfaceClass)} aria-label="학생별 제출 현황">
+                      {visible.map((r) => (
+                        <SubmissionRow
+                          key={r.studentId}
+                          row={r}
+                          assignment={assignment}
+                          onChange={(next, id) => replaceSubmission(next, id)}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
 
               <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -181,8 +245,10 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
                   {editOpen ? (
                     <AssignmentForm
                       assignment={assignment}
+                      classMode={!!cls}
                       onDone={(saved) => {
-                        if (saved) setData((d) => ({ ...d, assignment: saved }));
+                        // 고치기 응답에는 class_id가 없다(학급은 바뀌지 않음) → 원래 값과 합친다
+                        if (saved) setData((d) => ({ ...d, assignment: d.assignment ? { ...d.assignment, ...saved } : saved }));
                         setEditOpen(false);
                       }}
                     />
@@ -197,8 +263,21 @@ export function SubmissionReview({ assignmentId }: { assignmentId: string | null
   );
 }
 
-/** canEdit: 과제 내용 고치기는 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql). 제출물 검토는 그대로 담임이 한다. */
-function AssignmentHeader({ assignment, canEdit, onEdit }: { assignment: Assignment; canEdit: boolean; onEdit: () => void }) {
+/**
+ * canEdit: 과제 내용 고치기는 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql). 제출물 검토는 그대로 담임이 한다.
+ * classLabel: 과제의 학급 이름(학급별 과제 — 내 학급이 여럿이거나 내 학급 과제가 아닐 때만, 관리자 화면에서만).
+ */
+function AssignmentHeader({
+  assignment,
+  classLabel,
+  canEdit,
+  onEdit,
+}: {
+  assignment: Assignment;
+  classLabel: string | null;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <section className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-(--shadow-md) ring-1 ring-foreground/10 sm:p-5 dark:shadow-none">
@@ -206,9 +285,17 @@ function AssignmentHeader({ assignment, canEdit, onEdit }: { assignment: Assignm
         <h2 className="min-w-0 flex-1 font-heading text-2xl leading-snug font-normal break-keep">{assignment.title}</h2>
         <Badge variant={assignment.published ? "default" : "outline"}>{assignment.published ? "공개" : "비공개"}</Badge>
       </div>
-      <p className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <CalendarClockIcon className="size-4" aria-hidden />
-        {assignment.due_at ? `마감 ${formatDateTime(assignment.due_at)}` : "마감 없음"}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        {classLabel ? (
+          <span className="inline-flex items-center gap-1 font-medium text-foreground">
+            <SchoolIcon className="size-4 text-muted-foreground" aria-hidden />
+            {classLabel}
+          </span>
+        ) : null}
+        <span className="inline-flex items-center gap-1">
+          <CalendarClockIcon className="size-4" aria-hidden />
+          {assignment.due_at ? `마감 ${formatDateTime(assignment.due_at)}` : "마감 없음"}
+        </span>
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)} aria-expanded={open}>

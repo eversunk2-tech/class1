@@ -9,7 +9,7 @@ import type { AdminClass } from "@/lib/classes";
 import { cn } from "@/lib/utils";
 
 /**
- * 회원 추가에서 학생을 넣을 학급 고르기(docs/classes/spec.md 개정 1-2 ③).
+ * 회원 추가에서 학생을 넣을 학급 고르기(docs/classes/spec.md 개정 1-2 ③). 과제 만들기(개정 3-2)도 같은 칸을 쓴다.
  * 내 학급이 하나면 자동으로 정해 보여 주기만 하고, 여럿이면 고르게 한다(잘못 넣지 않도록 미리 고르지 않음).
  * 학급이 하나도 없을 때는 호출하는 쪽이 "먼저 학급을 개설해 주세요"를 보여 준다.
  */
@@ -19,6 +19,8 @@ export function ClassSelectField({
   onChange,
   disabled,
   help,
+  pickHelp,
+  invalid,
 }: {
   classes: AdminClass[];
   value: string;
@@ -26,6 +28,10 @@ export function ClassSelectField({
   disabled?: boolean;
   /** 칸 아래 안내 문구 */
   help?: string;
+  /** 아직 고르지 않았을 때의 안내 문구(기본: 학생 등록용) */
+  pickHelp?: string;
+  /** 저장하려는데 고르지 않았을 때 — 칸을 오류로 표시한다 */
+  invalid?: boolean;
 }) {
   const fieldId = useId();
   const helpId = `${fieldId}-help`;
@@ -61,8 +67,9 @@ export function ClassSelectField({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         required
+        aria-invalid={invalid || undefined}
         aria-describedby={helpId}
-        className="h-11 w-full px-3"
+        className="h-11 w-full px-3 aria-invalid:border-destructive"
       >
         <option value="" disabled>
           학급을 골라 주세요
@@ -73,8 +80,12 @@ export function ClassSelectField({
           </option>
         ))}
       </NativeSelect>
-      <p id={helpId} className={cn("text-xs", value ? "text-muted-foreground" : "text-foreground")}>
-        {value ? (help ?? "학생은 고른 학급에 등록돼요.") : "학생을 등록할 학급을 골라 주세요."}
+      <p
+        id={helpId}
+        role={invalid && !value ? "alert" : undefined}
+        className={cn("text-xs", invalid && !value ? "text-destructive" : value ? "text-muted-foreground" : "text-foreground")}
+      >
+        {value ? (help ?? "학생은 고른 학급에 등록돼요.") : (pickHelp ?? "학생을 등록할 학급을 골라 주세요.")}
       </p>
     </div>
   );

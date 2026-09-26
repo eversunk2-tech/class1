@@ -411,23 +411,68 @@ export async function fetchStudentEngagement(): Promise<StudentEngagementRow[]> 
 // ─────────────────────────────────────────────
 
 const ASSIGNMENT_COLUMNS = "id,title,description_md,due_at,published,created_by,created_at,updated_at";
+/**
+ * 관리자 화면 전용: 과제의 학급 id까지(20260927040000_class_assignments.sql — 과제도 학급별로, spec 개정 3-2).
+ * 학생 화면은 이 열을 읽지 않는다(학생에게 학급 정보를 보이지 않음 — RLS가 자기 학급 과제만 돌려준다).
+ */
+const ASSIGNMENT_COLUMNS_WITH_CLASS = `${ASSIGNMENT_COLUMNS},class_id`;
 const SUBMISSION_COLUMNS = "id,assignment_id,user_id,body_md,link_url,status,submitted_at,updated_at";
 
-export type AssignmentWithCount = Assignment & { submission_count: number };
+/**
+ * 관리자 화면의 과제(학급 id 포함).
+ * class_id: 과제의 학급 id. undefined = 과제에 학급 열이 아직 없음(⑥ SQL 전 — 예전처럼 모든 학급이 함께 쓰는 과제).
+ */
+export type AdminAssignment = Assignment & { class_id?: string | null };
 
-/** 과제 목록. 관리자는 비공개 포함 전체, 학생은 RLS로 공개 과제만. */
-export async function fetchAssignments(): Promise<AssignmentWithCount[]> {
-  const { data, error } = await supabase
-    .from("assignments")
-    .select(`${ASSIGNMENT_COLUMNS},assignment_submissions(count)`)
-    .order("created_at", { ascending: false });
+export type AssignmentWithCount = AdminAssignment & { submission_count: number };
+
+/** 과제를 학급별로 나누는 SQL(⑥) 적용 전 안내(관리자 과제 관리 화면) */
+export const ASSIGNMENT_CLASS_MISSING_MESSAGE =
+  "과제를 학급별로 나누는 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 20260927040000_class_assignments.sql을 실행해 주세요. 그 전에는 예전처럼 모든 학생이 모든 공개 과제를 봐요.";
+
+/** 관리자 과제 목록. classColumn = 과제에 학급 열이 있음(⑥ 적용 뒤 — 새 과제는 학급을 골라 만든다) */
+export type AssignmentList = { rows: AssignmentWithCount[]; classColumn: boolean };
+
+async function readAssignmentList(columns: string, classIds: readonly string[] | null): Promise<AssignmentWithCount[]> {
+  let q = supabase.from("assignments").select(`${columns},assignment_submissions(count)`);
+  if (classIds) q = q.in("class_id", [...classIds]);
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as unknown as (Assignment & { assignment_submissions: CountEmbed })[]).map(
+  return ((data ?? []) as unknown as (AdminAssignment & { assignment_submissions: CountEmbed })[]).map(
     ({ assignment_submissions, ...a }) => ({ ...a, submission_count: assignment_submissions?.[0]?.count ?? 0 }),
   );
 }
 
-/** 공개 과제만(학생 화면). 관리자가 학생 화면을 볼 때도 공개 과제만 보이게 명시적으로 거른다. */
+/**
+ * 관리자 과제 목록(학습 현황 > 과제 관리). 누가 어떤 과제를 읽을 수 있는지는 RLS가 정한다.
+ * classIds — 학습 현황의 학급 범위(학급 고르기와 같이 움직인다):
+ *   - 배열이면 그 학급들의 과제만(class_id=in.(…)). 총괄은 RLS로 모든 과제를 읽을 수 있지만 목록은 내 학급 범위로만.
+ *     빈 배열(학급이 없는 선생님)이면 과제 없음 — 학급 열이 있는지만 확인한다.
+ *     과제에 학급 열이 아직 없으면(⑥ 전) 예전처럼 거르지 않고 읽고 classColumn=false.
+ *   - null이면 학급 기능 전(① 전) — 예전처럼 전체(classColumn=false).
+ * 제출 수(submission_count)는 RLS가 거른 수 = 내가 담임인 학생의 제출물 수다.
+ */
+export async function fetchAssignments(classIds: readonly string[] | null = null): Promise<AssignmentList> {
+  if (classIds) {
+    try {
+      if (!classIds.length) {
+        const { error } = await supabase.from("assignments").select("id,class_id").limit(1);
+        if (error) throw error;
+        return { rows: [], classColumn: true };
+      }
+      return { rows: await readAssignmentList(ASSIGNMENT_COLUMNS_WITH_CLASS, classIds), classColumn: true };
+    } catch (err) {
+      if (!isMissingSchemaError(err)) throw err;
+      // 과제에 학급 열이 아직 없음(⑥ 전) → 아래 예전 방식
+    }
+  }
+  return { rows: await readAssignmentList(ASSIGNMENT_COLUMNS, null), classColumn: false };
+}
+
+/**
+ * 공개 과제만(학생 화면). 관리자가 학생 화면을 볼 때도 공개 과제만 보이게 명시적으로 거른다.
+ * 과제를 학급별로 나눈 뒤(⑥)에는 RLS가 학생에게 자기 학급의 공개 과제만 돌려준다 — 학급 열은 읽지 않는다(학생 화면에 학급 정보 없음).
+ */
 export async function fetchPublishedAssignments(): Promise<Assignment[]> {
   const { data, error } = await supabase
     .from("assignments")
@@ -438,10 +483,22 @@ export async function fetchPublishedAssignments(): Promise<Assignment[]> {
   return (data ?? []) as Assignment[];
 }
 
-export async function fetchAssignment(id: string): Promise<Assignment | null> {
-  const { data, error } = await supabase.from("assignments").select(ASSIGNMENT_COLUMNS).eq("id", id).maybeSingle();
-  if (error) throw error;
-  return (data as Assignment | null) ?? null;
+/**
+ * 과제 1건(관리자 제출 현황). 과제에 학급 열이 있으면 class_id까지, 없으면(⑥ 전) 예전 열만(class_id = undefined).
+ * 볼 수 없는 과제(RLS — 다른 학급 과제 등)나 없는 과제는 null.
+ */
+export async function fetchAssignment(id: string): Promise<AdminAssignment | null> {
+  const read = async (columns: string): Promise<AdminAssignment | null> => {
+    const { data, error } = await supabase.from("assignments").select(columns).eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as unknown as AdminAssignment | null) ?? null;
+  };
+  try {
+    return await read(ASSIGNMENT_COLUMNS_WITH_CLASS);
+  } catch (err) {
+    if (!isMissingSchemaError(err)) throw err;
+    return read(ASSIGNMENT_COLUMNS);
+  }
 }
 
 export type AssignmentInput = {
@@ -451,15 +508,26 @@ export type AssignmentInput = {
   published: boolean;
 };
 
-export async function createAssignment(input: AssignmentInput): Promise<Assignment> {
-  const { data, error } = await supabase.from("assignments").insert(input).select(ASSIGNMENT_COLUMNS).single();
+/**
+ * 새 과제. 만든 사람(created_by)은 보내지 않는다(DB 기본값 auth.uid()).
+ * classId: 과제를 낼 학급(⑥ 적용 뒤 필수 — RLS가 "내가 담임인 학급"만 허용, 만든 뒤에는 바꿀 수 없다).
+ *          null이면 학급 없이(⑥ 전 예전 방식).
+ */
+export async function createAssignment(input: AssignmentInput, classId: string | null = null): Promise<AdminAssignment> {
+  const row: AssignmentInput & { class_id?: string } = classId ? { ...input, class_id: classId } : input;
+  const { data, error } = await supabase
+    .from("assignments")
+    .insert(row)
+    .select(classId ? ASSIGNMENT_COLUMNS_WITH_CLASS : ASSIGNMENT_COLUMNS)
+    .single();
   if (error) throw error;
-  return data as Assignment;
+  return data as unknown as AdminAssignment;
 }
 
 /**
  * 과제 수정·공개 전환. 쓴 선생님과 총괄만(20260927030000_content_owner_only.sql) — 남의 과제는 RLS가 0행으로 걸러
- * "not-updated"를 던진다(화면은 isPermissionRejection으로 까닭을 알린다). 고칠 수 있는 열은 AssignmentInput 4개뿐(열 권한).
+ * "not-updated"를 던진다(화면은 isPermissionRejection으로 까닭을 알린다). 고칠 수 있는 열은 AssignmentInput 4개뿐(열 권한 —
+ * 과제의 학급(class_id)·만든 사람은 바꿀 수 없다). 돌려주는 행에는 class_id가 없다(부르는 쪽이 원래 값과 합친다).
  */
 export async function updateAssignment(id: string, patch: Partial<AssignmentInput>): Promise<Assignment> {
   const { data, error } = await supabase.from("assignments").update(patch).eq("id", id).select(ASSIGNMENT_COLUMNS).maybeSingle();
@@ -469,8 +537,9 @@ export async function updateAssignment(id: string, patch: Partial<AssignmentInpu
 }
 
 /**
- * 과제 삭제(제출물도 cascade로 함께 삭제 — 다른 반 학생이 낸 제출물 포함). 쓴 선생님과 총괄만(RLS).
- * 0건이면 실패로 본다("not-deleted" — 남의 과제이거나 이미 지워짐).
+ * 과제 삭제(제출물도 cascade로 함께 삭제). 쓴 선생님과 총괄만(RLS).
+ * 과제를 학급별로 나눈 뒤(⑥)에는 그 과제의 학급 학생만 낼 수 있으므로 그 학급 제출물만 지워진다
+ * (⑥ 전에는 반과 상관없이 그 과제의 제출물 모두). 0건이면 실패로 본다("not-deleted" — 남의 과제이거나 이미 지워짐).
  */
 export async function deleteAssignment(id: string): Promise<void> {
   const { data, error } = await supabase.from("assignments").delete().eq("id", id).select("id");

@@ -102,10 +102,9 @@ export function LearningView() {
                 <SubmissionReview key="invalid" assignmentId={null} />
               )
             ) : (
-              <>
-                <WholeScopeNote className="mb-4" />
-                <AssignmentManager />
-              </>
+              // 과제 목록은 학급 고르기와 같이 움직인다(학급별 과제 — 개정 3-2). "내 학급 전체 기준" 안내는 학급 없는
+              // 예전 과제일 때만 AssignmentManager 안에서 보인다.
+              <AssignmentManager />
             )}
           </ClassScopeGate>
         </TabsContent>
