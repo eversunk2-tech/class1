@@ -503,6 +503,12 @@
       else leaveDock();
       bar.hidden = !(on && (run || record || (scenePanel && !compact)));
       viewBox.classList.toggle("has-bar", !bar.hidden);
+      // 크게 보기가 켜지고 꺼질 때 알린다 — lesson.js가 머리말을 자동으로 접고 펼친다(2026-09-26 spec 개정 7)
+      try {
+        document.dispatchEvent(new CustomEvent("ss:scenefull", { detail: { on: on } }));
+      } catch (err) {
+        /* CustomEvent가 없는 옛 브라우저: 머리말 자동 접기만 빠진다 */
+      }
     }
     listenMq(compactMq, function () {
       place();
@@ -519,11 +525,13 @@
     function prefKey() {
       return "sceneMode:" + (portraitMq && portraitMq.matches ? "portrait" : "landscape");
     }
-    // 태블릿 세로(세로 방향·폭 600px 이상)는 켜짐이 기본 — 단 막대에 넣을 것(실행·기록 버튼이나 측정값)이 없는 앱은 끔이 기본
-    // (Review A2 N1 — 예: 막대가 비는 앱). 학생이 누른 선택은 그대로 기억한다.
+    // 켜짐이 기본(2026-09-26 사용자 결정 — 가로도): 태블릿 세로(세로 방향·폭 600px 이상)와 가로 화면(태블릿·PC — 좁은/낮은 화면은
+    // 빼고: 휴대폰 가로는 장면이 너무 작아진다). 휴대폰 세로(폭 600px 미만)도 끔. 막대에 넣을 것(실행·기록 버튼이나 측정값)이 없는 앱은
+    // 끔이 기본(Review A2 N1 — 예: 막대가 비는 앱). 학생이 누른 선택은 방향별로 그대로 기억한다.
     function defaultOn() {
-      var w = window.innerWidth || document.documentElement.clientWidth || 0;
-      return !!(portraitMq && portraitMq.matches && w >= 600 && (run || record || scenePanel));
+      if (!(run || record || scenePanel)) return false;
+      if (portraitMq && portraitMq.matches) return (window.innerWidth || document.documentElement.clientWidth || 0) >= 600;
+      return !(compactMq && compactMq.matches);
     }
     function set(v, opts) {
       on = !!v;

@@ -305,7 +305,7 @@ create policy "game-uploads: 본인 또는 관리자 삭제"
 - **섹션 재구성**(2열 그리드 유지, `DashboardSection` 재사용):
   1. **최근 과학 수업**: 기존 `TaggedPostList tag="과학"`에 더해 "차시별 앱 현황" 서브 블록 — 단원별 앱 등록 수(예: "1. 산과 염기 6/6")와
      최근에 연결된 차시 앱 3~5개를 실험(`sim`)/조사(`guide`) 배지와 함께 바로가기 링크로 표시하는 신규 컴포넌트(`ScienceAppStatus`, 로컬 데이터라 즉시 렌더).
-  2. **최근 자유게시판**: `CommunityPostList kind="board" limit=3`.
+  2. **최근 자유게시판**: `CommunityPostList kind="board" limit=3 loginOnly` — **로그인한 사용자에게만**(2026-09-26 사용자 결정: "로그인을 하지 않으면 자유게시판 미리보기는 되지 않도록"). 로그인하지 않은 방문자에게는 목록을 불러오지 않고 "로그인하면 볼 수 있어요 — 최근 자유게시판 글은 로그인한 우리 반 친구들에게만 보여요" 안내. 화면에서만 가리는 것이며, `/board/` 자체의 공개 범위는 "로그인해야만 이용" 스위치·RLS가 정한다(통계 타일의 글 수는 그대로).
   3. **학습게임 미리보기**: `CommunityPostList kind="game" limit=3`(카드에 썸네일 대신 게임 아이콘 + 제목, 플레이는 상세에서만).
 - "최근 소식"·"인기 글"·"최근 수학 수업" 섹션과 `PopularPosts`/`TaggedPostList tag="수학"` 호출 제거.
 

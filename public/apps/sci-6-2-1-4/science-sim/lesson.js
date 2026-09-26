@@ -88,12 +88,41 @@
             collapseBtn.setAttribute("aria-expanded", String(!on));
             collapseBtn.textContent = on ? "▼ 펼치기" : "▲ 접기";
             if (!opts.silent && SciSim.uiPref) SciSim.uiPref.set("headerCollapsed", on);
+            setH(); // 머리말 높이 변수를 바로 맞춘다(크게 보기 실험 영역 위쪽이 한 프레임도 어긋나지 않게)
+          };
+          /* 크게 보기 자동 접기(2026-09-26 spec 개정 7, 사용자 결정): 크게 보기(한 화면 실험실)가 보이는 동안(실험하기 단계 + 켜짐)은
+           * 가로·세로 모든 화면에서 머리말을 자동으로 접는다(저장하지 않음). 그동안 학생이 누른 접기/펼치기는 그 크게 보기 동안만 따른다.
+           * 크게 보기를 끄거나 다른 단계로 가면 학생이 저장해 둔 상태(기본 펼침)로 돌아가고, 다시 켜면 다시 접힌다.
+           * 알림: experiment.js enlarge()가 켜고 끌 때 document에 "ss:scenefull"을 보낸다 + 단계 섹션의 hidden 변화.
+           * 크게 보기가 없는 앱(조사 앱)은 예전과 똑같다. */
+          var sceneFull = false; // 크게 보기가 보이는 중인가
+          var sceneOverride = null; // 크게 보기 동안 학생이 누른 상태(null = 누른 적 없음 → 접힘)
+          var applyHeader = function () {
+            var now = !!document.querySelector("[data-stage]:not([hidden]) .ss-exp-layout.is-full");
+            if (now !== sceneFull) {
+              sceneFull = now;
+              sceneOverride = null;
+            }
+            var stored = SciSim.uiPref ? SciSim.uiPref.get("headerCollapsed") === true : false; // 기본은 펼침(예전과 같음)
+            var want = sceneFull ? (sceneOverride === null ? true : sceneOverride) : stored;
+            if (want !== header.classList.contains("is-collapsed")) setCollapsed(want, { silent: true });
           };
           collapseBtn.addEventListener("click", function () {
-            setCollapsed(!header.classList.contains("is-collapsed"));
+            var next = !header.classList.contains("is-collapsed");
+            if (sceneFull) {
+              sceneOverride = next; // 크게 보기 동안만(저장하지 않음)
+              setCollapsed(next, { silent: true });
+            } else setCollapsed(next);
           });
-          var storedCollapsed = SciSim.uiPref ? SciSim.uiPref.get("headerCollapsed") : null;
-          setCollapsed(storedCollapsed === true, { silent: true }); // 기본은 펼침(예전과 같음) — 접었던 적 있으면 그 상태로 시작
+          document.addEventListener("ss:scenefull", applyHeader);
+          if ("MutationObserver" in window) {
+            var stageMo = new MutationObserver(applyHeader);
+            Array.prototype.forEach.call(document.querySelectorAll("[data-stage]"), function (sec) {
+              stageMo.observe(sec, { attributes: true, attributeFilter: ["hidden"] });
+            });
+          }
+          setCollapsed(false, { silent: true }); // 버튼 글자·aria 초기화
+          applyHeader(); // 접었던 적 있으면 그 상태로 시작, 크게 보기가 이미 보이면 접힘
         }
       }
 

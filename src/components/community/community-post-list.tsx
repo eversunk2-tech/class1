@@ -35,12 +35,16 @@ type Status = "loading" | "ready" | "error" | "setup";
  * 자유게시판 · 학습게임 목록(TaggedPostList 패턴, spec §3).
  * - `limit`이 없으면 "더 보기" 페이지네이션, 있으면 위에서 N개만(홈 미리보기).
  * - 숨긴 글은 RLS가 작성자 본인·관리자에게만 돌려주므로 "숨김" 배지를 붙여 보여 준다.
+ * - `loginOnly`면 로그인한 사용자에게만 글을 불러와 보여 주고, 로그인하지 않은 방문자에게는 로그인 안내를 보인다
+ *   (홈 '최근 자유게시판' 미리보기 — 2026-09-26 사용자 결정. 화면에서만 가리는 것이며, 게시판 자체의 공개 범위는
+ *   "로그인해야만 이용" 스위치·RLS가 정한다).
  */
-export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?: number }) {
+export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: CommunityKind; limit?: number; loginOnly?: boolean }) {
   const { loading: sessionLoading, user } = useSession();
   // "로그인해야만 이용"이 켜져 있으면 RLS가 글을 돌려주지 않는다 → 빈 목록 대신 까닭을 알려 준다.
   const locked = useLoginLocked();
   const userId = user?.id ?? null;
+  const hiddenForGuest = loginOnly && !sessionLoading && !userId;
   const pageSize = limit ?? PAGE_SIZE;
   const meta = KIND_META[kind];
   const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
@@ -53,6 +57,7 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
   // 로그인 사용자가 바뀌면(내 숨김 글 노출 여부) 다시 조회한다.
   useEffect(() => {
     if (sessionLoading) return;
+    if (loginOnly && !userId) return; // 로그인하지 않은 방문자에게는 불러오지도 않는다
     let active = true;
     fetchCommunityPosts(kind, 0, pageSize)
       .then((page) => {
@@ -67,7 +72,7 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
     return () => {
       active = false;
     };
-  }, [kind, pageSize, userId, sessionLoading, attempt]);
+  }, [kind, pageSize, userId, sessionLoading, attempt, loginOnly]);
 
   const retry = useCallback(() => {
     setStatus("loading");
@@ -90,6 +95,9 @@ export function CommunityPostList({ kind, limit }: { kind: CommunityKind; limit?
   }
 
   if (locked) return <LoginNeededNotice what={meta.label} className="py-8" />;
+  if (hiddenForGuest) {
+    return <LoginNeededNotice what={meta.label} description={`최근 ${meta.label} 글은 로그인한 우리 반 친구들에게만 보여요.`} className="py-8" />;
+  }
 
   if (status === "loading") {
     return (

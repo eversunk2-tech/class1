@@ -138,7 +138,8 @@ export default function Home() {
           moreHref="/board/"
           moreLabel="자유게시판 더 보기"
         >
-          <CommunityPostList kind="board" limit={3} />
+          {/* 로그인하지 않은 방문자에게는 자유게시판 미리보기를 보이지 않는다(2026-09-26 사용자 결정) */}
+          <CommunityPostList kind="board" limit={3} loginOnly />
         </DashboardSection>
         <DashboardSection
           id="games-heading"

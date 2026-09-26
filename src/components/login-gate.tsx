@@ -106,14 +106,14 @@ function LockPanel({
  * 오류가 아니라 "지금은 로그인해야 볼 수 있다"는 설명이므로 경고색 대신 옅은 브랜드 보라 판 + 흰 자물쇠 칩 +
  * 흰 알약 버튼을 쓴다(디자인 개편 1단계, 동작은 그대로).
  */
-export function LoginNeededNotice({ what, className }: { what: string; className?: string }) {
+export function LoginNeededNotice({ what, description, className }: { what: string; description?: string; className?: string }) {
   const pathname = usePathname();
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
   return (
     <LockPanel
       size="sm"
       title="로그인하면 볼 수 있어요"
-      description={`지금은 로그인한 우리 반 친구들만 ${what}을 볼 수 있어요.`}
+      description={description ?? `지금은 로그인한 우리 반 친구들만 ${what}을 볼 수 있어요.`}
       href={loginHref(path)}
       className={className}
     />
