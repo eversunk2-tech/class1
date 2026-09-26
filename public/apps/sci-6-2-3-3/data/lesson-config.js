@@ -95,10 +95,10 @@ window.LessonConfig = {
     },
     { id: "b1", exp: "B", label: "전지 1개", run: "▶ 전지 1개로 스위치 닫기", short: "전지 1개", battery: 1 },
     { id: "b2", exp: "B", label: "전지 2개 (직렬연결)", run: "▶ 전지 2개로 스위치 닫기", short: "전지 2개(직렬연결)", battery: 2 },
-    { id: "nbl", exp: "D", label: "바꾸기 전 · 왼쪽 끝", run: "▶ 왼쪽 끝 나침반 살펴보기", short: "바꾸기 전 · 왼쪽 끝", dir: "before", pos: "left" },
-    { id: "nbr", exp: "D", label: "바꾸기 전 · 오른쪽 끝", run: "▶ 오른쪽 끝 나침반 살펴보기", short: "바꾸기 전 · 오른쪽 끝", dir: "before", pos: "right" },
-    { id: "nal", exp: "D", label: "바꾼 뒤 · 왼쪽 끝", run: "▶ 전지 방향을 바꾸고 왼쪽 끝 살펴보기", short: "바꾼 뒤 · 왼쪽 끝", dir: "after", pos: "left" },
-    { id: "nar", exp: "D", label: "바꾼 뒤 · 오른쪽 끝", run: "▶ 오른쪽 끝 나침반 살펴보기", short: "바꾼 뒤 · 오른쪽 끝", dir: "after", pos: "right" },
+    { id: "nbl", exp: "D", label: "바꾸기 전 · 왼쪽 나침반", run: "▶ 왼쪽 나침반 살펴보기", short: "바꾸기 전 · 왼쪽 끝", dir: "before", pos: "left" },
+    { id: "nbr", exp: "D", label: "바꾸기 전 · 오른쪽 나침반", run: "▶ 오른쪽 나침반 살펴보기", short: "바꾸기 전 · 오른쪽 끝", dir: "before", pos: "right" },
+    { id: "nal", exp: "D", label: "바꾼 뒤 · 왼쪽 나침반", run: "▶ 전지 방향을 바꾸고 왼쪽 나침반 살펴보기", short: "바꾼 뒤 · 왼쪽 끝", dir: "after", pos: "left" },
+    { id: "nar", exp: "D", label: "바꾼 뒤 · 오른쪽 나침반", run: "▶ 오른쪽 나침반 살펴보기", short: "바꾼 뒤 · 오른쪽 끝", dir: "after", pos: "right" },
   ],
 
   // 실험 1 — 보기 고르기(실험관찰 39~40쪽)

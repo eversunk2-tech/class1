@@ -173,7 +173,7 @@
     },
     runLabel: function (sel) {
       var c = CELL[sel.opt];
-      if (c.exp === "D" && c.dir === curDir() && sceneClosed()) return "▶ " + (c.pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반 살펴보기";
+      if (c.exp === "D" && c.dir === curDir() && sceneClosed()) return "▶ " + (c.pos === "left" ? "왼쪽" : "오른쪽") + " 나침반 살펴보기";
       return c.run;
     },
     view: {
@@ -274,7 +274,7 @@
       viewBox: "0 0 " + W + " " + H,
       class: "comp-svg",
       role: "img",
-      "aria-label": "위에서 본 " + (pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반(모형). 빨간 끝은 나침반 바늘의 N극이에요.",
+      "aria-label": "위에서 본 " + (pos === "left" ? "왼쪽" : "오른쪽") + " 나침반(모형). 빨간 끝은 나침반 바늘의 N극이에요.",
     });
     // 전자석(회색 막대) — 왼쪽 나침반이면 오른쪽에, 오른쪽 나침반이면 왼쪽에 있다
     var barX = pos === "left" ? 196 : 8;
@@ -351,11 +351,11 @@
     var ang = needleAngle(c.dir);
     var body3 = el("div", { class: "obs-body" }, [
       figure(photoNode(), "📷 방금 한 실험 화면(모형)"),
-      el("figure", { class: "comp-fig" }, [compassSVG(ang, c.pos), el("figcaption", { class: "ss-help", text: "🔍 " + C.directions.filter(function (d) { return d.id === c.dir; })[0].name + " · " + (c.pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반을 위에서 본 모습(모형)" })]),
+      el("figure", { class: "comp-fig" }, [compassSVG(ang, c.pos), el("figcaption", { class: "ss-help", text: "🔍 " + C.directions.filter(function (d) { return d.id === c.dir; })[0].name + " · " + (c.pos === "left" ? "왼쪽" : "오른쪽") + " 나침반을 위에서 본 모습(모형)" })]),
       S.rich("나침반 바늘의 **빨간 끝은 N극**이에요. 자석의 **다른 극끼리 끌어당겨요**.", "p"),
     ]);
     return {
-      question: (c.pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반의 바늘을 보고, 이 끝이 무슨 극인지 골라 봅시다.",
+      question: (c.pos === "left" ? "왼쪽" : "오른쪽") + " 나침반의 바늘을 보고, 전자석의 끝이 무슨 극인지 골라 봅시다.", // 2026-09-26 사용자 문구
       body: body3,
       type: "choice",
       choices: C.poleCheck.choices,
@@ -439,7 +439,7 @@
         sw.classList.toggle("is-on", !!st.closed);
         var t = "";
         if (st.exp === "B") t = "🔋 전지 " + st.battery + "개" + (st.battery === 2 ? " 직렬연결" : "") + " · 🔗 붙은 고리: " + st.rings + "개";
-        else if (st.exp === "D") t = "🔋 전지 방향: " + (st.flipped ? "바꾼 뒤" : "바꾸기 전") + (st.look ? " · 🧭 " + (st.look === "left" ? "왼쪽" : "오른쪽") + " 끝" : "");
+        else if (st.exp === "D") t = "🔋 전지 방향: " + (st.flipped ? "바꾼 뒤" : "바꾸기 전") + (st.look ? " · 🧭 " + (st.look === "left" ? "왼쪽" : "오른쪽") + " 나침반" : "");
         else t = st.rings > 0 ? "🔗 둥근 철 고리: 붙어 있어요" : "🔗 둥근 철 고리: 붙지 않았어요";
         info.textContent = extra || t;
       },
@@ -584,7 +584,7 @@
       api.hud.set(st);
       await waitVisible();
       await api.focus(c.pos);
-      api.hud.say((c.pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반을 살펴보고 극을 골라요.");
+      api.hud.say((c.pos === "left" ? "왼쪽" : "오른쪽") + " 나침반을 살펴보고 극을 골라요.");
     }
     st.done = true;
     api.apply();
@@ -828,7 +828,7 @@
       g.appendChild(n("text", { x: cx + ux * (L + 11), y: cy + uy * (L + 11) + 4, "text-anchor": "middle", class: "s2-tag-n" }, "N"));
       g.appendChild(n("text", { x: cx - ux * (L + 11), y: cy - uy * (L + 11) + 4, "text-anchor": "middle", class: "s2-tag-s" }, "S"));
       g.appendChild(n("circle", { cx: cx, cy: cy, r: 4, class: "comp-pin" }));
-      g.appendChild(n("text", { x: cx, y: cy + R + 18, "text-anchor": "middle", class: "s2-lbl-xs" }, (pos === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반"));
+      g.appendChild(n("text", { x: cx, y: cy + R + 18, "text-anchor": "middle", class: "s2-lbl-xs" }, (pos === "left" ? "왼쪽" : "오른쪽") + " 나침반"));
       g.appendChild(n("text", { x: cx, y: cy + R + 34, "text-anchor": "middle", class: "s2-lbl-xs" }, "(위에서 본 모습)"));
     }
     function apply() {
@@ -1096,7 +1096,7 @@
         var north = M.label("북", { height: 0.17 });
         north.position.set(-0.3, 0.1, -0.28);
         g.add(north);
-        var lb = M.label((side === "left" ? "왼쪽" : "오른쪽") + " 끝 나침반", { height: 0.22 });
+        var lb = M.label((side === "left" ? "왼쪽" : "오른쪽") + " 나침반", { height: 0.22 });
         lb.position.set(0, 0.85, 0.05);
         g.add(lb);
         var mark = new T.Mesh(new T.TorusGeometry(0.5, 0.035, 8, 40), new T.MeshBasicMaterial({ color: 0x2f6fd6 }));
