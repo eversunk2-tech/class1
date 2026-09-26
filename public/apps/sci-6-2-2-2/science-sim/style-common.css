@@ -401,6 +401,40 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 .ss-view-tools .ss-btn { flex: 1 1 auto; }
 .ss-model-note { margin-top: 8px; }
 
+/* ── 확대한 장면 옮기기: 이동 화살표 ▲▼◀▶(sim3d.js, 2026-09-26 spec 개정 8) ──
+   3D 칸(.ss-view3d) 안에 sim3d.js가 붙인다. 처음보다 확대했거나 옮겨 둔 동안만 보인다(처음 시점에서는 hidden, 2D 대체 화면에는 없음).
+   자리는 sim3d.js가 잰다 — 가장자리 가운데에서 시작해 토글·모형 배지·앱 표시(HUD 등)·드래그 안내 글과 겹치지 않는 가장 가까운 곳
+   (아래 left/top은 재기 전의 기본 자리). 누르는 곳 44px.
+   모양(2026-09-26 사용자 피드백 — "더 반투명하게"): 뒤 장면이 거의 그대로 비치는 아주 옅은 흰 원(밝음 20%·어두움 10%) + 꺾쇠 화살표.
+   꺾쇠는 밝음에서 어두운 선(75%)에 얇은 흰 빛 테, 어두움에서 밝은 선(85%)에 얇은 검은 빛 테 — 원이 옅어도 밝은 곳·어두운 곳
+   어디서든 선이 보이게. 누르고 있는 동안 .is-pressed(조금 진하게), 한도에 닿은 쪽은 .is-limit(더 옅게, aria-disabled).
+   초점 표시는 전역 :focus-visible 그대로. */
+.ss-pan { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.ss-pan-btn {
+  position: absolute; width: 44px; height: 44px; margin: 0; padding: 0;
+  display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid rgba(31, 39, 51, 0.16); background: rgba(255, 255, 255, 0.2); color: rgba(31, 39, 51, 0.75);
+  cursor: pointer; pointer-events: auto; touch-action: none;
+  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+}
+.ss-pan-btn svg {
+  width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 0 2.5px rgba(255, 255, 255, 0.8)); /* 흰 빛 테 — 어두운 장면에서도 선이 보이게 */
+}
+.ss-pan-up { left: calc(50% - 22px); top: 8px; }
+.ss-pan-down { left: calc(50% - 22px); top: calc(100% - 52px); }
+.ss-pan-left { left: 8px; top: calc(50% - 22px); }
+.ss-pan-right { left: calc(100% - 52px); top: calc(50% - 22px); }
+@media (hover: hover) { .ss-pan-btn:hover { background: rgba(255, 255, 255, 0.34); } }
+.ss-pan-btn.is-pressed { background: rgba(255, 255, 255, 0.45); color: #1f2733; }
+.ss-pan-btn.is-limit { opacity: 0.3; cursor: default; }
+@media (prefers-color-scheme: dark) {
+  .ss-pan-btn { border-color: rgba(255, 255, 255, 0.24); background: rgba(255, 255, 255, 0.1); color: rgba(242, 244, 248, 0.85); }
+  .ss-pan-btn svg { filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 0 2.5px rgba(0, 0, 0, 0.8)); } /* 검은 빛 테 — 밝은 물체 위에서도 */
+}
+@media (prefers-color-scheme: dark) and (hover: hover) { .ss-pan-btn:hover { background: rgba(255, 255, 255, 0.18); } }
+@media (prefers-color-scheme: dark) { .ss-pan-btn.is-pressed { background: rgba(255, 255, 255, 0.26); color: #fff; } }
+
 /* ── 장면 안 조작 막대(전체 화면 켜짐 전용, 측정값·실행·기록) ── 장면 박스 안쪽 아래(등장 애니메이션 없음).
    모든 앱에 늘 존재하지만 꺼짐일 때(또는 넣을 것이 없을 때)는 hidden이라 [hidden]{display:none}에 의해 화면에서 완전히 빠진다.
    막대가 보이는 3D 장면(.has-bar)은 3D 칸(.ss-view3d — 캔버스와 앱이 그 안에 붙인 안내 글·이름표)이 막대 위에서 끝나서
