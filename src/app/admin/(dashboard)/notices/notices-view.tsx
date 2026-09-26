@@ -412,7 +412,8 @@ export function NoticesView() {
                           id={`notice-body-${n.id}`}
                           className={cn("text-sm text-foreground/80 whitespace-pre-wrap [overflow-wrap:anywhere]", long && !open && "line-clamp-3")}
                         >
-                          <LinkifiedText text={n.body} />
+                          {/* 접힌 긴 본문은 글자로만 — 가려진 링크에 Tab 초점이 가서 칸이 밀리지 않게(Review links L2) */}
+                          {long && !open ? n.body : <LinkifiedText text={n.body} />}
                         </p>
                         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>쓴 날 {formatDateTime(n.created_at)}</span>
@@ -609,7 +610,7 @@ function NoticeEditor({
           aria-describedby="notice-body-help"
         />
         <p id="notice-body-help" className={cn("flex justify-between gap-2 text-xs", bodyShown ? "text-destructive" : "text-muted-foreground")}>
-          <span>{bodyShown ?? `1~${formatCount(NOTICE_BODY_MAX)}자. 쓴 그대로(줄바꿈 포함) 보여요. https://로 시작하는 주소는 누르면 열리는 링크가 돼요.`}</span>
+          <span>{bodyShown ?? `1~${formatCount(NOTICE_BODY_MAX)}자. 쓴 그대로(줄바꿈 포함) 보여요. http:// 또는 https://로 시작하는 주소는 누르면 새 창에서 열리는 링크가 돼요 — 주소창에서 복사해 붙이고, 주소 뒤는 한 칸 띄어 주세요.`}</span>
           <span className="shrink-0 tabular-nums" aria-hidden>
             {formatCount(bodyLen)}/{formatCount(NOTICE_BODY_MAX)}
           </span>

@@ -58,7 +58,8 @@ export function LinkifiedText({ text }: { text: string }): ReactNode {
         className="font-medium text-primary underline decoration-primary/40 underline-offset-2 [overflow-wrap:anywhere] hover:decoration-primary focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none"
       >
         {part.text}
-        <span className="sr-only"> (새 창에서 열려요)</span>
+        {/* select-none: 본문을 복사할 때 이 안내가 주소에 섞이지 않게(Review links L1) */}
+        <span className="sr-only select-none"> (새 창에서 열려요)</span>
       </a>
     ) : (
       part.text
