@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
-import { TaggedPostList } from "@/components/class/tagged-post-list";
 import { CommunityPostList } from "@/components/community/community-post-list";
 import { HomeHero } from "@/components/dashboard/home-hero";
 import { MenuShortcutCard } from "@/components/dashboard/menu-shortcut-card";
 import { ScienceAppStatus } from "@/components/dashboard/science-app-status";
 import { StatTiles } from "@/components/dashboard/stat-tile";
+import { TeacherPosts } from "@/components/dashboard/teacher-posts";
 import { Icon3D, type Icon3DName } from "@/components/illustrations/icon-3d";
 import { menuItems, type MenuColor } from "@/data/menu";
 import { menuColorClasses } from "@/lib/menu-colors";
@@ -84,7 +84,8 @@ function DashboardSection({
   );
 }
 
-// 홈 대시보드(docs/community/spec.md §6: 최근 과학 수업 · 최근 자유게시판 · 학습게임 미리보기). 각 섹션은 독립적으로 데이터를 불러오므로 하나가 실패해도 나머지는 그대로 보인다.
+// 홈 대시보드(docs/community/spec.md §6: 최근 과학 수업 · 선생님 글 · 최근 자유게시판 · 학습게임 미리보기). 각 섹션은 독립적으로 데이터를 불러오므로 하나가 실패해도 나머지는 그대로 보인다.
+// 2026-09-26 사용자 결정: '과학 수업 글'을 과학 수업에서 떼어 '선생님 글'(홈에만, 제목을 누르면 본문이 펼쳐짐, 날짜 없음)로.
 // 디자인: docs/design/redesign/spec.md §4.3 + build-1b-instructions.md("더 화려하게") —
 // 히어로(큰 부엉이 + 떠다니는 3D 소품 + 버튼 2개) → 기능 카드 3개 → 정보 카드 줄 → 정보 카드 섹션.
 export default function Home() {
@@ -121,12 +122,12 @@ export default function Home() {
         moreHref="/science/"
         moreLabel="과학 수업 더 보기"
       >
-        <div className="@container">
-          <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-2 @3xl:gap-8">
-            <ScienceAppStatus />
-            <TaggedPostList tag="과학" limit={3} accent="science" emptyTitle="아직 과학 수업 글이 없어요" />
-          </div>
-        </div>
+        <ScienceAppStatus />
+      </DashboardSection>
+
+      {/* 선생님 글: 관리자 화면에서 쓴 글 — 제목만 보이고 누르면 본문이 펼쳐진다(왼쪽 메뉴·"더 보기" 페이지 없음) */}
+      <DashboardSection id="teacher-posts-heading" title="선생님 글" image="newspaper" color="home">
+        <TeacherPosts />
       </DashboardSection>
 
       <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-2">

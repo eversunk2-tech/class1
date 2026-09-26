@@ -4,7 +4,7 @@ import { ScienceView, ScienceViewSkeleton } from "@/components/science/science-v
 
 export const metadata: Metadata = {
   title: "과학수업",
-  description: "학기와 단원별 과학 탐구 차시, 교과서·실험관찰 쪽수, 과학 수업 글을 모아 두었어요.",
+  description: "학기와 단원별 과학 탐구 차시와 교과서·실험관찰 쪽수를 모아 두었어요.",
 };
 
 // 과학수업(spec §4.3): 학기 → 단원 → 차시.

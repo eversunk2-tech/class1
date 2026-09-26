@@ -12,7 +12,6 @@ import {
   FlaskConicalIcon,
   NotebookPenIcon,
 } from "lucide-react";
-import { TaggedPostList } from "@/components/class/tagged-post-list";
 import { Icon3D, type Icon3DName } from "@/components/illustrations/icon-3d";
 import { Mascot } from "@/components/illustrations/mascot";
 import { PropStage, type StageProp } from "@/components/illustrations/prop-stage";
@@ -320,11 +319,6 @@ function ScienceHome() {
             ))}
           </ul>
         </div>
-      </section>
-
-      <section aria-labelledby="science-heading" className="flex flex-col gap-5">
-        <SectionHeading id="science-heading">과학 수업 글</SectionHeading>
-        <TaggedPostList tag="과학" accent="science" />
       </section>
     </div>
   );
