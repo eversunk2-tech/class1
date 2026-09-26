@@ -32,6 +32,7 @@
 ### Supabase
 * 환경 변수: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local`, 커밋 금지).
 * anon key만 클라이언트에 노출한다. service_role key는 절대 코드/저장소에 넣지 않는다.
+* **저장소는 공개(GitHub public)다** — 이메일·학생 이름 같은 개인정보를 저장소 파일(SQL·문서 포함)에 쓰지 않는다. 필요하면 SQL 틀에 자리표시(`'총괄_이메일'`)만 두고 실제 값은 대화로 전한다.
 * 모든 테이블에 RLS를 켜고 정책을 작성한다. 보안은 클라이언트 가드가 아니라 RLS로 보장한다.
 * 블로그 공용 테이블: `profiles`(role: admin/user), `posts`, `comments`, `likes`, `views`.
 * 학습 테이블: `member_directory`, `app_results`, `app_progress`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks`, `praise_presets` (설계: `docs/admin/spec.md`, `docs/admin/responses-spec.md`).
@@ -59,6 +60,7 @@
 * 가입 정책: Supabase 가입 허용 유지(OAuth 방문자는 첫 로그인 시 일반 사용자로 자동 가입), Confirm email 켬.
 * 계정은 관리자 대시보드 **회원 관리 > 회원 추가**(한 명 / 엑셀 일괄: 아이디·비밀번호·역할)로 만든다. 역할은 학생=`user`, 교사=`admin`(새 역할 없음), 이메일은 `아이디@class1.local`, 첫 로그인 때 비밀번호 변경 강제. 로컬 스크립트(`scripts/import-users.mjs`)는 예비용.
 * **강제 탈퇴는 완전 탈퇴**: `auth.users`를 삭제(복구 없음)하되 학습 기록은 남기고 "탈퇴한 학생"으로 표시한다. 관리자 대상은 불가. 기록을 지울 수 있는 외래키가 생기면 안 된다(`withdrawal_blocking_fks()`가 막음).
+* **학급(반별 구분, 2026-09-26 사용자 결정 — `docs/classes/spec.md` 개정 1·2, 구현 중)**: 역할 = **총괄**(`profiles.is_super_admin`, 사이트 관리자 — 부엉이반 담임 겸임) / **담임**(`role='admin'`, 자기가 개설한 학급 — `class_teachers`) / **학생**(`profiles.class_id`). 학습 기록(과학 앱 결과·진행, 학생 응답, 과제 제출, 피드백)은 **그 반 담임만** 본다(총괄도 다른 반은 못 봄 — RLS `teaches_student()`에 총괄 예외 없음). 비밀번호 초기화·탈퇴 = 담임(자기 반) + 총괄(모든 반), 학생 등록 = 담임(자기 반만), 담임 지정·교사 계정·로그인 잠금 스위치 = 총괄만. 담임이 학급을 개설하고 이름을 정한다. 학급 이름은 **관리자 화면에서만** — 학생 화면에는 소속 정보를 보이지 않는다(`class_id`·`is_super_admin`은 공개 열이 아님). 지금 학생 = '부엉이반'(담임 = 총괄). 선생님 글은 학급별(학생 = 자기 담임 글, 비로그인 = 총괄 글).
 * redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`, `https://class1-chi.vercel.app/class1/**`(Vercel)를 등록한다(Supabase Authentication → URL Configuration — 아이디·비밀번호 로그인에는 필요 없고 GitHub·Google 로그인이 그 주소로 돌아오게 할 때 필요).
 
 
@@ -75,6 +77,7 @@
 * 검증(lint·build·필요한 브라우저 확인)을 마친 뒤 커밋한다. 커밋 메시지는 영어, 끝에 Co-Authored-By 줄.
 * **push(배포)는 사용자가 확인·요청한 뒤에만** 한다. push 후 GitHub Actions 결과와 **두 배포 사이트(GitHub Pages·Vercel)**가 새 코드를 주는지 확인해 보고한다.
 * 사용자가 어떤 단계에 대해 "검토 끝나면 바로 커밋·푸시해줘"라고 미리 허락하면(09-25~26 단계 B·C·크게 보기 개편), **그 단계에 한해** Review에서 막히는 문제가 없거나 고친 뒤 확인 없이 커밋·push한다. 허락은 다음 단계로 넘어가지 않는다 — 새 단계는 시작할 때 다시 묻는다.
+* 여러 작업(에이전트)이 동시에 진행되면 작업 트리에 변경이 섞인다 — 커밋할 때 `git add`는 그 작업의 경로만 골라서(`git add -A` 금지), `supabase/.temp/`는 빼고.
 * 앱의 저장 구조를 바꾸면 저장 키 버전(`:vN`)을 올리고, 학생 진행 기록이 처음부터 다시 시작된다는 점을 사용자에게 알린다. 올릴 때 앱 시작 시 **그 앱의 예전 판 로컬 키만** 지운다(남겨 두면 로그아웃·동기화 때 새 판 기록을 덮을 수 있음 — 단계 C Review M1).
 
 
@@ -87,7 +90,7 @@
 * 서브에이전트는 git commit/push와 실 DB 쓰기를 하지 않는다. 커밋은 Claude가 검증 후 한다.
 * 브라우저는 공유되므로 서브에이전트는 **자기 탭(tabs_create) 또는 자기 전용 headless 브라우저(겹치지 않는 포트)**만 쓰고, 다른 탭·프로세스를 건드리지 않으며, `localStorage.clear()`를 쓰지 않는다(자기 앱 키만 삭제). 띄운 서버는 끝날 때 종료한다.
 * 임시 파일은 스크래치 디렉터리에만 두고 끝나면 지운다.
-* 테스트할 때 **실제 Supabase 주소는 첫 페이지 로드부터 막고**(요청 가로채기) 가짜 세션·가짜 응답만 쓴다. 실제 Gemini도 부르지 않는다. 검증된 방법: 자기 headless Chrome에 `--host-resolver-rules="MAP *.supabase.co 127.0.0.1:9, MAP supabase.co 127.0.0.1:9"` + CDP `Fetch.enable`(`*supabase.co*`)로 가짜 응답, 3D는 `--use-angle=swiftshader --enable-unsafe-swiftshader`, CDP는 Node 24 내장 `WebSocket`(설치 없이).
+* 테스트할 때 **실제 Supabase 주소는 첫 페이지 로드부터 막고**(요청 가로채기) 가짜 세션·가짜 응답만 쓴다. 실제 Gemini도 부르지 않는다. 검증된 방법: 자기 headless Chrome에 `--host-resolver-rules="MAP *.supabase.co 127.0.0.1:9, MAP supabase.co 127.0.0.1:9"` + CDP `Fetch.enable`(`*supabase.co*`)로 가짜 응답, 3D는 `--use-angle=swiftshader --enable-unsafe-swiftshader`, CDP는 Node 24 내장 `WebSocket`(설치 없이). **캐시 끄기**(`Network.setCacheDisabled` — 같은 프로필을 다시 쓰면 예전 JS를 캐시에서 읽어 헛결과가 나온 적 있음).
 * 앱 테스트는 dev 서버(`blog-dev`) 대신 **자기 정적 서버로 저장소 `public/`을 직접 서빙**한다(`python3 -m http.server <겹치지 않는 포트> --bind 127.0.0.1 --directory public` → `http://127.0.0.1:<포트>/apps/<앱>/index.html`) — 데스크톱 앱이 미리보기 dev 서버를 멈출 때가 있다. 비교용 예전 판은 `git archive <커밋> public`을 스크래치에 풀어 다른 포트로.
 * 서브에이전트는 **아무것도 내려받거나 설치하지 않는다**(npm 패키지·브라우저·CDN 파일 저장 금지 — 테스트 페이지가 CDN을 불러오는 것만 허용). 필요하면 Claude에게 보고하고, Claude가 사용자 허락을 받는다.
 * Review 에이전트는 코드를 고치지 않고 보고서(`review-*.md`: 심각도별 표, 재현, 제안, 끝에 "배포해도 됨 / 고친 뒤 배포")만 쓴다. 사용자에게 보여 줄 대표 스크린숏이 필요하면 지침에서 `showcase/`로 요구한다.
@@ -169,6 +172,8 @@
 ## 커뮤니티(자유게시판·학습게임) 규칙
 
 * 로그인한 사용자 누구나 글·댓글·좋아요·신고, 글은 바로 공개. 관리자(교사)는 숨기기·삭제·신고 처리. 사용자 입력은 텍스트로만 렌더링(마크다운이면 DOMPurify, 이미지 첨부 없음).
+* **홈 '선생님 글'**(2026-09-26 사용자 결정): 제목만 목록, 누르면 본문이 펼쳐짐, **날짜·조회수·읽음 기록 없음**, 왼쪽 메뉴에 없음(홈에서만). 관리자 '선생님 글'에서 담임이 **제목·본문만** 쓴다(블로그 편집기 '글 관리·새 글 작성' 진입점은 뺌 — 코드는 남김). 홈에서 '최근 과학 수업'과 좌우 반씩. 과학수업 페이지에는 글 칸 없음.
+* **검색**(상단 돋보기, 2026-09-26): 블로그 글이 아니라 실험 앱(사이트 안 차시 자료)·자유게시판(로그인한 사람만)·학습게임(잠금 스위치대로). 태그 칩 = 종류.
 * **자유게시판은 로그인한 사용자만** 본다(2026-09-26 사용자 결정, 스위치와 상관없이): 목록·글·글쓰기 화면은 로그인 안내, 홈 '최근 자유게시판' 미리보기와 '자유게시판 글' 수도 로그인 안내(비로그인이면 불러오지도 않음), RLS도 비로그인에게 게시판 글·댓글·좋아요를 돌려주지 않는다. 학습게임은 스위치대로.
 * **업로드 게임 보안(절대 원칙)**: 업로드 HTML은 사이트 출처로 절대 실행하지 않는다. 비공개 버킷에 `text/plain`으로 저장 → `download()`로 텍스트를 받아 → 고정 CSP 래퍼 안의 `sandbox="allow-scripts"` iframe(`allow-same-origin` 등 추가 금지)에서만 실행. 공개 URL·blob URL·새 탭·`dangerouslySetInnerHTML` 금지. 게임은 "게임 시작"을 눌러야 실행.
 * 게임 파일: 확장자 `.html`/`.htm`이면 이름은 무엇이든 가능, UTF-8, 2MB 이하, 한 사람당 게임 글 30개.
