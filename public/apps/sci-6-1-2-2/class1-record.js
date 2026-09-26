@@ -409,13 +409,18 @@
   /**
    * Edge Function 호출(로그인 토큰 첨부). 실패는 던지지 않고 결과 객체로 돌려준다.
    * 개인정보는 body에 넣지 않는다(호출하는 쪽 책임).
+   * opts.allowAnon: 로그인 세션이 없으면(not_logged_in) 공개 키로 부른다 — 체험 모드에서도 쓰는 함수만(check-answer, 2026-09-26).
+   *   다른 사람으로 로그인된 경우(user_changed) 등 그 밖의 실패는 그대로 돌려준다.
    */
   async function callFunction(name, body, opts) {
     if (!state.client) return fail("not_initialized", "Class1Record.init()을 먼저 호출하세요.");
     if (typeof name !== "string" || !/^[a-z0-9][a-z0-9-]{0,59}$/.test(name)) return fail("invalid", "함수 이름이 올바르지 않습니다.");
     var o = opts || {};
     var auth = await authFor(o.expectedUserId);
-    if (!auth.ok) return auth;
+    if (!auth.ok) {
+      if (!(o.allowAnon && auth.reason === "not_logged_in" && state.anonKey)) return auth;
+      auth = { ok: true, token: state.anonKey };
+    }
     var ctrl = typeof AbortController === "function" ? new AbortController() : null;
     var timer = o.timeoutMs && ctrl ? setTimeout(function () { ctrl.abort(); }, o.timeoutMs) : null;
     try {

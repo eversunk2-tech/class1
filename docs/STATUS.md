@@ -51,9 +51,9 @@
 * 지도서 PDF 인쇄 쪽 = PDF 쪽 + 오프셋: 1학기 산과 염기 +103, 물체의 운동 약 +179~180 / 2학기 계절의 변화 +103, 물질의 연소 +179, 전기의 이용 +253 (단원 지도 계획은 PDF 5쪽). 2학기 실험관찰은 `실험관찰-6-2.pdf`.
 
 ### 과학 앱 공통 기능 (공통 틀, 23개 모두 적용)
-* **로그인 잠금 연동**: 잠금 꺼짐 + 비로그인 → **체험 모드**(끝까지 가능, 이 기기에만 저장, 서버 호출 0, "로그인하면 기록이 저장돼요"). 로그인하면 체험 기록은 이어받지 않고 지운다. 잠금 켜짐 + 비로그인 → 로그인 안내.
+* **로그인 잠금 연동**: 잠금 꺼짐 + 비로그인 → **체험 모드**(끝까지 가능, 이 기기에만 저장, 기록 저장 서버 호출 0 — 답 판정 Gemini는 부름(09-26), "로그인하면 기록이 저장돼요"). 로그인하면 체험 기록은 이어받지 않고 지운다. 잠금 켜짐 + 비로그인 → 로그인 안내.
 * 로그인 학생: 진행 상황 `app_progress` 자동 저장·이어서 하기, 로그아웃 시 `sci6…` 로컬 삭제, 완료 시 `app_results`(+`detail.qa`).
-* **학생 답 되짚기·차단**(`answer-check.js` + Edge Function `check-answer`): 통과 / 다시 생각(질문당 1회, 그대로 제출 가능) / 통과 불가(무의미·주제 무관). 로컬 규칙은 확실한 무의미 5종만, 주제 무관은 Gemini만. Gemini 실패·체험 모드면 차단 없음(로컬 규칙만). 같은 질문 3번째 차단부터 "🙋 선생님과 확인했어요". "✔ 잘 적었어요"는 검사 통과 뒤에만. 안내 문구(외부 검사 사실)는 넣지 않음(사용자 결정) — 학생에게 개인정보를 적지 않도록 교실에서 안내.
+* **학생 답 되짚기·차단**(`answer-check.js` + Edge Function `check-answer`): 통과 / 다시 생각(질문당 1회, 그대로 제출 가능) / 통과 불가(무의미·주제 무관). 로컬 규칙은 확실한 무의미 5종만, 주제 무관은 Gemini만(**체험 모드도 — 09-26 사용자 결정**). Gemini 실패면 차단 없음(로컬 규칙만). 같은 질문 3번째 차단부터 "🙋 선생님과 확인했어요". "✔ 잘 적었어요"는 검사 통과 뒤에만. 안내 문구(외부 검사 사실)는 넣지 않음(사용자 결정) — 학생에게 개인정보를 적지 않도록 교실에서 안내.
 * **마치기 조건**: 정리하기 답이 통과 불가면 '학습 마치기' 거부, '더 탐구하고 싶은 점'은 **필수**(느슨 판정: 무의미·주제 무관만 거부). 버튼 위에 "'학습 마치기'를 눌러야 선생님에게 제출돼요" 상시 표시.
 * 디자인: 사이트와 같은 보라·알약 버튼·본문 Pretendard(jsDelivr)·제목 G마켓 산스 Bold + 부드러운 그림자(사이트의 `public/fonts/gmarket-sans/`를 상대경로로). `persist.js`가 글꼴 `<link>`를 비차단으로 붙여 글꼴이 막혀도 첫 화면 즉시. 3D 장면·그래프 색은 그대로.
 * **실험 화면(2026-09-25 개편 단계 A, 실험 앱 20개)**: 기본은 예전 구조(가로: 장면 왼쪽·조작 오른쪽), 장면 왼쪽 위 "⛶ 전체 화면 보기" → 크게 보기. **태블릿·PC는 가로·세로 모두 크게 보기가 기본**(09-26 사용자 결정 — 전에는 세로만; 휴대폰(세로 폭 600px 미만·가로 낮은 화면)과 막대에 넣을 것이 없는 앱은 끔), 선택은 방향별로 기억(`ssUiPref:sceneMode:portrait|landscape`, `sci6` 접두사 아님 — 로그아웃해도 남는 화면 설정). 머리말 "▲ 접기"(계정 줄+단계 메뉴, 23개 앱, `ssUiPref:headerCollapsed`) — **크게 보기가 보이는 동안은 가로·세로 모두 자동으로 접힘**(09-26 개정 7, 그동안 누른 펼치기는 저장 안 함, 끄거나 다른 단계로 가면 원래대로). 알림은 머리말 위.
@@ -76,8 +76,8 @@
 * 보라 주색 + 연보라 배경 그라데이션, 메뉴별 파스텔 그라데이션 카드, 본문 Pretendard(OFL, npm 자체 호스팅, 가변 글꼴), **제목 G마켓 산스 Bold + 부드러운 그림자**(5단계, 2026-09-24 사용자 선택 — 주아체 대신, 공식 OTF 원본 `public/fonts/gmarket-sans/`, 관리자 화면은 그림자 없음), 왼쪽 사이드바 유지, 다크모드 유지. 관리자 화면만 보라 채도 약 25% 낮춤(`src/app/admin/admin-theme.css`), 위험 버튼은 진한 빨강(`src/lib/danger-button.ts`).
 * 마스코트 "부엉이 과학자"(Canva AI 생성, 사용자 선택): `public/illustrations/mascot/owl-{wave,tablet,think,cheer}.webp`(홈·과학수업·빈 화면·완료), 원본·배경 제거 스크립트 `docs/design/redesign/mascot-src/`. 09-25 사용자 지적("흰 배경이 매끄럽지 못하게 남음")으로 배경 제거를 v2로 다시 함(가장자리 색에서 흰 배경을 걷어 냄 — 흰 테두리·돌기·발밑 그림자 없음, 원본 JPEG에서 4장 모두 `cutout.cjs` 자동 설정). 표시할 때 쓰던 "가장자리 1px 깎기" SVG 필터는 뺐다.
 * 사이트 맨 아래 문구: "© {연도} PSC. All rights reserved."(09-25 사용자 요청, `src/components/site-footer.tsx`).
-* **사이트 이름 "모두의 배움터"**(09-26 사용자 결정 — 다른 선생님 반도 쓸 수 있게, 전 "우리 반 배움터"): 홈 소개 "친구들과 함께 배우고 탐구하는 공간이에요. 궁금한 메뉴를 눌러 시작해 봐요!"(사용자 문구), "배움터 한눈에 보기", 로그인 안내·메뉴·게시판·사이트 설명의 '우리 반' → '친구들'/'새 소식'(칭찬 문구 '우리 반 학생'은 그대로).
-* **반별로 나눠 보이게 하기 — 계획 작성 중**(09-26 사용자 요청): Plan 에이전트(sonnet)가 `docs/classes/spec.md`를 쓰는 중(지침 `docs/classes/plan-instructions.md`) → 사용자 결정·승인 뒤 단계별 구현.
+* **사이트 이름 "모두의 배움터"**(09-26 사용자 결정 — 다른 선생님 반도 쓸 수 있게, 전 "우리 반 배움터", 커밋 `3d63f67` 배포 완료·두 사이트 확인): 홈 소개 "친구들과 함께 배우고 탐구하는 공간이에요. 궁금한 메뉴를 눌러 시작해 봐요!"(사용자 문구), "배움터 한눈에 보기", 로그인 안내·메뉴·게시판·사이트 설명의 '우리 반' → '친구들'/'새 소식'(칭찬 문구 '우리 반 학생'은 그대로).
+* **반별로 나눠 보이게 하기 — 사용자 승인(09-26), Build 중**: 사용자가 "전반적으로 추천대로" + 개별 결정(`docs/classes/spec.md` 끝 **개정 1** — 학습 기록은 **담임만**(총괄도 다른 반 기록은 못 봄), 비밀번호 초기화·탈퇴는 총괄도 모든 반, 총괄 = 부엉이반 담임 겸임, 총괄이 담임 지정 → 담임이 학급 개설(이름 직접)·학생 등록, 학급 이름은 관리자 화면에서만, 학생 화면 그대로, 지금 학생은 **"부엉이반"**). Build 에이전트 2명 동시(DB·함수 `build-db-instructions.md` → `build-db-report.md` / 화면 `build-ui-instructions.md` → `build-ui-report.md`) → 별도 Review → 사용자 SQL 실행(① schema ② `docs/classes/setup-owl-class.sql`(이메일은 대화로 — 저장소 공개라 파일에 안 씀) ③ rls) → 함수 3개 재배포 → push. 이전 기록: 계획 단계(09-26 사용자 요청): `docs/classes/spec.md`(Plan 에이전트 sonnet 작성 + Claude 검토·수정 4곳). 추천: `role`(admin/user) 그대로 + `profiles.is_super_admin`·`profiles.class_id`·`classes`·`class_teachers`, 함수 `teaches_student()` 등으로 학생 기록 RLS 약 13곳의 `is_admin()`을 좁힘, 과학 앱 코드 변경 없음, Edge Function 3개 수정. 사용자가 정할 질문 11개(§2.6 — 역할, 게시판·학습게임·과제·잠금 스위치 반별 여부, 아이디 규칙, 교사 계정·반 만들기 권한, 반 이동 기준) → 승인 뒤 단계 1~5(스키마 → RLS 치환+이관 → 함수·화면 → Review → 선택 확장).
 * 3D 아이콘 15개: Microsoft Fluent Emoji 3D(MIT) `public/illustrations/3d/`(고지 `LICENSE-fluent-emoji.txt`).
 
 ## Supabase (모두 사용자가 실행·배포 완료)
@@ -102,7 +102,7 @@
 | admin-reset-password | 비밀번호 초기화 | Verify JWT, 관리자 검증 |
 | admin-delete-member | 완전 탈퇴 | 관리자 검증, 기록을 지울 FK가 있으면 삭제 전 거부 |
 | admin-create-member | 회원 추가(단건·일괄) | 관리자 검증, 비밀번호 기록 안 함 |
-| check-answer | 학생 답 판정(Gemini) | 로그인 학생만, 비밀 `GEMINI_API_KEY`, 모델 `gemini-flash-lite-latest`(`GEMINI_MODEL`로 변경 가능). 09-26: Gemini 대기 7초(앱 쪽 9초), 생각 끔(`thinkingBudget:0` → 400이면 `thinkingLevel:"low"` → 설정 없음), 로그에 켜질 때 모델 정보·판정마다 `ms`·`modelVersion`·`thinking` |
+| check-answer | 학생 답 판정(Gemini) | 로그인 학생 + **체험 모드(공개 키, 09-26 사용자 결정 — 허용 출처만·IP별 1분 60/1시간 600·전체 1분 300, Secret `CHECK_ANSWER_ALLOW_ANON=off`로 끔)**, 비밀 `GEMINI_API_KEY`(무료 등급), 모델 `gemini-flash-lite-latest`(`GEMINI_MODEL`로 변경 가능). 09-26: Gemini 대기 7초(앱 쪽 9초), 생각 끔(`thinkingBudget:0` → 400이면 `thinkingLevel:"low"` → 설정 없음), 로그에 켜질 때 모델 정보·판정마다 `ms`·`modelVersion`·`thinking` |
 * 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다(`--no-verify-jwt` 금지). 4개 모두 09-26 최신 코드로 배포됨(사용자).
 * 함수 4개의 허용 출처(CORS): GitHub Pages·`http://localhost:3000` + Secret `EXTRA_ALLOWED_ORIGINS`(쉼표 구분 https 출처 — 지금 `https://class1-chi.vercel.app`). 새 도메인을 더하면 Secret만 바꾸고 함수 4개 다시 배포.
 * **Supabase CLI**: 사용자 Mac에서 `npx supabase login` 해 둠(09-26, 토큰은 macOS 키체인 — 키체인 창의 암호는 Mac 로그인 암호), 프로젝트 연결됨(`supabase/.temp/`는 커밋하지 않음). 배포 때 "Access token not provided"가 나오면 사용자가 `npx supabase login`을 다시(브라우저 승인 → 확인 코드). Docker 경고는 무시해도 됨. Claude는 토큰·암호·확인 코드를 묻거나 입력하지 않는다.
@@ -142,6 +142,7 @@
     * 1학기 2단원 탐구 1·2(수업 미사용)는 문항 그대로, 화면(공통 틀)만
   * **마지막: 단계 E**(마무리) — 정본↔23개 사본 `diff -r`, STATUS·CLAUDE 정리, 실제 태블릿 확인 부탁. 두 정본 사이 어긋남도 맞춘다: `stage-nav.js`는 조사판에만 "잠긴 단계에는 완료(✓) 안 보이기" 수정이 있고(실험판에 옮길지 확인), `lesson.js`는 실험판에만 `--ss-footer-h`가 있다(조사판에 필요한지 확인).
   * 사용자 결정 모음: 순서 A→B→C→D→E, 단계마다 별도 Review 에이전트. 기본 실험 화면은 예전 구조, 크게 보기 = 한 화면 실험실(개정 6). **B·C·크게 보기 개편은 사용자가 "검토 끝나면 바로 커밋·푸시"를 허락**(단계마다 따로 말함 — D는 시작할 때 다시 확인).
+* **체험 모드도 Gemini 답 판정(09-26 사용자 요청)**: `check-answer`가 공개 키 호출을 받음(허용 출처·IP별 한도·끄기 Secret), 앱은 `answer-check.js`(두 정본)·`class1-record.js`(`callFunction`의 `allowAnon`)로 체험 모드에서도 부름 — 23개 사본 동기화, 가짜 응답으로 확인(비로그인=anon·로그인=authenticated, 식별 정보 없음, 차단 카드). **배포 순서: 사용자가 `check-answer` 재배포 → 그다음 push**(거꾸로면 체험 모드 학생에게 판정 대신 되짚기 카드만 뜸).
 * **학생 답 되짚기(Gemini) 시간 초과 — 해결(09-26)**: 증상은 학생 계정으로 "집에 가고 싶다"가 막히지 않고 되짚기 기본 문구만 뜸, 함수 로그 `check-answer: Gemini 호출 실패 timeout`. 고침 ① `3a45060`: 서버 Gemini 대기 3→7초, 앱 대기 3.5→9초, 대답을 못 받으면 그 질문을 "되짚음"으로 기록하지 않음(전에는 한 번 늦으면 그 기기에서 그 질문 검사가 꺼짐) ② `ce3c80b`: 생각 끄기 + 폴백, 로그에 모델 정보·`ms`. 사용자가 함수 재배포 → 두 사이트 모두 막기 카드 확인. **다시 느려지면** 함수 로그의 `ms`·모델 정보를 보고 Secret `GEMINI_MODEL`만 바꾼다(코드 수정 불필요).
 * 참고(09-24 해결): 게임 업로드 안내 문구의 "index.html"을 실제 규칙("이름은 무엇이든, `.html`/`.htm`으로 끝나면 됨")에 맞게 고침(`game-upload-field.tsx`, `community-post-form.tsx`, `games/page.tsx`, `lib/community.ts` 오류 문구).
 * 참고(09-24 해결): 낮은 지적 3개 — `sci-6-2-1-4` 기록하기 버튼 가림(태블릿 가로, 카드 여백 조정), 움직임 줄이기에서 멈춰 보이던 스피너(2.4초로 천천히 돎), 앱 선택 표시에 남은 예전 파랑 7곳(보라로) — 모두 고침(`docs/science/small-fix-2-report.md`).

@@ -7,7 +7,12 @@
 //            ok / block만 고르고(rethink 금지), 내용이 아쉽다는 이유로는 절대 막지 않는다.
 //        Authorization: Bearer <학생 access token> — 게이트웨이(Verify JWT)가 서명을 검증하고,
 //        이 함수가 다시 토큰의 주장(claims)을 확인한다: role === "authenticated" + sub 있음 + 만료 전.
-//        anon key·service_role key만으로는 호출할 수 없다(둘 다 role이 다르고 sub가 없다 — review M1).
+//        **체험 모드(비로그인)**: 2026-09-26 사용자 결정으로 공개 키(anon key, role "anon")로도 부를 수 있다.
+//          공개 키는 사이트 코드에 들어 있어 누구나 볼 수 있으므로 비로그인 호출에만 남용 방지를 건다:
+//          ① Secret CHECK_ANSWER_ALLOW_ANON=off 이면 받지 않는다(401 — 코드 수정 없이 끄기)
+//          ② 허용 출처(ALLOWED_ORIGINS)에서 온 요청만(아니면 403)
+//          ③ 이 인스턴스 메모리 기준 IP별 한도(1분 60번·1시간 600번 — 학교는 한 반이 같은 IP)와 전체 한도(1분 300번) — 넘으면 200 rate_limited
+//        service_role key·그 밖의 토큰은 받지 않는다.
 // 응답:  200 { ok: true, verdict: "ok" | "rethink" | "block", message: "" }
 //        401 { ok: false, reason: "not_logged_in" }
 //        400/405/413 { ok: false, reason: "invalid" }
@@ -17,8 +22,9 @@
 // 보안·개인정보 메모
 // - 요청에 학생 이름·학번·이메일·user id를 받지 않는다. question·model·hint는 이미 브라우저에 공개로 내려가는 lesson-config.js 내용이다.
 // - 토큰은 읽기만 하고(서명 검증은 게이트웨이 몫) **로그에 남기지 않는다**. sub(user id)도 기록하지 않는다.
+// - 비로그인 호출의 IP는 한도 계산(메모리)에만 쓰고 로그·응답에 남기지 않는다.
 // - GEMINI_API_KEY는 Supabase Secrets에서만 읽고(`Deno.env.get`), 코드·응답·로그에 절대 남기지 않는다(헤더로만 보낸다).
-// - 로그는 한 줄뿐: { appId, stage, verdict, priorBlocks } — 학생 답·식별 정보는 기록하지 않는다.
+// - 로그는 한 줄뿐: { appId, stage, verdict, priorBlocks, who("user"|"anon") … } — 학생 답·식별 정보는 기록하지 않는다.
 // - 서비스 롤 키도, DB 조회도 쓰지 않는다(로그인 여부는 게이트웨이가 본다).
 // - block은 "질문과 전혀 관련이 없거나 뜻을 알 수 없을 때"만 고르게 프롬프트에서 강하게 제한한다(오차단 방지).
 
@@ -111,6 +117,69 @@ export function isLoggedInToken(authHeader: string | null, nowSec?: number): boo
   if (typeof claims.sub !== "string" || claims.sub.trim() === "") return false;
   const now = nowSec ?? Math.floor(Date.now() / 1000);
   if (typeof claims.exp === "number" && claims.exp < now) return false; // 만료된 토큰
+  return true;
+}
+
+/**
+ * 토큰 종류(2026-09-26): 로그인한 사용자 "user" / 공개 키 "anon"(체험 모드) / 그 밖 null.
+ * 서명 검증은 게이트웨이(Verify JWT) 몫 — 여기서는 주장(claims)만 본다. 토큰 문자열은 기록하지 않는다.
+ */
+export function tokenKind(authHeader: string | null, nowSec?: number): "user" | "anon" | null {
+  if (isLoggedInToken(authHeader, nowSec)) return "user";
+  const raw = (authHeader ?? "").replace(/^Bearer\s+/i, "").trim();
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)))) as Record<string, unknown>;
+    return claims && claims.role === "anon" ? "anon" : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 체험 모드(비로그인) 호출을 받을지 — Secret CHECK_ANSWER_ALLOW_ANON=off 면 받지 않는다(기본 받음). */
+const ANON_ENABLED = (Deno.env.get("CHECK_ANSWER_ALLOW_ANON") ?? "on").trim().toLowerCase() !== "off";
+// 학교는 반 전체가 같은 공인 IP로 나가는 경우가 많다 → 한 반(약 30명)이 함께 체험 모드를 써도 막히지 않게 넉넉히.
+const ANON_PER_MIN = 60; // IP 하나가 1분에
+const ANON_PER_HOUR = 600; // IP 하나가 1시간에
+const ANON_GLOBAL_PER_MIN = 300; // 이 인스턴스 전체가 1분에(IP를 바꿔 가며 부르는 경우 대비)
+type AnonBucket = { m: number; mc: number; h: number; hc: number };
+const anonBuckets = new Map<string, AnonBucket>();
+let anonGlobal = { m: -1, c: 0 };
+
+/** 요청한 곳의 IP(한도 계산용 — 기록하지 않는다). 없으면 "unknown"(한 묶음으로 센다). */
+function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  const ip = xff ? xff.split(",")[0] : req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? "unknown";
+  return ip.trim().slice(0, 64) || "unknown";
+}
+
+/** 비로그인 호출 한도(메모리, 인스턴스마다). 받을 수 있으면 true(그리고 센다). */
+export function takeAnonSlot(ip: string, nowMs: number): boolean {
+  const minute = Math.floor(nowMs / 60000);
+  const hour = Math.floor(nowMs / 3600000);
+  if (anonGlobal.m !== minute) anonGlobal = { m: minute, c: 0 };
+  if (anonGlobal.c >= ANON_GLOBAL_PER_MIN) return false;
+  let b = anonBuckets.get(ip);
+  if (!b) {
+    if (anonBuckets.size >= 5000) anonBuckets.clear(); // 메모리 보호(드묾)
+    b = { m: minute, mc: 0, h: hour, hc: 0 };
+    anonBuckets.set(ip, b);
+  }
+  if (b.m !== minute) {
+    b.m = minute;
+    b.mc = 0;
+  }
+  if (b.h !== hour) {
+    b.h = hour;
+    b.hc = 0;
+  }
+  if (b.mc >= ANON_PER_MIN || b.hc >= ANON_PER_HOUR) return false;
+  b.mc++;
+  b.hc++;
+  anonGlobal.c++;
   return true;
 }
 
@@ -307,9 +376,19 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return json({ ok: false, reason: "invalid" }, 405, headers);
 
-  // ① 로그인한 학생인지 확인(review M1). anon key·service_role key만으로는 여기서 막힌다.
-  if (!isLoggedInToken(req.headers.get("authorization"))) {
+  // ① 로그인한 학생 또는 체험 모드(공개 키) — service_role key·그 밖의 토큰은 막는다(review M1).
+  const who = tokenKind(req.headers.get("authorization"));
+  if (who === null || (who === "anon" && !ANON_ENABLED)) {
     return json({ ok: false, reason: "not_logged_in" }, 401, headers);
+  }
+  if (who === "anon") {
+    // 체험 모드 호출은 우리 사이트에서 온 것만(다른 사이트의 브라우저 호출 차단) + IP별·전체 한도
+    const origin = req.headers.get("origin");
+    if (!origin || !ALLOWED_ORIGINS.has(origin)) return json({ ok: false, reason: "invalid" }, 403, headers);
+    if (!takeAnonSlot(clientIp(req), Date.now())) {
+      console.error("check-answer: 체험 모드 호출 한도 초과");
+      return json({ ok: false, reason: "rate_limited" }, 200, headers);
+    }
   }
 
   // ② 본문 크기 제한(review L1). 필드 상한을 모두 더해도 2KB 남짓이다.
@@ -390,6 +469,7 @@ Deno.serve(async (req: Request) => {
       stage: parsed.stage,
       verdict: verdict.verdict,
       priorBlocks: parsed.priorBlocks,
+      who,
       ms: Date.now() - started,
       modelVersion: (data as { modelVersion?: string } | null)?.modelVersion ?? null,
       thinking: used,

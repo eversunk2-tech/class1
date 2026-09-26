@@ -12,9 +12,10 @@
  *   정답이 없는 질문이라 **무의미한 글·완전히 딴 이야기만** 막는다(ok / block만 쓴다).
  *   내용이 아쉽다는 이유로는 절대 되짚지 않는다(rethink 없음). Edge Function도 이 단계는 같은 기준으로 본다.
  *
- * ▶ 체험 모드(비로그인 · 사이트 잠금 꺼짐)
- *   서버(check-answer)를 부르지 않는다. 로컬 규칙의 확실한 무의미만 막고 **나머지는 바로 통과**시킨다
- *   (전에는 "응답을 못 받았다"로 보고 좋은 답에도 되짚기 카드를 한 번 띄웠다 — scope-fix review M1).
+ * ▶ 체험 모드(비로그인 · 사이트 잠금 꺼짐) — 2026-09-26 사용자 결정: **체험 모드도 Gemini 판정을 받는다.**
+ *   로그인 토큰 대신 공개 키로 check-answer를 부른다(Class1Record.callFunction의 allowAnon). 서버는 비로그인 호출에
+ *   허용 출처·IP별 한도를 걸고, Secret CHECK_ANSWER_ALLOW_ANON=off면 받지 않는다 → 그때는 "응답 못 받음"과 같게(막지 않음).
+ *   판정 기록(되짚음·차단 횟수)은 이 기기에만 남는다(체험 모드는 서버에 학습 기록을 올리지 않는다).
  *
  * ▶ 차단은 좁게(중요)
  *   - 로컬 규칙(Rules.block)은 **누가 봐도 확실한 무의미**만 막는다(자모만·같은 글자 반복·숫자만·질문 그대로 복사·자판 뭉개기).
@@ -61,7 +62,7 @@
   var stageChecks = {}; /* { "<data-stage>": [fn, …] } */
   var finishChecks = []; /* [{ mount, fn }] — '학습 마치기'를 누를 때 한 번 더 보는 검사 */
 
-  /** 체험 모드(비로그인 · 사이트 잠금 꺼짐)인지. 이때는 서버를 부르지 않는다. */
+  /** 체험 모드(비로그인 · 사이트 잠금 꺼짐)인지. 이때는 로그인 주인 확인 없이 공개 키로 묻는다(ask). */
   function isTrial() {
     try {
       return !!(SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial());
@@ -182,14 +183,14 @@
   function ask(payload) {
     try {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(null);
-      // 체험 모드(비로그인)에서는 서버를 부르지 않는다. verify()가 이미 앞에서 통과시키므로 여기까지 오지 않는다(보호용).
-      if (isTrial()) return Promise.resolve(null);
       var rec = window.Class1Record;
       if (!rec || typeof rec.callFunction !== "function") return Promise.resolve(null);
+      var trial = isTrial();
       var call = rec
         .callFunction("check-answer", payload, {
           timeoutMs: TIMEOUT_MS,
-          expectedUserId: SciSim.Sync && SciSim.Sync.owner ? SciSim.Sync.owner() : undefined,
+          expectedUserId: !trial && SciSim.Sync && SciSim.Sync.owner ? SciSim.Sync.owner() : undefined,
+          allowAnon: true, // 체험 모드(비로그인)도 판정을 받는다(2026-09-26) — 로그인 세션이 없으면 공개 키로
         })
         .then(function (res) {
           if (!res || !res.ok || !res.data || res.data.ok !== true) return null;
@@ -348,7 +349,6 @@
     if (st.nudged) return true;
     if (st.okFp && st.okFp === fp(t)) return true;
     if (o && o.stage === "conclude" && modelWordHit(t, o.model)) return true;
-    if (isTrial()) return true; /* 서버를 부르지 않으므로 로컬 규칙만으로 끝난다 */
     return false;
   }
 
@@ -397,9 +397,7 @@
     /* ④ 정리하기 통과 지름길(모범 답안 낱말이 이미 들어 있음) */
     if (o.stage === "conclude" && modelWordHit(text, o.model)) return Promise.resolve(pass());
 
-    /* ⑤ 체험 모드 — 서버를 부르지 않으므로 ①의 로컬 규칙만으로 판단하고 그대로 통과시킨다(scope-fix review M1).
-     *    (전에는 여기서 "응답 못 받음"으로 보고 좋은 답에도 되짚기 카드를 한 번 띄웠다.) */
-    if (isTrial()) return Promise.resolve(pass());
+    /* ⑤ 체험 모드도 아래에서 Gemini에게 묻는다(2026-09-26 사용자 결정 — 전에는 로컬 규칙만으로 통과시켰다). */
 
     /* ⑥ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) */
     if (cfg.appId && !APP_ID_RE.test(cfg.appId)) return Promise.resolve(true);
