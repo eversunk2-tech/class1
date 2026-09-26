@@ -88,6 +88,34 @@
       north: Math.cos(PHI) * Math.sin(dec) - Math.sin(PHI) * Math.cos(dec) * Math.cos(H),
     };
   }
+  // 그 달 남중(H = 0)의 태양 방향 — 3D(태양·그림자·빛줄기·호)와 '옆에서 본 모습' 칸이 모두 이 값 하나를 쓴다(따로 계산하지 않는다, spec 개정 4)
+  var NOON = {};
+  function noonSun(month) {
+    return NOON[month] || (NOON[month] = sunDir(geo(month).dec, 0));
+  }
+
+  /* 태양 고도 측정기(받침판 + 막대기, 모형) 치수 — 3D와 '옆에서 본 모습' 칸이 같이 쓴다(spec 개정 4, 하늘 반구 반지름 RS = 8 기준).
+   *  - 막대기 DEV.stick: 예전(1)에는 처음 시점에서 여름 그림자(막대기 길이의 약 1/4)와 호가 몇 px뿐이라 3배로 키웠다.
+   *  - 받침판: 12달 남중 그림자가 모두 판 위에 오게 남북으로 길게, 막대기는 판의 남쪽 끝 가까이(남중 그림자는 북쪽으로 생긴다).
+   *  - 햇빛은 평행하다 → 막대기 끝을 지나는 빛줄기는 태양 방향과 평행하다. 하늘 반구의 중심(원점)이 막대기 끝이 아니므로 그 빛줄기는
+   *    모형 속 태양 중심에서 |끝 높이 × cos(고도) + 막대기 z × sin(고도)|만큼 비껴간다. 막대기를 정남쪽으로 옮겨 가장 낮은·가장 높은
+   *    남중 고도에서 이 거리가 같아지게 해(DEV.z = −끝 높이 ÷ tan(두 고도의 가운데)) 12달 중 가장 큰 값을 줄였다(지금 치수로 원점에
+   *    둘 때 2.67 → 1.52, 3·9월은 0.02 이하). 태양 원반·빛무리를 조금 키워 빛줄기가 빛무리 안에서 나오게 했다(build3D). */
+  var DEV = (function () {
+    var alts = MONTHS.map(function (m) {
+      return m.altitude;
+    });
+    var lo = Math.min.apply(null, alts);
+    var hi = Math.max.apply(null, alts);
+    var d = { stick: 3.0, r: 0.08, top: 0.05, halfW: 1.25, marginS: 0.55, marginN: 0.6 };
+    d.tipY = d.top + d.stick; // 막대기 끝의 높이(땅 = 0)
+    d.z = -d.tipY / Math.tan(((lo + hi) / 2) * RAD); // 막대기 자리(정남쪽이 −z)
+    d.z0 = d.z - d.marginS; // 받침판 남쪽 끝
+    d.z1 = d.z + d.stick / Math.tan(lo * RAD) + d.marginN; // 북쪽 끝(가장 긴 남중 그림자 + 여유)
+    return d;
+  })();
+  // 3D 처음 시점의 방향(장면 가운데 → 카메라) — Sim3D의 viewDir, '옆에서 본 모습' 칸의 좌우(VIEW_RIGHT)가 같이 쓴다
+  var VIEW_DIR = [-0.34, 0.5, 0.8];
   /* ───────── 저장 ───────── */
   var records = S.RecordStore(store, {
     key: "records",
@@ -155,6 +183,127 @@
       el("div", { class: "ss-card" }, [el("label", { for: "ss-curiosity", class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "선택" }), C.curiosity.prompt]), inp])
     );
   })();
+
+  /* ───────── 남중할 때 옆에서 본 모습 칸(모형) — spec 개정 4 보충(2026-09-26 사용자 결정) ─────────
+   * 탐구 2(sci-6-2-1-2)의 '옆에서 본 모습' 칸을 본떴다. 3D 처음 시점은 남중 그림(막대기·그림자·빛줄기·호)이 담긴 자오선 면(정남북
+   * 수직면)을 약 20° 비스듬히 보므로 호가 실제 각보다 작고 납작하게 보인다(여름은 그림자가 짧아 몇 px). 이 칸은 그 면을 정면으로 본
+   * 그림이라 칸 속 빛줄기와 땅이 이루는 각 = 그 달 남중 고도다.
+   *  - 3D와 같은 태양 방향 값 noonSun(month) 하나로 그린다: 각의 cos·sin = 그 값의 수평 길이·위 성분, 그림자 길이 = 막대기 길이 ×
+   *    수평 길이 ÷ 위 성분(3D 그림자 끝과 같은 식), 태양 → 막대기 끝 → 그림자 끝이 한 직선. 막대기·받침판 비율도 3D와 같은 DEV.
+   *  - 좌우는 탐구 2와 같은 약속(3D 처음 시점 화면의 좌우와 같게): 태양이 처음 시점 화면의 왼쪽이면 그림자는 오른쪽으로 그린다.
+   *    남중 태양은 정남쪽이라 처음 시점(북북동에서 남쪽 하늘을 봄)에서 늘 왼쪽 → 칸의 왼쪽 = 남, 오른쪽 = 북(동쪽에서 서쪽을 바라본
+   *    모습). 땅 양끝에 '남'·'북'을 적는다.
+   *  - 숫자는 쓰지 않는다(값은 값 패널에만). 글자는 안 바뀌는 것('태양 고도', '남', '북', 칸 이름, 안내)뿐.
+   *  - 자리: 값 칸 맨 아래(기록하기 아래) — 기본 화면은 오른쪽(좁은 화면은 아래) 패널, 크게 보기는 값·기록하기가 장면 안 막대로
+   *    옮겨 가므로 조작 칸 안(달 고르기 바로 아래). 장면·버튼을 가리지 않고, 3D·2D 어느 쪽으로 보든 보인다.
+   *  - 달을 고르기 전·태양이 남중하기 전에는 안내 글만(값 패널과 같은 때에 나타난다). */
+  // 칸 좌표(viewBox 200×130): 땅 GY, 막대기 밑동 SX, 1(모형 단위) = K. 여름(75.5°) 태양이 위로, 겨울(29.0°) 태양이 왼쪽으로, 겨울 그림자·받침판이
+  // 오른쪽으로 칸 안에 들어오는 가장 큰 K(여름 그림자·호가 되도록 크게). 태양은 막대기 끝에서 빛줄기를 따라 SUN_S만큼 떨어진 곳
+  // (실제로는 아주 멀다 — 방향만 맞춘다).
+  var SV = { W: 200, H: 130, GY: 110, SX: 30, K: 26.5, SUN_S: 0.8, SUN_R: 6, ARC_MAX: 32, ARC_K: 0.76 };
+  // 처음 시점 카메라의 화면 오른쪽 방향(장면 x·z): 앞(카메라 → 가운데)의 수평 성분 f에 대해 오른쪽 = f × 위 = (−f.z, 0, f.x)
+  var VIEW_RIGHT = (function () {
+    var fx = -VIEW_DIR[0];
+    var fz = -VIEW_DIR[2];
+    var n = Math.hypot(fx, fz);
+    return { x: -fz / n, z: fx / n };
+  })();
+  function makeSideView() {
+    var LABEL = "태양이 남중할 때 막대기와 그림자를 옆에서 본 모습(모형)";
+    var g = svg("svg", { viewBox: "0 0 " + SV.W + " " + SV.H, class: "sv-svg", "aria-hidden": "true", focusable: "false" });
+    g.appendChild(svg("rect", { x: 0, y: 0, width: SV.W, height: SV.GY, class: "sv-sky" }));
+    g.appendChild(svg("rect", { x: 0, y: SV.GY, width: SV.W, height: SV.H - SV.GY, class: "sv-earth" }));
+    var dyn = svg("g", {}); // 달이 정해졌을 때만 보이는 것
+    var board = svg("rect", { y: SV.GY, height: 3.5, class: "sv-board" });
+    var shadow = svg("rect", { y: SV.GY - 1.5, height: 4.5, class: "sv-shadow" });
+    var stick = svg("rect", { x: SV.SX - DEV.r * SV.K, y: SV.GY - DEV.stick * SV.K, width: 2 * DEV.r * SV.K, height: DEV.stick * SV.K, class: "sv-stick" });
+    var arc = svg("path", { class: "sv-arc" });
+    var ray = svg("line", { class: "sv-ray" });
+    var sun = svg("circle", { r: SV.SUN_R, class: "sv-sun" });
+    var lbl = svg("text", { y: SV.GY + 15, "text-anchor": "middle", class: "sv-lbl" }, "태양 고도");
+    dyn.appendChild(board);
+    g.appendChild(dyn);
+    g.appendChild(svg("line", { x1: 0, x2: SV.W, y1: SV.GY, y2: SV.GY, class: "sv-ground" }));
+    var dyn2 = svg("g", {});
+    [shadow, stick, arc, ray, sun, lbl].forEach(function (x) {
+      dyn2.appendChild(x);
+    });
+    g.appendChild(dyn2);
+    var dirL = svg("text", { x: 6, y: SV.GY + 15, class: "sv-dir" });
+    var dirR = svg("text", { x: SV.W - 6, y: SV.GY + 15, "text-anchor": "end", class: "sv-dir" });
+    g.appendChild(dirL);
+    g.appendChild(dirR);
+    var guide = svg("text", { x: SV.W / 2, y: SV.GY / 2 + 4, "text-anchor": "middle", class: "sv-guide" });
+    g.appendChild(guide);
+    var node = el("figure", { class: "side-view", role: "img", "aria-label": LABEL }, [el("figcaption", { class: "side-cap", "aria-hidden": "true", text: "남중할 때 옆에서 본 모습(모형)" }), g]);
+    function p2(x) {
+      return x.toFixed(2);
+    }
+    var last = null;
+    return {
+      node: node,
+      // month: 그릴 달(없으면 안내만), wait: 달은 골랐고 태양이 남중하기 전
+      set: function (month, wait) {
+        var key = month ? "m" + month : wait ? "wait" : "none";
+        if (key === last) return;
+        last = key;
+        if (!month) {
+          dyn.style.display = "none";
+          dyn2.style.display = "none";
+          guide.style.display = "";
+          guide.textContent = wait ? "태양이 남중하면 나타나요…" : "달을 고르면 나타나요";
+          dirL.textContent = "남";
+          dirR.textContent = "북";
+          node.setAttribute("aria-label", LABEL + ": " + guide.textContent);
+          return;
+        }
+        var d = noonSun(month); // 3D와 같은 값
+        var hl = Math.hypot(d.east, d.north); // cos(남중 고도)
+        var s = d.up; // sin(남중 고도)
+        if (!(s > 0) || !(hl > 0)) return;
+        // 그림자가 뻗는 쪽: 태양이 처음 시점 화면의 왼쪽이면 오른쪽(+1) — 탐구 2와 같은 약속(장면 x = −동, z = 북)
+        var sg = -d.east * VIEW_RIGHT.x + d.north * VIEW_RIGHT.z > 0 ? -1 : 1;
+        var top = SV.GY - DEV.stick * SV.K; // 막대기 끝(칸 좌표)
+        var L = (DEV.stick * hl) / s; // 그림자 길이(모형 단위) = 3D의 |막대기 밑동 → 그림자 끝|
+        var tx = SV.SX + sg * L * SV.K; // 그림자 끝
+        var sx = SV.SX - sg * SV.SUN_S * SV.K * hl; // 태양: 막대기 끝에서 태양 쪽으로(태양 → 막대기 끝 → 그림자 끝이 한 직선)
+        var sy = top - SV.SUN_S * SV.K * s;
+        var b0 = SV.SX - sg * DEV.marginS * SV.K; // 받침판(태양 쪽 끝 ~ 반대쪽 끝) — 3D 받침판과 같은 비율
+        var b1 = SV.SX + sg * (DEV.z1 - DEV.z) * SV.K;
+        board.setAttribute("x", p2(Math.min(b0, b1)));
+        board.setAttribute("width", p2(Math.abs(b1 - b0)));
+        shadow.setAttribute("x", p2(Math.min(SV.SX, tx)));
+        shadow.setAttribute("width", p2(Math.abs(tx - SV.SX)));
+        ray.setAttribute("x1", p2(sx));
+        ray.setAttribute("y1", p2(sy));
+        ray.setAttribute("x2", p2(tx));
+        ray.setAttribute("y2", String(SV.GY));
+        sun.setAttribute("cx", p2(sx));
+        sun.setAttribute("cy", p2(sy));
+        // 호: 그림자 끝에서 땅(막대기 쪽)과 빛줄기 사이 — 반지름은 그림자 길이의 ARC_K배(막대기에 닿지 않게), 가장 크게 ARC_MAX
+        var r = Math.min(SV.ARC_MAX, SV.ARC_K * L * SV.K);
+        arc.setAttribute(
+          "d",
+          "M " + p2(tx) + " " + SV.GY + " L " + p2(tx - sg * r) + " " + SV.GY + " A " + p2(r) + " " + p2(r) + " 0 0 " + (sg > 0 ? 1 : 0) + " " + p2(tx - sg * r * hl) + " " + p2(SV.GY - r * s) + " Z"
+        );
+        lbl.setAttribute("x", p2(clamp(tx - sg * r * 0.5, 47, SV.W - 47))); // '남'·'북'과 겹치지 않게
+        dirL.textContent = sg > 0 ? "남" : "북";
+        dirR.textContent = sg > 0 ? "북" : "남";
+        dyn.style.display = "";
+        dyn2.style.display = "";
+        guide.style.display = "none";
+        node.setAttribute(
+          "aria-label",
+          month +
+            "월 21일 " +
+            LABEL +
+            ": 왼쪽이 " +
+            (sg > 0 ? "남쪽, 오른쪽이 북쪽" : "북쪽, 오른쪽이 남쪽") +
+            "이에요. 남쪽 하늘의 태양에서 오는 빛줄기가 막대기 끝을 지나 그림자 끝에 닿아요. 빨간 호는 그림자 끝에서 빛줄기와 땅이 이루는 각, 태양 고도예요."
+        );
+      },
+    };
+  }
 
   /* ═════════ 2. 실험하기 (앱 전용 화면) ═════════ */
   var R = {};
@@ -268,7 +417,9 @@
     R.valuePanel = el("div", { class: "value-panel" }, [el("h3", { class: "ss-step-h value-h" }, [R.valStepN, " ", R.valHead]), R.valueLive, R.pathLegend]);
     R.record = el("button", { type: "button", class: "ss-btn ss-btn-primary ss-btn-big ss-wide", text: "📝 기록하기", disabled: true });
     R.recordMsg = el("p", { class: "ss-help", "aria-live": "polite" });
-    R.valueCard = el("div", { class: "value-card" }, [R.valuePanel, R.record, R.recordMsg]);
+    // 남중할 때 옆에서 본 모습 칸(개정 4 보충): 값 칸 맨 아래 — 크게 보기에서는 값·기록하기가 장면 안 막대로 옮겨 가 조작 칸의 달 고르기 바로 아래
+    R.side = makeSideView();
+    R.valueCard = el("div", { class: "value-card" }, [R.valuePanel, R.record, R.recordMsg, R.side.node]);
     var monthCard = el("div", { class: "ss-card ss-step-card obs-card" }, [
       el("h3", { class: "ss-step-h" }, [el("span", { class: "ss-step-n", text: "①" }), " 관찰할 달 고르기"]),
       R.monthBar,
@@ -361,6 +512,9 @@
       R.valAlt.classList.toggle("is-wait", !showAlt);
       R.valDay.classList.toggle("is-wait", !showDay);
     }
+    // 옆에서 본 모습 칸: 값 패널에 남중 고도가 나타날 때(남중) 그 달 모습, 그 전에는 안내만
+    var sideOn = !!m && (phase === "noon" || phase === "done");
+    R.side.set(sideOn ? m : null, !sideOn && !!m && busy);
     R.record.disabled = busy || !m || phase !== "done" || !seen[m];
     R.btnToggle.disabled = busy || mounting || (viewKind === "2d" && !can3D);
     R.btnPathCurrent.disabled = busy;
@@ -426,6 +580,9 @@
     drawExp();
     setTimeout(function () {
       S.Experiment.scrollIntoView(R.record, { align: "nearest" }); // 기록 버튼이 화면 밖일 때만 조금 내린다
+      // 크게 보기: 조작 칸 안의 '옆에서 본 모습' 칸이 가려 있으면 그 칸 안에서만 최소로 움직여 보이게(세로 화면처럼 조작 칸이 낮을 때 —
+      // 달 버튼은 그대로 보인다). 기본 화면은 예전처럼 페이지를 더 움직이지 않는다(방금 누른 달 버튼이 머리말 밑으로 가려질 수 있어서)
+      if (R.layout.classList.contains("is-full")) S.Experiment.scrollIntoView(R.side.node, { align: "nearest" });
     }, 60);
   }
   function showFF(month) {
@@ -495,7 +652,7 @@
       // 처음 시점(= "처음 방향으로"·두 번 탭): 교과서처럼 남쪽 하늘을 바라본 모습 — 동쪽이 왼쪽, 서쪽이 오른쪽으로 2D와 같다
       // (fix-B1 L5: 예전에는 남서쪽에서 봐서 동쪽이 오른쪽이었다). 북쪽에서 동쪽으로 조금 돌려 위에서 본다 — 정북에서 보면
       // 정남쪽 자오선에 그린 남중 고도 선·호가 옆으로 서서 보이지 않는다.
-      viewDir: [-0.34, 0.5, 0.8],
+      viewDir: VIEW_DIR,
       minDistance: 7,
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -530,23 +687,8 @@
       var domeMat = new T.MeshBasicMaterial({ color: 0x9cc8f0, transparent: true, opacity: 0.08, side: T.DoubleSide, depthWrite: false });
       var dome = new T.Mesh(new T.SphereGeometry(RS, 64, 20, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
       root.add(dome);
-      // 고도 30°·60° 보조선 + 정남쪽 자오선(남 → 머리 위)
+      // 정남쪽 자오선(남 → 머리 위). 고도 30°·60° 가로 보조선(위선)과 그 이름표는 없앴다(spec 개정 4 — 사용자: 필요 없음)
       var guideMat = new T.LineBasicMaterial({ color: 0x7f8ea3, transparent: true, opacity: 0.55 });
-      [30, 60].forEach(function (a) {
-        var pts = [];
-        for (var i = 0; i <= 96; i++) {
-          var az = (i / 96) * Math.PI * 2;
-          pts.push(new T.Vector3(Math.cos(az) * RS * Math.cos(a * RAD), RS * Math.sin(a * RAD), Math.sin(az) * RS * Math.cos(a * RAD)));
-        }
-        root.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), guideMat));
-        // 보조선 이름표도 길(선) 위에 그린다(길이 앞을 지나가도 글자가 보이게)
-        var lb = M.label(a + "°", { height: 0.6, bg: "rgba(255,255,255,0.8)", depthTest: false });
-        lb.renderOrder = 20;
-        // 정남쪽 자오선이 아니라 남동쪽(45°)에 둔다 — 남중할 때의 태양·남중 고도 선과 겹치지 않게
-        var ca = RS * Math.cos(a * RAD) * Math.SQRT1_2;
-        lb.position.set(-ca, RS * Math.sin(a * RAD) + 0.35, -ca);
-        root.add(lb);
-      });
       var mer = [];
       for (var k = 0; k <= 30; k++) {
         var t = (k / 30) * (Math.PI / 2);
@@ -567,42 +709,93 @@
         lb.position.set(d[1], 0.55, d[2]);
         root.add(lb);
       });
-      // 가운데: 태양 고도 측정기(탐구 2와 같은 모양, 받침판 + 막대기) — 이번 차시에서는 소품
-      var dev = new T.Group();
-      var board = new T.Mesh(new T.BoxGeometry(1.5, 0.08, 1.5), M.material(0xe8dcc0, { roughness: 0.8 }));
-      board.position.y = 0.04;
-      var stick = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 1.0, 12), M.material(0x8a5a2b));
-      stick.position.y = 0.58;
-      dev.add(board, stick);
-      var shadowPivot = new T.Group();
-      shadowPivot.position.y = 0.085;
-      var shadow = new T.Mesh(new T.PlaneGeometry(0.1, 1), new T.MeshBasicMaterial({ color: 0x2b3240, transparent: true, opacity: 0.55, depthWrite: false }));
-      shadow.rotation.x = -Math.PI / 2;
-      shadow.position.z = 0.5; // 막대 밑동에서 +z(로컬) 방향으로 뻗는다
-      shadowPivot.add(shadow);
-      shadowPivot.visible = false;
-      dev.add(shadowPivot);
-      root.add(dev);
+      /* ── 가운데: 태양 고도 측정기(받침판 + 막대기, 모형 — 치수는 위 DEV) ──
+       * 남중할 때 교과서의 태양 고도 재는 방법을 그린다(spec 개정 4): 태양 쪽에서 오는 빛줄기가 막대기 끝을 지나 그림자 끝에 닿고,
+       * 그림자 끝에서 그림자(받침판)와 그 빛줄기가 이루는 각(호) = 태양 고도. 해·그림자·빛줄기·호는 모두 같은 태양 방향으로 계산한다
+       * (남중은 noonSun(month) 하나). 태양은 그대로 그 달의 길 위(반지름 RS, 길의 가장 높은 곳)에 있다. */
+      var STICK_TIP = new T.Vector3(0, DEV.tipY, DEV.z);
+      var boardMat = M.material(0xe8dcc0, { roughness: 0.8 });
+      var board = new T.Mesh(new T.BoxGeometry(2 * DEV.halfW, DEV.top, DEV.z1 - DEV.z0), boardMat);
+      board.name = "board";
+      board.position.set(0, DEV.top / 2, (DEV.z0 + DEV.z1) / 2);
+      var stick = new T.Mesh(new T.CylinderGeometry(DEV.r, DEV.r, DEV.stick, 16), M.material(0x8a5a2b));
+      stick.name = "stick";
+      stick.position.set(0, DEV.top + DEV.stick / 2, DEV.z);
+      root.add(board, stick);
+      v.onThemeChange(function (dark) {
+        boardMat.color.set(dark ? 0xcbbf9f : 0xe8dcc0);
+      });
       var devLbl = M.label("태양 고도 측정기", { height: 0.55 });
-      devLbl.position.set(0, 1.6, 0.4);
+      devLbl.position.set(-DEV.halfW - 1.7, 0.45, DEV.z0 - 0.2); // 받침판 남동쪽 — 빛줄기·호와 겹치지 않는 자리
       root.add(devLbl);
+
+      // 막대기 그림자: 태양 반대쪽(수평)으로, 받침판 위 길이 = 막대기 길이 ÷ tan(고도). 판 밖으로 나가는 부분(해 뜰 무렵·질 무렵의
+      // 긴 그림자)은 땅(y ≈ 0) 위에 — 막대기 끝을 지난 빛이 땅에 닿는 곳(끝 높이 ÷ tan(고도))까지, 하늘 반구 안쪽까지만 그린다.
+      var shadowMat = new T.MeshBasicMaterial({ color: 0x2b3240, transparent: true, opacity: 0.55, depthWrite: false });
+      var shadowPivot = new T.Group(); // 막대기 밑동, 로컬 +z = 그림자 방향
+      shadowPivot.position.set(0, 0, DEV.z);
+      function shadowPart(name, y) {
+        var m = new T.Mesh(new T.PlaneGeometry(2 * DEV.r, 1), shadowMat);
+        m.name = name;
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = y;
+        m.renderOrder = 5;
+        shadowPivot.add(m);
+        return m;
+      }
+      var shBoard = shadowPart("shadowBoard", DEV.top + 0.008);
+      var shGround = shadowPart("shadowGround", 0.012);
+      shadowPivot.visible = false;
+      root.add(shadowPivot);
+      function spanShadow(m, from, to) {
+        m.scale.y = Math.max(0.001, to - from);
+        m.position.z = (from + to) / 2;
+      }
+      // 막대기 밑동에서 수평 방향 (ux, uz)로 받침판 가장자리까지 / 하늘 반구 안쪽 경계(원점에서 RS − 0.5)까지의 거리
+      function boardExit(ux, uz) {
+        var t = Infinity;
+        if (ux > 1e-9) t = Math.min(t, DEV.halfW / ux);
+        if (ux < -1e-9) t = Math.min(t, -DEV.halfW / ux);
+        if (uz > 1e-9) t = Math.min(t, (DEV.z1 - DEV.z) / uz);
+        if (uz < -1e-9) t = Math.min(t, (DEV.z0 - DEV.z) / uz);
+        return t;
+      }
+      function domeExit(ux, uz) {
+        var rl = RS - 0.5;
+        var b = DEV.z * uz;
+        return -b + Math.sqrt(Math.max(0, b * b - DEV.z * DEV.z + rl * rl));
+      }
+      // 태양 방향 d(동·위·북)를 장면 좌표의 단위 벡터로(태양 = RS × 이 벡터, placeSun과 같은 식)
+      function dirOf(d) {
+        return P(d, 1);
+      }
+      // 그림자 끝(받침판 윗면 위) = 막대기 끝 − (막대기 길이 ÷ d의 위 성분) × d — 막대기 끝을 지나는 햇빛이 판에 닿는 곳
+      function shadowTip(D) {
+        return STICK_TIP.clone().addScaledVector(D, -DEV.stick / D.y);
+      }
       function setShadow(d) {
         if (!d || d.up <= 0.005) {
           shadowPivot.visible = false;
           return;
         }
-        var alt = Math.asin(clamp(d.up, -1, 1));
-        var len = Math.min(5, 1.0 / Math.tan(alt)); // 그림자 길이 = 막대 길이 ÷ tan(고도)
+        var hl = Math.hypot(d.east, d.north) || 1e-9;
+        var ux = d.east / hl; // 그림자 방향 = 태양 반대쪽(수평): x = +east(동 = −x 이므로), z = −north
+        var uz = -d.north / hl;
+        var tanA = d.up / hl;
+        var sb = DEV.stick / tanA; // 받침판 위 그림자 길이 = 막대기 길이 ÷ tan(고도)
+        var edge = boardExit(ux, uz);
+        var lim = domeExit(ux, uz);
+        shadowPivot.rotation.y = Math.atan2(ux, uz);
         shadowPivot.visible = true;
-        shadow.scale.y = len;
-        shadow.position.z = len / 2;
-        // 그림자는 태양 반대쪽(수평 방향)으로 생긴다
-        var sx = d.east; // 태양 반대 방향의 x = +east (동 = −x 이므로)
-        var sz = -d.north;
-        shadowPivot.rotation.y = Math.atan2(sx, sz);
+        spanShadow(shBoard, 0, Math.min(sb, edge, lim));
+        var sg = Math.min(DEV.tipY / tanA, lim); // 판 밖: 끝 높이 ÷ tan(고도)까지 땅 위에
+        shGround.visible = sb > edge && sg > edge;
+        if (shGround.visible) spanShadow(shGround, edge, sg);
       }
-      // 태양(+빛무리)
-      var sun = new T.Mesh(new T.SphereGeometry(0.5, 24, 16), new T.MeshBasicMaterial({ color: 0xffc93a }));
+      // 태양(+빛무리) — 개정 4에서 원반 0.5 → 0.62, 빛무리 2.4 → 3.6(막대기 끝을 지나는 빛줄기가 빛무리 안에서 나오게)
+      var SUN_R = 0.62;
+      var sun = new T.Mesh(new T.SphereGeometry(SUN_R, 24, 16), new T.MeshBasicMaterial({ color: 0xffc93a }));
+      sun.name = "sun";
       var gc = document.createElement("canvas");
       gc.width = gc.height = 128;
       var g2 = gc.getContext("2d");
@@ -613,19 +806,103 @@
       g2.fillRect(0, 0, 128, 128);
       var glowTex = new T.CanvasTexture(gc);
       var glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false }));
-      glow.scale.set(2.4, 2.4, 1);
+      glow.scale.set(3.6, 3.6, 1);
       sun.add(glow);
       sun.visible = false;
       root.add(sun);
 
+      /* ── 남중 때의 태양 고도 그림(개정 4, 탐구 2 sci-6-2-1-2와 같은 빛줄기·호) ──
+       * 막대기 끝을 지나 그림자 끝에 닿는 빛줄기 하나 + 그림자 끝의 호. 옅은 평행 빛줄기 여러 가닥은 없앴다(개정 4 보충 — 사용자:
+       * "추가 태양 광선 가닥 더 있는 것들은 삭제"). 숫자 이름표는 띄우지 않는다(바뀌는 값은 값 패널에만).
+       * 해가 남중 자리에 있을 때만 보인다(setNoon/hideNoon). */
+      var UP = new T.Vector3(0, 1, 0);
+      function rayTexture(fade) {
+        // 세로 결: 아래(그림자 끝·땅 쪽) 불투명 → 위(태양 쪽) 끝 fade 비율만큼 투명해진다(빛무리 속에서 나오는 것처럼)
+        var c = document.createElement("canvas");
+        c.width = 4;
+        c.height = 128;
+        var x = c.getContext("2d");
+        var gr = x.createLinearGradient(0, 0, 0, 128); // 캔버스 위 = 원기둥 위(태양 쪽)
+        gr.addColorStop(0, "rgba(255,255,255,0)");
+        gr.addColorStop(fade, "rgba(255,255,255,1)");
+        gr.addColorStop(1, "rgba(255,255,255,1)");
+        x.fillStyle = gr;
+        x.fillRect(0, 0, 4, 128);
+        return new T.CanvasTexture(c);
+      }
+      var noonG = new T.Group();
+      noonG.name = "noonPicture";
+      noonG.visible = false;
+      root.add(noonG);
+      var keyRay = new T.Mesh(
+        new T.CylinderGeometry(0.06, 0.06, 1, 10, 1, true),
+        new T.MeshBasicMaterial({ color: 0xff9800, map: rayTexture(0.06), transparent: true, opacity: 0.95, depthWrite: false })
+      );
+      keyRay.name = "keyRay";
+      keyRay.renderOrder = 41;
+      noonG.add(keyRay);
+      // 호: 채움(반투명) + 테두리(굵은 관 — 비스듬히 보아도 선이 보이게). 반지름은 그 달 그림자 길이의 ARC_K배(막대기에 닿지 않게),
+      // 가장 크게 ARC_MAX
+      var ARC_MAX = 2.2;
+      var ARC_K = 0.8;
+      var ARC_TUBE = 0.055;
+      var arcG = new T.Group();
+      arcG.name = "altArc";
+      var arcFillMat = new T.MeshBasicMaterial({ color: 0xd8434f, transparent: true, opacity: 0.5, side: T.DoubleSide, depthWrite: false });
+      var arcLineMat = new T.MeshBasicMaterial({ color: 0xd8434f, transparent: true, opacity: 0.95, depthWrite: false });
+      var arcFill = new T.Mesh(new T.CircleGeometry(1, 8, 0, 0.5), arcFillMat);
+      var arcLine = new T.Mesh(new T.BufferGeometry(), arcLineMat);
+      arcFill.renderOrder = 42; // 빛줄기(41) 위 — 여름의 작은 호가 빛줄기에 덮이지 않게
+      arcLine.renderOrder = 43;
+      arcG.add(arcFill, arcLine);
+      noonG.add(arcG);
+      v.onThemeChange(function (dark) {
+        var c = dark ? 0xff6f79 : 0xd8434f;
+        arcFillMat.color.set(c);
+        arcLineMat.color.set(c);
+      });
+      function stretch(mesh, a, b) {
+        // 높이 1인 원기둥을 a → b로 늘려 놓는다(로컬 +y = b 쪽)
+        var dd = b.clone().sub(a);
+        var len = dd.length() || 0.001;
+        mesh.position.copy(a).addScaledVector(dd, 0.5);
+        mesh.quaternion.setFromUnitVectors(UP, dd.normalize());
+        mesh.scale.set(1, len, 1);
+      }
+      var basis = new T.Matrix4();
+      function setNoon(month) {
+        var D = dirOf(noonSun(month)); // 그 달 남중의 태양 방향 — placeSun·setShadow·'옆에서 본 모습' 칸과 같은 값
+        var sunC = D.clone().multiplyScalar(RS); // 태양 중심(placeSun과 같은 자리)
+        var tip = shadowTip(D); // 그림자 끝(setShadow가 그린 그림자의 끝과 같은 점)
+        // 또렷한 빛줄기: 막대기 끝을 지나는 d와 평행한 직선 위, 태양 중심에 가장 가까운 점(빛무리 안) → 그림자 끝
+        var from = STICK_TIP.clone().addScaledVector(D, sunC.clone().sub(STICK_TIP).dot(D));
+        stretch(keyRay, tip, from);
+        // 호: 그림자 끝에서, 땅(막대기 밑동 쪽) 방향과 빛줄기(태양 쪽) 방향 사이 — 두 방향 모두 D에서 나온다(각 = asin(D.y) = 남중 고도)
+        var hl = Math.hypot(D.x, D.z) || 1e-9;
+        var toSun = new T.Vector3(D.x / hl, 0, D.z / hl); // 그림자 끝 → 막대기 밑동(수평)
+        var a = Math.asin(clamp(D.y, -1, 1));
+        var r = Math.min(ARC_MAX, ARC_K * (DEV.stick / Math.tan(a)));
+        arcFill.geometry.dispose();
+        arcFill.geometry = new T.CircleGeometry(r, 40, 0, a);
+        var arcPts = [];
+        for (var i = 0; i <= 40; i++) arcPts.push(new T.Vector3(r * Math.cos((a * i) / 40), r * Math.sin((a * i) / 40), 0));
+        arcLine.geometry.dispose();
+        arcLine.geometry = new T.TubeGeometry(new T.CatmullRomCurve3(arcPts), 40, ARC_TUBE, 8, false);
+        basis.makeBasis(toSun, UP, toSun.clone().cross(UP));
+        arcG.quaternion.setFromRotationMatrix(basis);
+        arcG.position.set(tip.x, tip.y + 0.01, tip.z);
+        noonG.visible = true;
+      }
+      function hideNoon() {
+        noonG.visible = false;
+      }
+
       var cur = null; // { group, tube, segs }
-      var noonGroup = null;
       var ghostGroup = null;
       function clearCur() {
         if (cur) v.discard(cur.group);
         cur = null;
-        if (noonGroup) v.discard(noonGroup);
-        noonGroup = null;
+        hideNoon();
       }
       function makeCur(month) {
         clearCur();
@@ -644,26 +921,6 @@
         if (!cur) return;
         var k = Math.round(clamp(frac, 0, 1) * cur.segs);
         cur.tube.geometry.setDrawRange(0, k * 6 * 6);
-      }
-      function makeNoon(month) {
-        if (noonGroup) v.discard(noonGroup);
-        var g = geo(month);
-        var a = g.alt * RAD;
-        var grp = new T.Group();
-        var orange = new T.MeshBasicMaterial({ color: 0xe0802b });
-        var gray = new T.MeshBasicMaterial({ color: 0x5b6676 });
-        grp.add(tube([new T.Vector3(0, 0.1, 0), new T.Vector3(0, RS * Math.sin(a), -RS * Math.cos(a))], 0.03, orange, 4));
-        grp.add(tube([new T.Vector3(0, 0.1, 0), new T.Vector3(0, 0.1, -RS)], 0.03, gray, 4));
-        var arc = [];
-        var ar = 2.6;
-        for (var i = 0; i <= 24; i++) {
-          var th = (a * i) / 24;
-          arc.push(new T.Vector3(0, 0.1 + ar * Math.sin(th), -ar * Math.cos(th)));
-        }
-        grp.add(tube(arc, 0.045, orange, 24));
-        // 남중 고도 숫자는 3D 이름표로 띄우지 않는다(fix-B1 L4 — 바뀌는 값은 값 패널에만, CLAUDE.md "장면 속 글자")
-        root.add(grp);
-        noonGroup = grp;
       }
       // 궤적 보기(compare3): 대표 3개(봄·가을=3월·여름=6월·겨울=12월)를 기록 여부와 무관하게 그린다.
       // 이름표는 3D 안에 띄우지 않는다(개수가 늘면 서로 겹치던 문제, audit.md) — 색·이름은 값 패널 옆 범례(R.pathLegend)로.
@@ -710,6 +967,20 @@
         setShadow(d);
         setDay(d);
       }
+      // 3D 캔버스 설명(화면 읽기 프로그램용) — 값은 값 패널에 있으므로 숫자는 넣지 않는다
+      var canvasEl = v.renderer && v.renderer.domElement;
+      function setAria(month) {
+        if (!canvasEl) return;
+        canvasEl.setAttribute(
+          "aria-label",
+          month
+            ? "3D 하늘 모형: " +
+                month +
+                "월 21일 태양의 하루 길. 태양이 남중할 때 햇빛이 태양 고도 측정기의 막대기 끝을 지나 그림자 끝에 닿고, 그림자 끝에서 그림자와 빛줄기가 이루는 각을 호로 나타냈어요. 드래그하면 돌려 볼 수 있어요."
+            : "3D 하늘 모형: 가운데에 태양 고도 측정기가 있어요. 달을 고르면 태양의 하루 길이 나타나요. 드래그하면 돌려 볼 수 있어요."
+        );
+      }
+      setAria(null);
 
       var disposed = false;
       return {
@@ -727,29 +998,34 @@
             placeSun(d);
             reveal((H + g.H0) / (2 * g.H0));
           }
+          setAria(month);
           at(Hs);
           await v.tween(half, function (e, lin) {
             at(Hs + (0 - Hs) * lin);
           });
           if (disposed) return;
-          makeNoon(month);
+          setNoon(month); // 남중: 태양 고도 그림이 나타난다
           if (onNoon) onNoon();
           await v.wait(200);
+          // 오후에는 해가 남중 자리를 떠나 그림자가 돌아가므로 남중 그림(빛줄기·호)은 잠시 숨긴다(그림자 끝과 어긋나지 않게)
+          hideNoon();
           await v.tween(half, function (e, lin) {
             at(He * lin);
           });
           if (disposed) return;
-          // 끝: 남중 순간의 모습으로 멈춰 둔다(길 전체 + 남중 고도 표시)
-          placeSun(sunDir(g.dec, 0));
+          // 끝: 남중 순간의 모습으로 멈춰 둔다(길 전체 + 태양 고도 그림)
+          placeSun(noonSun(month));
           reveal(1);
+          setNoon(month);
           v.render();
         },
         show: function (month, ghosts) {
           setGhosts(ghosts, month);
           makeCur(month);
           reveal(1);
-          makeNoon(month);
-          placeSun(sunDir(geo(month).dec, 0));
+          placeSun(noonSun(month));
+          setNoon(month);
+          setAria(month);
           v.render();
         },
         setGhosts: setGhosts,
@@ -787,11 +1063,11 @@
     var sky = svg("rect", { x: 0, y: 0, width: W, height: HOR, rx: 10, fill: "#2c3a55" });
     s.appendChild(sky);
     s.appendChild(svg("rect", { x: 0, y: HOR, width: W, height: H - HOR, class: "sky2d-ground" }));
-    [30, 60].forEach(function (a) {
-      s.appendChild(svg("line", { x1: L, x2: Rr, y1: Y(a), y2: Y(a), class: "sky2d-grid" }));
+    // 고도 눈금: 가로 격자선(30°·60°)은 없앴다(spec 개정 4 — 3D의 위선 삭제와 같게). 왼쪽 눈금 숫자는 짧은 눈금과 함께 남겨 높이를 읽게 한다
+    [30, 60, 90].forEach(function (a) {
+      s.appendChild(svg("line", { x1: L - 3, x2: L + 9, y1: Y(a), y2: Y(a), class: "sky2d-tickmark" }));
       s.appendChild(svg("text", { x: L - 6, y: Y(a) + 5, "text-anchor": "end", class: "sky2d-tick" }, a + "°"));
     });
-    s.appendChild(svg("text", { x: L - 6, y: Y(90) + 12, "text-anchor": "end", class: "sky2d-tick" }, "90°"));
     s.appendChild(svg("line", { x1: X(180), x2: X(180), y1: HOR, y2: TOP, class: "sky2d-grid" }));
     s.appendChild(svg("line", { x1: 0, x2: W, y1: HOR, y2: HOR, class: "sky2d-horizon" }));
     [
@@ -933,14 +1209,14 @@
           at(He * t);
         });
         if (disposed) return;
-        placeSun(sunDir(g.dec, 0));
+        placeSun(noonSun(month));
         reveal(1);
       },
       show: function (month, ghosts) {
         prep(month, ghosts);
         reveal(1);
         drawNoon(month);
-        placeSun(sunDir(geo(month).dec, 0));
+        placeSun(noonSun(month));
       },
       setGhosts: setGhosts,
       resetView: function () {},
