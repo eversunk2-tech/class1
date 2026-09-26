@@ -127,9 +127,10 @@ export default function Home() {
           <ScienceAppStatus />
         </DashboardSection>
 
-        {/* 선생님 글: 관리자 화면에서 쓴 글 — 제목만 보이고 누르면 본문이 펼쳐진다(왼쪽 메뉴·"더 보기" 페이지 없음) */}
+        {/* 선생님 글: 관리자 화면에서 쓴 글 — 제목만 보이고 누르면 본문이 펼쳐진다(왼쪽 메뉴·"더 보기" 페이지 없음).
+            좌우 반씩일 때는 왼쪽 '최근 과학 수업' 칸의 내용 높이를 넘지 않게 쪽을 나눈다(좁으면 5개씩, 2026-09-26 사용자 요청). */}
         <DashboardSection id="teacher-posts-heading" title="선생님 글" image="newspaper" color="home">
-          <TeacherPosts />
+          <TeacherPosts besideHeadingId="science-heading" />
         </DashboardSection>
       </div>
 
