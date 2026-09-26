@@ -95,9 +95,9 @@
 --   begin
 --     select count(*) into a_all from public.assignments;
 --     select count(*) into p_all from public.posts;
---     update public.assignments set title = title where true;
+--     update public.assignments set title = title where current_user = 'authenticated';
 --     get diagnostics a_upd = row_count;
---     update public.posts set title = title where true;
+--     update public.posts set title = title where current_user = 'authenticated';
 --     get diagnostics p_upd = row_count;
 --     raise exception '% 총괄이 고칠 수 있는 과제 %/%개 · 글 %/%개(앞뒤가 같으면 정상, 총괄=%) — 시험이라 일부러 오류로 끝냅니다(아무것도 바뀌지 않음).',
 --       case when a_upd = a_all and p_upd = p_all and public.is_super_admin() then '✔' else '✖' end,
@@ -105,6 +105,7 @@
 --   end $$;
 --
 --   -- 6) 다른 교사 흉내(두 번째 교사가 생긴 뒤) — 남의 과제 · 글은 고치기 · 지우기 모두 0행, 내 것은 모두 고칠 수 있어야 한다
+--   ※ 5)·6)의 update·delete 줄에는 `current_user = 'authenticated'` 조건이 있어, 그 줄만 골라 실행해도(관리자 권한) 아무 행도 바뀌지 않는다(Review owner-only L1).
 --   set local role authenticated;
 --   select set_config('request.jwt.claims', '{"sub":"<총괄이 아닌 교사 id>","role":"authenticated"}', true);
 --   do $$
@@ -113,16 +114,16 @@
 --     if not public.is_admin() or public.is_super_admin() then
 --       raise exception '✖ 흉내 낸 계정이 "총괄이 아닌 교사"가 아닙니다 — id 를 확인해 주세요(아무것도 바뀌지 않음).';
 --     end if;
---     update public.assignments set title = title where created_by is distinct from auth.uid();
+--     update public.assignments set title = title where created_by is distinct from auth.uid() and current_user = 'authenticated';
 --     get diagnostics a_upd = row_count;
---     delete from public.assignments where created_by is distinct from auth.uid();
+--     delete from public.assignments where created_by is distinct from auth.uid() and current_user = 'authenticated';
 --     get diagnostics a_del = row_count;
---     update public.posts set title = title where author_id is distinct from auth.uid();
+--     update public.posts set title = title where author_id is distinct from auth.uid() and current_user = 'authenticated';
 --     get diagnostics p_upd = row_count;
---     delete from public.posts where author_id is distinct from auth.uid();
+--     delete from public.posts where author_id is distinct from auth.uid() and current_user = 'authenticated';
 --     get diagnostics p_del = row_count;
 --     select count(*) into mine from public.assignments where created_by = auth.uid();
---     update public.assignments set title = title where created_by = auth.uid();
+--     update public.assignments set title = title where created_by = auth.uid() and current_user = 'authenticated';
 --     get diagnostics mine_upd = row_count;
 --     raise exception '% 남의 과제 수정 %행 · 삭제 %행, 남의 글 수정 %행 · 삭제 %행(모두 0이면 정상) / 내 과제 고치기 %/%개 — 시험이라 일부러 오류로 끝냅니다(아무것도 바뀌지 않음).',
 --       case when a_upd + a_del + p_upd + p_del = 0 and mine_upd = mine then '✔' else '✖' end,
