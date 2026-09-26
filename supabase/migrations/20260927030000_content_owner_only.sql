@@ -131,6 +131,7 @@
 --   end $$;
 --
 -- ▶ 되돌리기(비상용 — 이 파일 이전 상태 = 교사 누구나 모든 과제 · 글을 고치고 지움). 아래 블록의 "-- "를 지우고 통째로 Run.
+--   ⚠ ⑥(20260927040000_class_assignments.sql)을 이미 적용했다면 **⑥의 되돌리기를 먼저** 실행한 뒤 이 되돌리기를 한다(Review class-assignments L4).
 --   옛 정의는 20260921020000_admin_learning.sql(244~249행) · 20260921000000_init_blog.sql(117~128행)을 글자 그대로 옮겼다.
 --   표 권한은 Supabase 기본값(표 전체 UPDATE — 이 파일 전과 같음)으로. 되돌린 뒤 다시 좁히려면 이 파일 전체를 다시 Run.
 --   drop policy if exists "assignments: 교사 본인 이름으로 작성" on public.assignments;
