@@ -164,7 +164,8 @@ export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: Co
   );
 }
 
-function CommunityPostCard({ post }: { post: CommunityPostSummary }) {
+/** 자유게시판·학습게임 글 카드(목록·검색 결과 공용) */
+export function CommunityPostCard({ post }: { post: CommunityPostSummary }) {
   const comments = embeddedCount(post.community_comments);
   const likes = embeddedCount(post.community_likes);
   const isGame = post.kind === "game";

@@ -114,21 +114,24 @@ export default function Home() {
         <StatTiles />
       </section>
 
-      <DashboardSection
-        id="science-heading"
-        title="최근 과학 수업"
-        image="test-tube"
-        color="science"
-        moreHref="/science/"
-        moreLabel="과학 수업 더 보기"
-      >
-        <ScienceAppStatus />
-      </DashboardSection>
+      {/* 최근 과학 수업 | 선생님 글 — 자유게시판·학습게임처럼 좌우 반씩(넓은 화면, 2026-09-26 사용자 요청), 좁으면 위아래 */}
+      <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-2">
+        <DashboardSection
+          id="science-heading"
+          title="최근 과학 수업"
+          image="test-tube"
+          color="science"
+          moreHref="/science/"
+          moreLabel="과학 수업 더 보기"
+        >
+          <ScienceAppStatus />
+        </DashboardSection>
 
-      {/* 선생님 글: 관리자 화면에서 쓴 글 — 제목만 보이고 누르면 본문이 펼쳐진다(왼쪽 메뉴·"더 보기" 페이지 없음) */}
-      <DashboardSection id="teacher-posts-heading" title="선생님 글" image="newspaper" color="home">
-        <TeacherPosts />
-      </DashboardSection>
+        {/* 선생님 글: 관리자 화면에서 쓴 글 — 제목만 보이고 누르면 본문이 펼쳐진다(왼쪽 메뉴·"더 보기" 페이지 없음) */}
+        <DashboardSection id="teacher-posts-heading" title="선생님 글" image="newspaper" color="home">
+          <TeacherPosts />
+        </DashboardSection>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-2">
         <DashboardSection
