@@ -4,9 +4,10 @@
  *   ① 실험하기 화면(앱 전용): 달 바(3월 → 2월, 계절별 묶음) · 값 패널 · 3D/2D 하늘 모형 · 궤적 보기(이번 달만·계절 대표 3개)
  *   ② 분석 표·꺾은선그래프 2개(남중 고도, 낮의 길이), 보기 고르기 2개, 결론 1개, 궁금한 점 한 줄(선택)   을 만든다.
  *
- * spec "개정 1": 12달 모두 측정. 달을 누르면 그 달 21일 태양의 하루 길을 약 1.2초 빨리 감기(모형)로 보여 주고,
- *   fix-1: 기록하기를 누르면 아직 기록하지 않은 다음 달을 자동으로 골라 재생한다(한 달 = 재생 → 기록 한 번). 다른 달은 언제든 직접 고를 수 있다.
- *   태양이 남중할 때 남중 고도, 질 때 낮의 길이가 값 패널에 나타난다 → '📝 기록하기'. 학생은 값을 타이핑하지 않는다.
+ * spec "개정 1": 12달 모두 측정. 달을 누르면 그 달 21일 태양이 해 뜰 때부터 해 질 때까지 하루 길을 따라 움직인다(약 1.2초 빨리 감기, 모형).
+ *   spec 개정 5: 움직이는 동안에는 태양만 움직이고, 움직임이 끝나면 태양이 남중 자리에 나타나 그때 한 번만 빛줄기·호·옆에서 본 모습·
+ *   값(남중 고도·낮의 길이)이 나타난다 → '📝 기록하기'는 기록만 한다(fix-1의 다음 달 자동 재생은 없앴다 — 다음 달은 학생이 직접 누른다).
+ *   학생은 값을 타이핑하지 않는다.
  *   공통 틀의 Experiment(조건 고르기 → 실행 → 관찰 카드 → 확인 → 기록)는 이 흐름과 맞지 않아 쓰지 않고,
  *   같은 CSS 틀(.ss-exp-layout 등)과 Sim3D·RecordStore만 쓴다(공통 틀은 고치지 않음).
  *
@@ -94,20 +95,23 @@
     return NOON[month] || (NOON[month] = sunDir(geo(month).dec, 0));
   }
 
-  /* 태양 고도 측정기(받침판 + 막대기, 모형) 치수 — 3D와 '옆에서 본 모습' 칸이 같이 쓴다(spec 개정 4, 하늘 반구 반지름 RS = 8 기준).
-   *  - 막대기 DEV.stick: 예전(1)에는 처음 시점에서 여름 그림자(막대기 길이의 약 1/4)와 호가 몇 px뿐이라 3배로 키웠다.
-   *  - 받침판: 12달 남중 그림자가 모두 판 위에 오게 남북으로 길게, 막대기는 판의 남쪽 끝 가까이(남중 그림자는 북쪽으로 생긴다).
+  /* 태양 고도 측정기(받침판 + 막대기, 모형) 치수 — 3D와 '옆에서 본 모습' 칸이 같이 쓴다(하늘 반구 반지름 RS = 8 기준).
    *  - 햇빛은 평행하다 → 막대기 끝을 지나는 빛줄기는 태양 방향과 평행하다. 하늘 반구의 중심(원점)이 막대기 끝이 아니므로 그 빛줄기는
-   *    모형 속 태양 중심에서 |끝 높이 × cos(고도) + 막대기 z × sin(고도)|만큼 비껴간다. 막대기를 정남쪽으로 옮겨 가장 낮은·가장 높은
-   *    남중 고도에서 이 거리가 같아지게 해(DEV.z = −끝 높이 ÷ tan(두 고도의 가운데)) 12달 중 가장 큰 값을 줄였다(지금 치수로 원점에
-   *    둘 때 2.67 → 1.52, 3·9월은 0.02 이하). 태양 원반·빛무리를 조금 키워 빛줄기가 빛무리 안에서 나오게 했다(build3D). */
+   *    모형 속 태양 중심에서 |끝 높이 × cos(고도) + 막대기 z × sin(고도)|만큼 비껴간다(끝 높이에 비례). 막대기를 정남쪽으로 옮겨 가장
+   *    낮은·가장 높은 남중 고도에서 이 거리가 같아지게 하고(DEV.z = −끝 높이 ÷ tan(두 고도의 가운데)), 개정 5에서 막대기를 다시 작게
+   *    해(3.0 → 0.75, 각은 '옆에서 본 모습' 칸이 크게 보여 준다) 12달 모두 빛줄기가 태양 원반(반지름 SUN_R)의 가운데 쪽을 지나게 했다
+   *    (가장 크게 비껴가는 6·12월 0.40 = 원반 반지름의 절반 아래, 3·9월 0.01 이하).
+   *  - 받침판: 12달 남중 그림자가 모두 판 위에 오게 남북으로 길게, 막대기는 판의 남쪽 끝 가까이(남중 그림자는 북쪽으로 생긴다).
+   *    남북 여유는 막대기 길이에 비례(옆 그림 칸의 받침판도 같은 비율). */
   var DEV = (function () {
     var alts = MONTHS.map(function (m) {
       return m.altitude;
     });
     var lo = Math.min.apply(null, alts);
     var hi = Math.max.apply(null, alts);
-    var d = { stick: 3.0, r: 0.08, top: 0.05, halfW: 1.25, marginS: 0.55, marginN: 0.6 };
+    var d = { stick: 0.75, r: 0.045, top: 0.04, halfW: 0.5 };
+    d.marginS = 0.18 * d.stick; // 막대기 남쪽 여유
+    d.marginN = 0.2 * d.stick; // 가장 긴 남중 그림자 끝 너머 여유
     d.tipY = d.top + d.stick; // 막대기 끝의 높이(땅 = 0)
     d.z = -d.tipY / Math.tan(((lo + hi) / 2) * RAD); // 막대기 자리(정남쪽이 −z)
     d.z0 = d.z - d.marginS; // 받침판 남쪽 끝
@@ -197,10 +201,10 @@
    *  - 자리: 값 칸 맨 아래(기록하기 아래) — 기본 화면은 오른쪽(좁은 화면은 아래) 패널, 크게 보기는 값·기록하기가 장면 안 막대로
    *    옮겨 가므로 조작 칸 안(달 고르기 바로 아래). 장면·버튼을 가리지 않고, 3D·2D 어느 쪽으로 보든 보인다.
    *  - 달을 고르기 전·태양이 남중하기 전에는 안내 글만(값 패널과 같은 때에 나타난다). */
-  // 칸 좌표(viewBox 200×130): 땅 GY, 막대기 밑동 SX, 1(모형 단위) = K. 여름(75.5°) 태양이 위로, 겨울(29.0°) 태양이 왼쪽으로, 겨울 그림자·받침판이
-  // 오른쪽으로 칸 안에 들어오는 가장 큰 K(여름 그림자·호가 되도록 크게). 태양은 막대기 끝에서 빛줄기를 따라 SUN_S만큼 떨어진 곳
-  // (실제로는 아주 멀다 — 방향만 맞춘다).
-  var SV = { W: 200, H: 130, GY: 110, SX: 30, K: 26.5, SUN_S: 0.8, SUN_R: 6, ARC_MAX: 32, ARC_K: 0.76 };
+  // 칸 좌표(viewBox 200×130): 땅 GY, 막대기 밑동 SX, 막대기 높이 STICK(칸 좌표) — 길이는 막대기 높이에 비례해 그린다(3D와 같은 비율,
+  // 3D 측정기 크기와는 따로). 여름(75.5°) 태양이 위로, 겨울(29.0°) 태양이 왼쪽으로, 겨울 그림자·받침판이 오른쪽으로 칸 안에 들어오는
+  // 가장 큰 크기(여름 그림자·호가 되도록 크게). 태양은 막대기 끝에서 빛줄기를 따라 SUN_D만큼 떨어진 곳(실제로는 아주 멀다 — 방향만 맞춘다).
+  var SV = { W: 200, H: 130, GY: 110, SX: 30, STICK: 79.5, STICK_W: 4.2, SUN_D: 21.2, SUN_R: 6.5, ARC_MAX: 32, ARC_K: 0.76, ARROW_AT: 0.42 };
   // 처음 시점 카메라의 화면 오른쪽 방향(장면 x·z): 앞(카메라 → 가운데)의 수평 성분 f에 대해 오른쪽 = f × 위 = (−f.z, 0, f.x)
   var VIEW_RIGHT = (function () {
     var fx = -VIEW_DIR[0];
@@ -210,22 +214,44 @@
   })();
   function makeSideView() {
     var LABEL = "태양이 남중할 때 막대기와 그림자를 옆에서 본 모습(모형)";
+    var KS = SV.STICK / DEV.stick; // 모형 1 → 칸 좌표
     var g = svg("svg", { viewBox: "0 0 " + SV.W + " " + SV.H, class: "sv-svg", "aria-hidden": "true", focusable: "false" });
+    // 빛줄기 결(태양 쪽 옅은 노랑 → 땅 쪽 주황), 해 빛무리, 빛이 나아가는 쪽 화살촉 — 3D 빛줄기와 같은 느낌(개정 5)
+    var defs = svg("defs", {});
+    var rayGrad = svg("linearGradient", { id: "sci6213-sv-raygrad", gradientUnits: "userSpaceOnUse" });
+    rayGrad.appendChild(svg("stop", { offset: "0", "stop-color": "#ffe27a" }));
+    rayGrad.appendChild(svg("stop", { offset: "1", "stop-color": "#ff8f00" }));
+    // 빛 번짐: 태양 쪽은 밝고 그림자 끝 쪽에서 사라진다(그림자 끝의 호를 가리지 않게)
+    var glowGrad = svg("linearGradient", { id: "sci6213-sv-glowgrad", gradientUnits: "userSpaceOnUse" });
+    glowGrad.appendChild(svg("stop", { offset: "0", "stop-color": "#ffd54f", "stop-opacity": "0.6" }));
+    glowGrad.appendChild(svg("stop", { offset: "0.72", "stop-color": "#ffd54f", "stop-opacity": "0.45" }));
+    glowGrad.appendChild(svg("stop", { offset: "0.95", "stop-color": "#ffd54f", "stop-opacity": "0" }));
+    var sunGlow = svg("radialGradient", { id: "sci6213-sv-sunglow" });
+    sunGlow.appendChild(svg("stop", { offset: "0", "stop-color": "#ffd54f", "stop-opacity": "0.85" }));
+    sunGlow.appendChild(svg("stop", { offset: "1", "stop-color": "#ffd54f", "stop-opacity": "0" }));
+    defs.appendChild(rayGrad);
+    defs.appendChild(glowGrad);
+    defs.appendChild(sunGlow);
+    g.appendChild(defs);
     g.appendChild(svg("rect", { x: 0, y: 0, width: SV.W, height: SV.GY, class: "sv-sky" }));
     g.appendChild(svg("rect", { x: 0, y: SV.GY, width: SV.W, height: SV.H - SV.GY, class: "sv-earth" }));
     var dyn = svg("g", {}); // 달이 정해졌을 때만 보이는 것
     var board = svg("rect", { y: SV.GY, height: 3.5, class: "sv-board" });
     var shadow = svg("rect", { y: SV.GY - 1.5, height: 4.5, class: "sv-shadow" });
-    var stick = svg("rect", { x: SV.SX - DEV.r * SV.K, y: SV.GY - DEV.stick * SV.K, width: 2 * DEV.r * SV.K, height: DEV.stick * SV.K, class: "sv-stick" });
+    var stick = svg("rect", { x: SV.SX - SV.STICK_W / 2, y: SV.GY - SV.STICK, width: SV.STICK_W, height: SV.STICK, class: "sv-stick" });
     var arc = svg("path", { class: "sv-arc" });
-    var ray = svg("line", { class: "sv-ray" });
+    var sunHalo = svg("circle", { r: SV.SUN_R * 2.3, fill: "url(#sci6213-sv-sunglow)", class: "sv-sunhalo" });
+    // 빛줄기 = 빛 번짐(넓고 옅게) + 빛나는 심(결 색) + 화살촉(막대기 끝과 그림자 끝 사이, 빛이 나아가는 쪽) — 태양 → 막대기 끝 → 그림자 끝
+    var rayGlow = svg("line", { class: "sv-ray-glow", stroke: "url(#sci6213-sv-glowgrad)" });
+    var rayCore = svg("line", { class: "sv-ray", stroke: "url(#sci6213-sv-raygrad)" });
+    var arrowP = svg("path", { d: "M -4.5 -3.8 L 4.5 0 L -4.5 3.8 Z", class: "sv-arrow" });
     var sun = svg("circle", { r: SV.SUN_R, class: "sv-sun" });
     var lbl = svg("text", { y: SV.GY + 15, "text-anchor": "middle", class: "sv-lbl" }, "태양 고도");
     dyn.appendChild(board);
     g.appendChild(dyn);
     g.appendChild(svg("line", { x1: 0, x2: SV.W, y1: SV.GY, y2: SV.GY, class: "sv-ground" }));
     var dyn2 = svg("g", {});
-    [shadow, stick, arc, ray, sun, lbl].forEach(function (x) {
+    [shadow, stick, sunHalo, rayGlow, rayCore, arrowP, arc, sun, lbl].forEach(function (x) {
       dyn2.appendChild(x);
     });
     g.appendChild(dyn2);
@@ -240,18 +266,21 @@
       return x.toFixed(2);
     }
     var last = null;
+    var growTimer = 0;
     return {
       node: node,
-      // month: 그릴 달(없으면 안내만), wait: 달은 골랐고 태양이 남중하기 전
-      set: function (month, wait) {
+      // month: 그릴 달(없으면 안내만), wait: 달은 골랐고 태양이 움직이는 중, grow: 이번에 나타날 때 빛줄기가 태양에서 뻗어 나가게(재생 직후 한 번)
+      set: function (month, wait, grow) {
         var key = month ? "m" + month : wait ? "wait" : "none";
         if (key === last) return;
         last = key;
+        clearTimeout(growTimer);
+        node.classList.remove("is-grow");
         if (!month) {
           dyn.style.display = "none";
           dyn2.style.display = "none";
           guide.style.display = "";
-          guide.textContent = wait ? "태양이 남중하면 나타나요…" : "달을 고르면 나타나요";
+          guide.textContent = wait ? "움직임이 끝나면 나타나요…" : "달을 고르면 나타나요";
           dirL.textContent = "남";
           dirR.textContent = "북";
           node.setAttribute("aria-label", LABEL + ": " + guide.textContent);
@@ -263,25 +292,40 @@
         if (!(s > 0) || !(hl > 0)) return;
         // 그림자가 뻗는 쪽: 태양이 처음 시점 화면의 왼쪽이면 오른쪽(+1) — 탐구 2와 같은 약속(장면 x = −동, z = 북)
         var sg = -d.east * VIEW_RIGHT.x + d.north * VIEW_RIGHT.z > 0 ? -1 : 1;
-        var top = SV.GY - DEV.stick * SV.K; // 막대기 끝(칸 좌표)
+        var top = SV.GY - SV.STICK; // 막대기 끝(칸 좌표)
         var L = (DEV.stick * hl) / s; // 그림자 길이(모형 단위) = 3D의 |막대기 밑동 → 그림자 끝|
-        var tx = SV.SX + sg * L * SV.K; // 그림자 끝
-        var sx = SV.SX - sg * SV.SUN_S * SV.K * hl; // 태양: 막대기 끝에서 태양 쪽으로(태양 → 막대기 끝 → 그림자 끝이 한 직선)
-        var sy = top - SV.SUN_S * SV.K * s;
-        var b0 = SV.SX - sg * DEV.marginS * SV.K; // 받침판(태양 쪽 끝 ~ 반대쪽 끝) — 3D 받침판과 같은 비율
-        var b1 = SV.SX + sg * (DEV.z1 - DEV.z) * SV.K;
+        var tx = SV.SX + sg * L * KS; // 그림자 끝
+        var sx = SV.SX - sg * SV.SUN_D * hl; // 태양: 막대기 끝에서 태양 쪽으로(태양 → 막대기 끝 → 그림자 끝이 한 직선)
+        var sy = top - SV.SUN_D * s;
+        var b0 = SV.SX - sg * DEV.marginS * KS; // 받침판(태양 쪽 끝 ~ 반대쪽 끝) — 3D 받침판과 같은 비율
+        var b1 = SV.SX + sg * (DEV.z1 - DEV.z) * KS;
         board.setAttribute("x", p2(Math.min(b0, b1)));
         board.setAttribute("width", p2(Math.abs(b1 - b0)));
         shadow.setAttribute("x", p2(Math.min(SV.SX, tx)));
         shadow.setAttribute("width", p2(Math.abs(tx - SV.SX)));
-        ray.setAttribute("x1", p2(sx));
-        ray.setAttribute("y1", p2(sy));
-        ray.setAttribute("x2", p2(tx));
-        ray.setAttribute("y2", String(SV.GY));
+        // 빛줄기: 태양 → 막대기 끝 → 그림자 끝(한 직선). 화살촉은 막대기 끝과 그림자 끝 사이 ARROW_AT, 그림자 끝 쪽을 가리킨다
+        [rayGlow, rayCore].forEach(function (ln) {
+          ln.setAttribute("x1", p2(sx));
+          ln.setAttribute("y1", p2(sy));
+          ln.setAttribute("x2", p2(tx));
+          ln.setAttribute("y2", String(SV.GY));
+        });
+        var ax = SV.SX + (tx - SV.SX) * SV.ARROW_AT;
+        var ay = top + (SV.GY - top) * SV.ARROW_AT;
+        arrowP.setAttribute("transform", "translate(" + p2(ax) + " " + p2(ay) + ") rotate(" + p2((Math.atan2(SV.GY - sy, tx - sx) * 180) / Math.PI) + ")");
+        node.style.setProperty("--sv-len", p2(Math.hypot(tx - sx, SV.GY - sy))); // 뻗어 나가는 연출의 길이(CSS)
+        [rayGrad, glowGrad].forEach(function (gr) {
+          gr.setAttribute("x1", p2(sx));
+          gr.setAttribute("y1", p2(sy));
+          gr.setAttribute("x2", p2(tx));
+          gr.setAttribute("y2", String(SV.GY));
+        });
         sun.setAttribute("cx", p2(sx));
         sun.setAttribute("cy", p2(sy));
+        sunHalo.setAttribute("cx", p2(sx));
+        sunHalo.setAttribute("cy", p2(sy));
         // 호: 그림자 끝에서 땅(막대기 쪽)과 빛줄기 사이 — 반지름은 그림자 길이의 ARC_K배(막대기에 닿지 않게), 가장 크게 ARC_MAX
-        var r = Math.min(SV.ARC_MAX, SV.ARC_K * L * SV.K);
+        var r = Math.min(SV.ARC_MAX, SV.ARC_K * L * KS);
         arc.setAttribute(
           "d",
           "M " + p2(tx) + " " + SV.GY + " L " + p2(tx - sg * r) + " " + SV.GY + " A " + p2(r) + " " + p2(r) + " 0 0 " + (sg > 0 ? 1 : 0) + " " + p2(tx - sg * r * hl) + " " + p2(SV.GY - r * s) + " Z"
@@ -292,6 +336,15 @@
         dyn.style.display = "";
         dyn2.style.display = "";
         guide.style.display = "none";
+        // 재생 직후 한 번: 빛줄기가 태양에서 그림자 끝까지 뻗어 나간 뒤 호·화살촉이 나타난다(CSS, 움직임 줄이기면 바로)
+        if (grow) {
+          void node.offsetWidth; // 애니메이션을 처음부터 다시
+          node.classList.add("is-grow");
+          // 다 나타난 뒤에는 표시를 거둔다 — 다른 단계에 갔다가 돌아올 때(숨김 → 보임) 연출이 다시 돌지 않게(Review fix-3 L1)
+          growTimer = setTimeout(function () {
+            node.classList.remove("is-grow");
+          }, 1000);
+        }
         node.setAttribute(
           "aria-label",
           month +
@@ -452,7 +505,7 @@
   /* ── 실험 화면 상태 그리기 ── */
   var busy = false;
   var shownMonth = null; // 하늘 모형에 지금 그려져 있는 달
-  var phase = "idle"; // 값 패널: idle | noon(고도만) | done
+  var phase = "idle"; // 값 패널: idle(움직이는 중·아직 안 봄) | done(움직임이 끝나 남중 모습과 값이 나타남)
   function nextTodo(after) {
     var order = MONTHS.map(function (m) {
       return m.month;
@@ -505,16 +558,17 @@
       var d = BY[m];
       R.valHead.textContent = monthTitle(m);
       R.valueCard.style.setProperty("--season", seasonOf(m).color);
-      var showAlt = phase === "noon" || phase === "done";
-      var showDay = phase === "done";
-      R.valAlt.textContent = showAlt ? f1(d.altitude) + "°" : busy ? "태양이 남중하면 나타나요…" : "—";
-      R.valDay.textContent = showDay ? dayLabel(d.dayMinutes) : busy ? "해가 지면 나타나요…" : "—";
-      R.valAlt.classList.toggle("is-wait", !showAlt);
-      R.valDay.classList.toggle("is-wait", !showDay);
+      // 두 값은 태양의 움직임이 끝난 뒤 한 번에 나타난다(개정 5 — 움직이는 동안에는 나타나지 않는다)
+      var shown = phase === "done";
+      R.valAlt.textContent = shown ? f1(d.altitude) + "°" : busy ? "움직임이 끝나면 나타나요…" : "—";
+      R.valDay.textContent = shown ? dayLabel(d.dayMinutes) : busy ? "움직임이 끝나면 나타나요…" : "—";
+      R.valAlt.classList.toggle("is-wait", !shown);
+      R.valDay.classList.toggle("is-wait", !shown);
     }
-    // 옆에서 본 모습 칸: 값 패널에 남중 고도가 나타날 때(남중) 그 달 모습, 그 전에는 안내만
-    var sideOn = !!m && (phase === "noon" || phase === "done");
-    R.side.set(sideOn ? m : null, !sideOn && !!m && busy);
+    // 옆에서 본 모습 칸: 값과 같은 때(움직임이 끝난 뒤)에 그 달 모습, 그 전에는 안내만. 재생 직후 한 번은 빛줄기가 태양에서 뻗어 나간다
+    var sideOn = !!m && phase === "done";
+    R.side.set(sideOn ? m : null, !sideOn && !!m && busy, sideOn && sideGrow);
+    sideGrow = false;
     R.record.disabled = busy || !m || phase !== "done" || !seen[m];
     R.btnToggle.disabled = busy || mounting || (viewKind === "2d" && !can3D);
     R.btnPathCurrent.disabled = busy;
@@ -524,8 +578,9 @@
     R.pathLegend.hidden = pathMode !== "compare3";
     if (!busy && m && phase === "done") {
       if (recOf(m)) {
+        // 기록하기는 기록만 한다(개정 5) — 다음 달은 학생이 직접 누른다(다음 달 버튼은 테두리가 깜박인다)
         var nx = nextTodo(m);
-        R.recordMsg.textContent = "✓ 기록한 달이에요." + (nx ? " 다음은 " + nx + "월을 눌러 보세요." : "");
+        R.recordMsg.textContent = "✔ " + m + "월을 기록했어요." + (nx ? " 다음은 " + nx + "월을 눌러 보세요." : " 12달을 모두 기록했어요.");
       } else R.recordMsg.textContent = "값을 확인했으면 '📝 기록하기'를 눌러요.";
     } else if (!busy) R.recordMsg.textContent = "";
   }
@@ -555,15 +610,9 @@
       await S.Experiment.scrollIntoView(R.viewBox);
       if (v.whenVisible) await v.whenVisible(900);
       showFF(month);
-      if (reduceMotion()) {
-        v.show(month, pathList(month));
-        phase = "noon";
-      } else {
-        await v.play(month, pathList(month), function () {
-          phase = "noon";
-          drawExp();
-        });
-      }
+      // 움직이는 동안에는 태양만(빛줄기·호·옆 그림·값 없음) — 끝나면 태양이 남중 자리에 나타나고 빛줄기·호가 한 번 나타난 뒤 끝난다
+      if (reduceMotion()) v.show(month, pathList(month));
+      else await v.play(month, pathList(month));
     } catch (e) {
       console.warn("[sci-6-2-1-3] 하늘 모형 애니메이션 오류(결과만 바로 보여 줘요)", e);
       ok = false;
@@ -577,16 +626,40 @@
     store.set("shown", month);
     phase = "done";
     busy = false;
+    sideGrow = !reduceMotion();
     drawExp();
     setTimeout(function () {
       S.Experiment.scrollIntoView(R.record, { align: "nearest" }); // 기록 버튼이 화면 밖일 때만 조금 내린다
-      // 크게 보기: 조작 칸 안의 '옆에서 본 모습' 칸이 가려 있으면 그 칸 안에서만 최소로 움직여 보이게(세로 화면처럼 조작 칸이 낮을 때 —
-      // 달 버튼은 그대로 보인다). 기본 화면은 예전처럼 페이지를 더 움직이지 않는다(방금 누른 달 버튼이 머리말 밑으로 가려질 수 있어서)
-      if (R.layout.classList.contains("is-full")) S.Experiment.scrollIntoView(R.side.node, { align: "nearest" });
+      revealSideInDock();
     }, 60);
   }
+  var sideGrow = false; // 다음 drawExp에서 옆 그림의 빛줄기가 태양에서 뻗어 나가게(재생 직후 한 번)
+  /* 크게 보기: 조작 칸 안의 '옆에서 본 모습' 칸이 가려 있으면 조작 칸만 조금 움직여 보이게 한다(페이지는 그대로). 다음 달은 학생이 직접
+     누르므로(개정 5) 달 버튼 윗줄이 칸 밖으로 나가지 않는 만큼만 움직인다(review-2 L3 — 휴대폰에서 크게 보기를 켰을 때 달 버튼이 가려지던 것).
+     기본 화면은 예전처럼 페이지를 더 움직이지 않는다(방금 누른 달 버튼이 머리말 밑으로 가려질 수 있어서). */
+  function revealSideInDock() {
+    if (!R.layout.classList.contains("is-full")) return;
+    var dock = R.panel;
+    var d = dock.getBoundingClientRect();
+    var inTop = d.top + dock.clientTop;
+    var need = R.side.node.getBoundingClientRect().bottom - (inTop + dock.clientHeight - 8);
+    if (!(need > 0)) return;
+    var btnTop = Infinity;
+    MONTHS.forEach(function (mm) {
+      var r = R.monthBtns[mm.month].getBoundingClientRect();
+      if (r.height > 0) btnTop = Math.min(btnTop, r.top);
+    });
+    var delta = Math.min(need, Math.max(0, btnTop - (inTop + 6)));
+    if (delta < 1) return;
+    try {
+      dock.scrollTo({ top: dock.scrollTop + delta, behavior: reduceMotion() ? "auto" : "smooth" });
+    } catch (e) {
+      dock.scrollTop += delta;
+    }
+  }
   function showFF(month) {
-    R.ff.textContent = "⏩ 빨리 감기(모형) · " + month + "월 21일 하루(낮 " + dayLabel(BY[month].dayMinutes) + ")를 약 1초로";
+    // 값(낮의 길이)은 움직임이 끝난 뒤에만 보이므로 배지에는 쓰지 않는다(개정 5)
+    R.ff.textContent = "⏩ 빨리 감기(모형) · " + month + "월 21일 하루를 약 1초로";
     R.ff.hidden = false;
   }
   function hideFF() {
@@ -602,17 +675,8 @@
     if (n >= MONTHS.length && !r.replaced) toast("🎉 12달을 모두 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
     else toast((r.replaced ? "🔁 다시 기록했어요: " : "📝 기록했어요: ") + m + "월 남중 고도 " + f1(d.altitude) + "°, 낮의 길이 " + dayLabel(d.dayMinutes));
     if (view) view.setGhosts(pathList(shownMonth));
-    drawExp();
+    drawExp(); // 기록만 한다(개정 5 — 다음 달 자동 재생 없음). 안내 줄: "✔ ○월을 기록했어요. 다음은 ○월을 눌러 보세요."
     lesson.refresh();
-    // 아직 기록하지 않은 다음 달을 자동으로 골라 재생한다(학생은 기록하기만 누르면 된다)
-    var nx = n < MONTHS.length ? nextTodo(m) : null;
-    if (nx) {
-      R.recordMsg.textContent = "▶ 다음 달(" + nx + "월)을 보여 줄게요.";
-      setTimeout(function () {
-        var sec = document.querySelector('section[data-stage="experiment"]');
-        if (!busy && selMonth === m && sec && !sec.hidden) pickMonth(nx); // 그사이 다른 단계로 갔으면 재생하지 않는다
-      }, 450);
-    }
   });
   function setPathMode(mode) {
     if (busy || pathMode === mode) return;
@@ -645,6 +709,8 @@
   /* ───────── 3D 하늘 모형 ─────────
    * 좌표: y 위, 북 = +z(카메라 쪽), 남 = −z, 동 = −x(남쪽을 볼 때 왼쪽), 서 = +x. 하늘 반구 반지름 RS. */
   var RS = 8;
+  // 재생이 끝난 뒤의 연출(ms, 개정 5): 해 진 뒤 잠깐 → 남중 자리에 태양이 스르르 나타남 → 빛줄기가 태양에서 뻗어 나감(3D). 2D는 앞 둘만
+  var REVEAL_MS = { pause: 150, fade: 320, grow: 380 };
   function build3D(container, ctx) {
     return S.Sim3D.create({
       container: container,
@@ -725,8 +791,8 @@
       v.onThemeChange(function (dark) {
         boardMat.color.set(dark ? 0xcbbf9f : 0xe8dcc0);
       });
-      var devLbl = M.label("태양 고도 측정기", { height: 0.55 });
-      devLbl.position.set(-DEV.halfW - 1.7, 0.45, DEV.z0 - 0.2); // 받침판 남동쪽 — 빛줄기·호와 겹치지 않는 자리
+      var devLbl = M.label("태양 고도 측정기", { height: 0.5 });
+      devLbl.position.set(-DEV.halfW - 1.55, 0.35, DEV.z); // 받침판 동쪽(처음 시점 화면의 왼쪽) — 빛줄기·호와 겹치지 않는 자리
       root.add(devLbl);
 
       // 막대기 그림자: 태양 반대쪽(수평)으로, 받침판 위 길이 = 막대기 길이 ÷ tan(고도). 판 밖으로 나가는 부분(해 뜰 무렵·질 무렵의
@@ -792,9 +858,10 @@
         shGround.visible = sb > edge && sg > edge;
         if (shGround.visible) spanShadow(shGround, edge, sg);
       }
-      // 태양(+빛무리) — 개정 4에서 원반 0.5 → 0.62, 빛무리 2.4 → 3.6(막대기 끝을 지나는 빛줄기가 빛무리 안에서 나오게)
-      var SUN_R = 0.62;
-      var sun = new T.Mesh(new T.SphereGeometry(SUN_R, 24, 16), new T.MeshBasicMaterial({ color: 0xffc93a }));
+      // 태양(+빛무리) — 개정 5: 원반 반지름 SUN_R 0.9(탐구 2와 같은 비율 — 반구 반지름의 약 11%), 빛무리는 원반의 2.5배.
+      // 막대기 끝을 지나는 빛줄기가 12달 모두 원반의 가운데 쪽을 지난다(위 DEV 주석).
+      var SUN_R = 0.9;
+      var sun = new T.Mesh(new T.SphereGeometry(SUN_R, 28, 18), new T.MeshBasicMaterial({ color: 0xffc93a }));
       sun.name = "sun";
       var gc = document.createElement("canvas");
       gc.width = gc.height = 128;
@@ -806,54 +873,128 @@
       g2.fillRect(0, 0, 128, 128);
       var glowTex = new T.CanvasTexture(gc);
       var glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false }));
-      glow.scale.set(3.6, 3.6, 1);
+      glow.scale.set(SUN_R * 5, SUN_R * 5, 1);
       sun.add(glow);
       sun.visible = false;
       root.add(sun);
-
-      /* ── 남중 때의 태양 고도 그림(개정 4, 탐구 2 sci-6-2-1-2와 같은 빛줄기·호) ──
-       * 막대기 끝을 지나 그림자 끝에 닿는 빛줄기 하나 + 그림자 끝의 호. 옅은 평행 빛줄기 여러 가닥은 없앴다(개정 4 보충 — 사용자:
-       * "추가 태양 광선 가닥 더 있는 것들은 삭제"). 숫자 이름표는 띄우지 않는다(바뀌는 값은 값 패널에만).
-       * 해가 남중 자리에 있을 때만 보인다(setNoon/hideNoon). */
-      var UP = new T.Vector3(0, 1, 0);
-      function rayTexture(fade) {
-        // 세로 결: 아래(그림자 끝·땅 쪽) 불투명 → 위(태양 쪽) 끝 fade 비율만큼 투명해진다(빛무리 속에서 나오는 것처럼)
-        var c = document.createElement("canvas");
-        c.width = 4;
-        c.height = 128;
-        var x = c.getContext("2d");
-        var gr = x.createLinearGradient(0, 0, 0, 128); // 캔버스 위 = 원기둥 위(태양 쪽)
-        gr.addColorStop(0, "rgba(255,255,255,0)");
-        gr.addColorStop(fade, "rgba(255,255,255,1)");
-        gr.addColorStop(1, "rgba(255,255,255,1)");
-        x.fillStyle = gr;
-        x.fillRect(0, 0, 4, 128);
-        return new T.CanvasTexture(c);
+      // 태양은 늘 반투명 목록에서 하늘 반구(renderOrder 0)보다 나중에 그린다 — 태양 중심이 반구 면 위에 있어, 먼저 그리면
+      // 반구 뒷면이 태양 바깥쪽 절반에만 한 번 더 비쳐 원반이 두 색으로 갈라져 보였다(Review fix-3 L2). 빛줄기(40~)보다는 먼저.
+      sun.material.transparent = true;
+      sun.renderOrder = 39;
+      glow.renderOrder = 39;
+      // 태양이 스르르 나타나게(0 → 1)
+      function setSunAlpha(k) {
+        sun.material.opacity = k;
+        glow.material.opacity = k;
       }
+
+      /* ── 남중 때의 태양 고도 그림(개정 4·5, 탐구 2 sci-6-2-1-2와 같은 빛줄기·호) ──
+       * 막대기 끝을 지나 그림자 끝에 닿는 빛줄기 하나 + 그림자 끝의 호. 숫자 이름표는 띄우지 않는다(바뀌는 값은 값 패널에만).
+       * 개정 5 '광선 느낌': 빛나는 심(태양 쪽 옅은 노랑 → 땅 쪽 주황) + 부드러운 빛 번짐(늘 카메라 쪽을 보는 넓은 판) + 빛이 나아가는 쪽
+       * 화살촉(태양과 막대기 끝 사이), 재생이 끝나 나타날 때 한 번 태양에서 그림자 끝까지 뻗어 나간다(움직임 줄이기·show는 바로).
+       * 빛 번짐은 양 끝이 옅어 태양 빛무리 속에서 나오고 그림자 끝의 호를 가리지 않는다. */
+      var UP = new T.Vector3(0, 1, 0);
+      function stripTexture(w, h, draw) {
+        var c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        draw(c.getContext("2d"), w, h);
+        var t = new T.CanvasTexture(c);
+        t.colorSpace = T.SRGBColorSpace;
+        return t;
+      }
+      // 빛나는 심의 결: 캔버스 위 = 원기둥 위(태양 쪽) — 맨 위는 투명(태양 원반 속에서 나오는 것처럼) → 옅은 노랑 → 주황
+      var coreTex = stripTexture(4, 128, function (x, w, h) {
+        var gr = x.createLinearGradient(0, 0, 0, h);
+        gr.addColorStop(0, "rgba(255,236,150,0)");
+        gr.addColorStop(0.08, "rgba(255,236,150,1)");
+        gr.addColorStop(0.55, "rgba(255,190,60,1)");
+        gr.addColorStop(1, "rgba(255,140,0,1)");
+        x.fillStyle = gr;
+        x.fillRect(0, 0, w, h);
+      });
+      // 빛 번짐의 결: 가로(폭)는 가운데 밝고 가장자리 투명, 세로(길이)는 태양 쪽·땅 쪽 끝을 옅게
+      var beamTex = stripTexture(64, 64, function (x, w, h) {
+        var gx = x.createLinearGradient(0, 0, w, 0);
+        gx.addColorStop(0, "rgba(255,214,90,0)");
+        gx.addColorStop(0.5, "rgba(255,214,90,1)");
+        gx.addColorStop(1, "rgba(255,214,90,0)");
+        x.fillStyle = gx;
+        x.fillRect(0, 0, w, h);
+        x.globalCompositeOperation = "destination-in";
+        var gv = x.createLinearGradient(0, 0, 0, h);
+        gv.addColorStop(0, "rgba(0,0,0,0)");
+        gv.addColorStop(0.1, "rgba(0,0,0,1)");
+        gv.addColorStop(0.8, "rgba(0,0,0,1)");
+        gv.addColorStop(1, "rgba(0,0,0,0)");
+        x.fillStyle = gv;
+        x.fillRect(0, 0, w, h);
+      });
       var noonG = new T.Group();
       noonG.name = "noonPicture";
       noonG.visible = false;
       root.add(noonG);
       var keyRay = new T.Mesh(
-        new T.CylinderGeometry(0.06, 0.06, 1, 10, 1, true),
-        new T.MeshBasicMaterial({ color: 0xff9800, map: rayTexture(0.06), transparent: true, opacity: 0.95, depthWrite: false })
+        new T.CylinderGeometry(0.05, 0.05, 1, 12, 1, true),
+        new T.MeshBasicMaterial({ map: coreTex, transparent: true, opacity: 0.95, depthWrite: false })
       );
       keyRay.name = "keyRay";
       keyRay.renderOrder = 41;
-      noonG.add(keyRay);
+      var beamMat = new T.MeshBasicMaterial({ map: beamTex, transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide });
+      var keyGlow = new T.Mesh(new T.PlaneGeometry(1, 1), beamMat);
+      keyGlow.name = "keyRayGlow";
+      keyGlow.renderOrder = 40;
+      keyGlow.frustumCulled = false;
+      var BEAM_W = 0.42;
+      var _ax = new T.Vector3();
+      var _n = new T.Vector3();
+      var _x = new T.Vector3();
+      var _cam = new T.Vector3();
+      var _m4 = new T.Matrix4();
+      // 빛 번짐 판을 빛줄기 축(로컬 y: 땅 쪽 a → 태양 쪽 b)을 따라 늘이고, 넓은 면이 카메라를 보게 축을 중심으로 돌린다(그리기 직전마다)
+      keyGlow.onBeforeRender = function (renderer, scene, camera) {
+        var a = keyGlow.userData.a;
+        var b = keyGlow.userData.b;
+        if (!a || !b) return;
+        _ax.copy(b).sub(a);
+        var len = _ax.length() || 1e-6;
+        _ax.divideScalar(len);
+        keyGlow.position.copy(a).addScaledVector(_ax, len / 2);
+        _cam.copy(camera.position);
+        keyGlow.parent.worldToLocal(_cam);
+        _n.copy(_cam).sub(keyGlow.position);
+        _n.addScaledVector(_ax, -_n.dot(_ax));
+        if (_n.lengthSq() < 1e-10) _n.set(_ax.y, -_ax.x, 0);
+        _n.normalize();
+        _x.copy(_ax).cross(_n);
+        _m4.makeBasis(_x, _ax, _n);
+        keyGlow.quaternion.setFromRotationMatrix(_m4);
+        keyGlow.scale.set(BEAM_W, len, 1);
+        keyGlow.updateMatrix();
+        keyGlow.matrixWorld.multiplyMatrices(keyGlow.parent.matrixWorld, keyGlow.matrix);
+      };
+      var ARROW_AT = 0.45; // 화살촉 자리: 빛줄기 윗끝(태양 쪽)에서 막대기 끝까지의 이만큼
+      var arrowMat = new T.MeshBasicMaterial({ color: 0xff9100, transparent: true, opacity: 0.95, depthWrite: false });
+      var arrow = new T.Mesh(new T.ConeGeometry(0.13, 0.36, 16), arrowMat);
+      arrow.name = "keyRayArrow";
+      arrow.renderOrder = 42;
+      noonG.add(keyGlow, keyRay, arrow);
+      v.onThemeChange(function (dark) {
+        beamMat.opacity = dark ? 0.75 : 0.55;
+      });
       // 호: 채움(반투명) + 테두리(굵은 관 — 비스듬히 보아도 선이 보이게). 반지름은 그 달 그림자 길이의 ARC_K배(막대기에 닿지 않게),
       // 가장 크게 ARC_MAX
       var ARC_MAX = 2.2;
       var ARC_K = 0.8;
-      var ARC_TUBE = 0.055;
+      var ARC_TUBE = 0.035;
       var arcG = new T.Group();
       arcG.name = "altArc";
       var arcFillMat = new T.MeshBasicMaterial({ color: 0xd8434f, transparent: true, opacity: 0.5, side: T.DoubleSide, depthWrite: false });
       var arcLineMat = new T.MeshBasicMaterial({ color: 0xd8434f, transparent: true, opacity: 0.95, depthWrite: false });
       var arcFill = new T.Mesh(new T.CircleGeometry(1, 8, 0, 0.5), arcFillMat);
       var arcLine = new T.Mesh(new T.BufferGeometry(), arcLineMat);
-      arcFill.renderOrder = 42; // 빛줄기(41) 위 — 여름의 작은 호가 빛줄기에 덮이지 않게
-      arcLine.renderOrder = 43;
+      arcFill.renderOrder = 43; // 빛줄기 위 — 작은 호가 빛줄기에 덮이지 않게
+      arcLine.renderOrder = 44;
       arcG.add(arcFill, arcLine);
       noonG.add(arcG);
       v.onThemeChange(function (dark) {
@@ -870,13 +1011,20 @@
         mesh.scale.set(1, len, 1);
       }
       var basis = new T.Matrix4();
-      function setNoon(month) {
+      var ray = { from: new T.Vector3(), tip: new T.Vector3(), arrowF: 0.5 };
+      // 남중 그림을 그 달 값으로 맞춘다. grow(0~1): 빛줄기가 태양 쪽에서 얼마나 뻗어 나왔는지(없으면 다 — 호도 보임)
+      function setNoon(month, grow) {
         var D = dirOf(noonSun(month)); // 그 달 남중의 태양 방향 — placeSun·setShadow·'옆에서 본 모습' 칸과 같은 값
         var sunC = D.clone().multiplyScalar(RS); // 태양 중심(placeSun과 같은 자리)
         var tip = shadowTip(D); // 그림자 끝(setShadow가 그린 그림자의 끝과 같은 점)
-        // 또렷한 빛줄기: 막대기 끝을 지나는 d와 평행한 직선 위, 태양 중심에 가장 가까운 점(빛무리 안) → 그림자 끝
+        // 빛줄기: 막대기 끝을 지나는 d와 평행한 직선 위, 태양 중심에 가장 가까운 점(태양 원반 안) → 그림자 끝
         var from = STICK_TIP.clone().addScaledVector(D, sunC.clone().sub(STICK_TIP).dot(D));
-        stretch(keyRay, tip, from);
+        ray.from.copy(from);
+        ray.tip.copy(tip);
+        var arrowPos = from.clone().lerp(STICK_TIP, ARROW_AT);
+        ray.arrowF = from.distanceTo(arrowPos) / from.distanceTo(tip);
+        arrow.position.copy(arrowPos);
+        arrow.quaternion.setFromUnitVectors(UP, D.clone().negate()); // 원뿔 꼭짓점이 땅 쪽(빛이 나아가는 쪽)
         // 호: 그림자 끝에서, 땅(막대기 밑동 쪽) 방향과 빛줄기(태양 쪽) 방향 사이 — 두 방향 모두 D에서 나온다(각 = asin(D.y) = 남중 고도)
         var hl = Math.hypot(D.x, D.z) || 1e-9;
         var toSun = new T.Vector3(D.x / hl, 0, D.z / hl); // 그림자 끝 → 막대기 밑동(수평)
@@ -892,6 +1040,18 @@
         arcG.quaternion.setFromRotationMatrix(basis);
         arcG.position.set(tip.x, tip.y + 0.01, tip.z);
         noonG.visible = true;
+        growRay(grow == null ? 1 : grow);
+        arcG.visible = grow == null || grow >= 1;
+      }
+      // 빛줄기가 태양 쪽 끝(from)에서 그림자 끝(tip) 쪽으로 e만큼 뻗은 모습(심·빛 번짐·화살촉 함께)
+      function growRay(e) {
+        var end = ray.from.clone().lerp(ray.tip, clamp(e, 0.002, 1));
+        stretch(keyRay, end, ray.from);
+        keyGlow.userData.a = end;
+        keyGlow.userData.b = ray.from.clone();
+        keyGlow.position.copy(end).lerp(ray.from, 0.5); // 그리기 전 위치(판 방향은 onBeforeRender)
+        keyGlow.scale.set(BEAM_W, Math.max(0.001, end.distanceTo(ray.from)), 1);
+        arrow.visible = e >= ray.arrowF + 0.02;
       }
       function hideNoon() {
         noonG.visible = false;
@@ -955,17 +1115,23 @@
         root.add(ghostGroup);
         v.render();
       }
-      function setDay(d) {
+      // 낮 하늘의 밝기(태양 높이) × k(태양이 스르르 나타나는 정도, 기본 1)
+      function setDay(d, k) {
         var up = d ? d.up : -1;
-        var day = up > 0 ? Math.min(1, up * 4 + 0.35) : 0;
+        var day = (up > 0 ? Math.min(1, up * 4 + 0.35) : 0) * (k == null ? 1 : k);
         domeMat.opacity = 0.06 + 0.2 * day;
-        ringMat.color.set(up > 0 ? 0xffc93a : 0x7d8a9c);
+        ringMat.color.set(day > 0.15 ? 0xffc93a : 0x7d8a9c);
       }
-      function placeSun(d) {
+      var SHADOW_OP = shadowMat.opacity;
+      // 태양·그림자·하늘을 태양 방향 d 하나로. k(0~1): 태양이 스르르 나타나는 정도(그림자·하늘 밝기도 함께, 기본 1)
+      function placeSun(d, k) {
+        k = k == null ? 1 : k;
         sun.position.copy(P(d));
-        sun.visible = d.up > -0.03;
+        sun.visible = d.up > -0.03 && k > 0;
+        setSunAlpha(k);
         setShadow(d);
-        setDay(d);
+        shadowMat.opacity = SHADOW_OP * k;
+        setDay(d, k);
       }
       // 3D 캔버스 설명(화면 읽기 프로그램용) — 값은 값 패널에 있으므로 숫자는 넣지 않는다
       var canvasEl = v.renderer && v.renderer.domElement;
@@ -984,7 +1150,10 @@
 
       var disposed = false;
       return {
-        play: async function (month, ghosts, onNoon) {
+        /* 재생(개정 5): ① 해 뜨기 조금 전 → 해 진 뒤 조금 더, 태양만 하루 길을 따라 움직인다(빛줄기·호 없음) ② 해가 진 뒤 잠깐(하늘
+           어두움) ③ 남중 자리에 태양이 스르르 나타난다 — 해 진 자리에서 남중으로 거꾸로 움직이지 않는다 ④ 그때 한 번 빛줄기가 태양에서
+           그림자 끝까지 뻗어 나가고 호가 나타난다. 값·옆 그림은 이 약속이 끝난 뒤 앱이 그린다(pickMonth). */
+        play: async function (month, ghosts) {
           var g = geo(month);
           setGhosts(ghosts, month);
           makeCur(month);
@@ -992,30 +1161,31 @@
           var ext = 0.14; // 해 뜨기 조금 전 · 해 진 뒤 조금 더(지평선 아래라 보이지 않는다)
           var Hs = -g.H0 - ext;
           var He = g.H0 + ext;
-          var half = C.playMs / 2;
           function at(H) {
-            var d = sunDir(g.dec, H);
-            placeSun(d);
+            placeSun(sunDir(g.dec, H));
             reveal((H + g.H0) / (2 * g.H0));
           }
           setAria(month);
           at(Hs);
-          await v.tween(half, function (e, lin) {
-            at(Hs + (0 - Hs) * lin);
+          await v.tween(C.playMs, function (e, lin) {
+            at(Hs + (He - Hs) * lin);
           });
           if (disposed) return;
-          setNoon(month); // 남중: 태양 고도 그림이 나타난다
-          if (onNoon) onNoon();
-          await v.wait(200);
-          // 오후에는 해가 남중 자리를 떠나 그림자가 돌아가므로 남중 그림(빛줄기·호)은 잠시 숨긴다(그림자 끝과 어긋나지 않게)
-          hideNoon();
-          await v.tween(half, function (e, lin) {
-            at(He * lin);
-          });
+          await v.wait(REVEAL_MS.pause);
           if (disposed) return;
-          // 끝: 남중 순간의 모습으로 멈춰 둔다(길 전체 + 태양 고도 그림)
-          placeSun(noonSun(month));
           reveal(1);
+          var dn = noonSun(month);
+          placeSun(dn, 0);
+          await v.tween(REVEAL_MS.fade, function (e, lin) {
+            placeSun(dn, lin);
+          });
+          if (disposed) return;
+          placeSun(dn, 1);
+          setNoon(month, 0);
+          await v.tween(REVEAL_MS.grow, function (e, lin) {
+            growRay(1 - (1 - lin) * (1 - lin)); // 처음엔 빠르게, 끝에서 부드럽게
+          });
+          if (disposed) return;
           setNoon(month);
           v.render();
         },
@@ -1127,9 +1297,9 @@
       // 남중할 때 태양 높이(정남쪽 점선)만 그린다 — 숫자 이름표는 없앴다(fix-B1 L4, 값은 값 패널에만)
       noonG.appendChild(svg("line", { x1: X(180), x2: X(180), y1: HOR, y2: Y(a), class: "sky2d-noon" }));
     }
-    function setDay(d) {
+    function setDay(d, k) {
       var up = d ? d.up : -1;
-      var day = up > 0 ? Math.min(1, up * 4 + 0.35) : 0;
+      var day = (up > 0 ? Math.min(1, up * 4 + 0.35) : 0) * (k == null ? 1 : k);
       // 밤 #2c3a55 → 낮 #bfe0fb
       var c0 = [44, 58, 85],
         c1 = [191, 224, 251];
@@ -1144,12 +1314,15 @@
           ")"
       );
     }
-    function placeSun(d) {
+    // k(0~1): 태양이 스르르 나타나는 정도(하늘 밝기도 함께, 기본 1) — 3D placeSun과 같은 약속
+    function placeSun(d, k) {
+      k = k == null ? 1 : k;
       var q = azAlt(d);
-      sunC.style.display = q.alt > -1 ? "" : "none";
+      sunC.style.display = q.alt > -1 && k > 0 ? "" : "none";
+      sunC.style.opacity = k < 1 ? String(k) : "";
       sunC.setAttribute("cx", X(q.az).toFixed(1));
       sunC.setAttribute("cy", Y(Math.max(q.alt, -2)).toFixed(1));
-      setDay(d);
+      setDay(d, k);
     }
     function prep(month, ghosts) {
       setGhosts(ghosts, month);
@@ -1188,7 +1361,9 @@
       });
     }
     return {
-      play: async function (month, ghosts, onNoon) {
+      // 재생(개정 5, 3D와 같은 약속): 태양만 해 뜰 때부터 해 질 때까지 움직이고(남중 표시 없음), 해가 진 뒤 잠깐 → 남중 자리에
+      // 태양이 스르르 나타나고(거꾸로 움직이지 않음) 그때 한 번 정남쪽 점선(남중 표시)이 나타난다
+      play: async function (month, ghosts) {
         var g = geo(month);
         prep(month, ghosts);
         var ext = 0.14;
@@ -1198,19 +1373,20 @@
           placeSun(sunDir(g.dec, Hh));
           reveal((Hh + g.H0) / (2 * g.H0));
         }
-        await animate(C.playMs / 2, function (t) {
-          at(Hs * (1 - t));
+        await animate(C.playMs, function (t) {
+          at(Hs + (He - Hs) * t);
         });
         if (disposed) return;
-        drawNoon(month);
-        if (onNoon) onNoon();
-        await wait(200);
-        await animate(C.playMs / 2, function (t) {
-          at(He * t);
-        });
+        await wait(REVEAL_MS.pause);
         if (disposed) return;
-        placeSun(noonSun(month));
         reveal(1);
+        var dn = noonSun(month);
+        await animate(REVEAL_MS.fade, function (t) {
+          placeSun(dn, t);
+        });
+        if (disposed) return;
+        placeSun(dn, 1);
+        drawNoon(month);
       },
       show: function (month, ghosts) {
         prep(month, ghosts);

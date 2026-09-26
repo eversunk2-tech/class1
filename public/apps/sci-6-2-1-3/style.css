@@ -105,13 +105,30 @@
 .sv-board { fill: #eadfc6; stroke: #a8946b; stroke-width: 0.8; }
 .sv-shadow { fill: #2b3240; opacity: 0.85; }
 .sv-stick { fill: #8a5a2b; }
-.sv-ray { stroke: #ef7d00; stroke-width: 2.4; stroke-linecap: round; }
+/* 빛줄기(개정 5 '광선 느낌' — 3D와 같게): 빛 번짐(넓고 옅게) + 빛나는 심(태양 쪽 옅은 노랑 → 땅 쪽 주황, 색은 app.js의 결) + 화살촉 */
+.sv-ray-glow { stroke-width: 7; stroke-linecap: round; } /* 색·옅어짐은 app.js의 결(태양 쪽 밝고 그림자 끝 쪽에서 사라짐) */
+.sv-ray { stroke-width: 2.6; stroke-linecap: round; }
+.sv-arrow { fill: #ff8f00; }
 .sv-arc { fill: rgba(216, 67, 79, 0.4); stroke: #d8434f; stroke-width: 1.8; }
 .sv-sun { fill: #ffc928; stroke: #d98f00; stroke-width: 1.6; }
 .sv-lbl { font: 800 11px system-ui, sans-serif; fill: #9b1b28; }
 .sv-dir { font: 800 11px system-ui, sans-serif; fill: #3a3020; }
 .sv-guide { font: 700 11px system-ui, sans-serif; fill: #3a4452; }
 .ss-exp-layout.is-full .side-view { margin-top: 8px; }
+/* 재생이 끝나 처음 나타날 때 한 번: 빛줄기가 태양에서 그림자 끝까지 뻗어 나간 뒤 화살촉·호·'태양 고도'가 나타난다(0.5초 안쪽).
+   길이 --sv-len은 app.js가 잰다. 움직임 줄이기면 바로 다 보인다. */
+.side-view.is-grow .sv-ray, .side-view.is-grow .sv-ray-glow {
+  stroke-dasharray: var(--sv-len, 200); stroke-dashoffset: var(--sv-len, 200); animation: svGrow 0.38s ease-out forwards;
+}
+.side-view.is-grow .sv-arrow { opacity: 0; animation: svShow 0.12s ease-out 0.24s forwards; }
+.side-view.is-grow .sv-arc, .side-view.is-grow .sv-lbl { opacity: 0; animation: svShow 0.16s ease-out 0.36s forwards; }
+@keyframes svGrow { to { stroke-dashoffset: 0; } }
+@keyframes svShow { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .side-view.is-grow .sv-ray, .side-view.is-grow .sv-ray-glow, .side-view.is-grow .sv-arrow, .side-view.is-grow .sv-arc, .side-view.is-grow .sv-lbl {
+    animation: none; stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1;
+  }
+}
 
 /* ── 하늘 모형 ── */
 .ff-badge {
