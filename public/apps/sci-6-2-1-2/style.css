@@ -91,7 +91,6 @@
 .tb-tick.is-rec { border-color: var(--ss-good); background: var(--ss-good-bg); }
 .tb-tick.is-rec .tb-tick-ok { visibility: visible; }
 .tb-tick.is-at { border-color: #d9822b; box-shadow: 0 0 0 3px color-mix(in srgb, #d9822b 35%, transparent); }
-.tb-tick.is-next { border-style: dashed; border-color: var(--ss-primary); }
 @media (min-width: 700px) { .tb-tick { width: 52px; font-size: 0.9rem; } }
 /* 좁은 화면: 눈금 버튼을 위아래 두 줄로 엇갈려 놓아 서로 겹치지 않게(각 52px) */
 @media (max-width: 520px) {

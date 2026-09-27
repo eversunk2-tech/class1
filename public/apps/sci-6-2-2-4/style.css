@@ -80,6 +80,10 @@
 @media (prefers-color-scheme: dark) {
   .s2-table { fill: #4d4436; }
 }
+/* 크게 보기(한 화면 실험실)의 2D: 그림이 장면 칸 안에 맞게 줄어든다(86px = 공통 틀의 토글 아래 빈 칸) — 단계 D, review-dock L3 */
+.ss-exp-layout.is-full .ss-view2d > .s2-wrap { height: calc(100% - 86px); min-height: 120px; display: flex; flex-direction: column; }
+.ss-exp-layout.is-full .s2-wrap > * { flex: none; }
+#experiment-root .ss-exp-layout.is-full .s2-wrap > .side-svg { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
 
 /* 진행 막대 이름("🔒 석회수 실험")이 줄바꿈되지 않게 */
 .ss-prow { grid-template-columns: 7.6em 1fr 3.2em; }

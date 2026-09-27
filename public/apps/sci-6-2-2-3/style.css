@@ -200,6 +200,16 @@
   .tb-mark::after { font-size: 0.66rem; }
 }
 @media (max-width: 520px) {
-  .ss-view3d ~ .hud-ff, .hud-ff { bottom: auto; top: 40px; left: 10px; transform: none; }
-  .ss-exp-layout.is-full .ss-exp-view:not(.is-2d) .hud-ff { top: 96px; bottom: auto; }
+  /* 휴대폰: 장면이 낮아 아래쪽은 드래그 안내 글 자리 — "모형" 배지 오른쪽 윗줄에 작게(기본 화면·크게 보기·2D 모두).
+     예전 자리(top 40px)는 "⛶ 전체 화면 보기" 토글(top 46px)과 겹쳤고(review-dock R2), 토글 아래(top 96px)는 실험해요 1의 ㉠ 촛불을 가렸다(단계 D). */
+  .ss-view3d ~ .hud-ff, .hud-ff,
+  .ss-exp-view.is-2d .hud-ff,
+  .ss-exp-layout.is-full .ss-exp-view:not(.is-2d) .hud-ff,
+  .ss-exp-view.has-bar:not(.is-2d) .hud-ff {
+    top: 9px; bottom: auto; left: 64px; transform: none; padding: 3px 9px; font-size: 0.72rem;
+  }
 }
+/* 크게 보기 + 2D 대체 화면: 그림을 장면 칸 안에 맞춘다(칸 안에서 밀지 않아도 촛불·성냥 조각이 처음부터 보이게 — review-dock L3).
+   86px = 공통 틀의 토글 아래 빈 칸(style-common.css). 기본 화면의 2D는 그대로. */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: max(120px, calc(100% - 86px)); }
+#experiment-root .ss-exp-layout.is-full .ss-view2d > .d2-wrap > .d2-svg { height: 100%; }

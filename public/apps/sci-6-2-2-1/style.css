@@ -34,6 +34,8 @@
 /* 관찰 카드 */
 .ob-seen { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--ss-surface-2); font-weight: 600; }
 .ob-icon { font-size: 1.6rem; line-height: 1.1; }
+/* 본 모습 글은 맞는 보기로 '확인하기'를 누른 뒤에만 보인다(단계 D — 보기 고르기 전에는 살펴볼 곳 안내만) */
+.ob-reveal { display: block; margin-top: 4px; font-weight: 700; }
 
 /* 궁금한 점(한 줄) */
 .curiosity-card .ss-text-input { width: 100%; }
@@ -72,6 +74,13 @@
 .d2-name { font-size: 17px; font-weight: 800; fill: currentColor; }
 .d2-vin { font-size: 13px; font-weight: 700; fill: #6b5a1c; }
 .d2-caption { margin: 8px 0 0; text-align: center; font-weight: 700; min-height: 1.5em; }
+/* 크게 보기(한 화면 실험실)의 2D: 두 그림(누르는 칸)이 장면 칸 안에 처음부터 다 보이게 칸 높이에 맞춘다
+   (86px = 공통 틀의 토글 아래 빈 칸, review-dock L3 — sci-6-2-1-2·-5와 같은 방식). 기본 화면의 2D는 그대로 */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: calc(100% - 86px); min-height: 140px; display: flex; flex-direction: column; }
+.ss-exp-layout.is-full .d2-wrap > .d2-row { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.ss-exp-layout.is-full .d2-row > .d2-pick { height: 100%; min-height: 0; }
+#experiment-root .ss-exp-layout.is-full .d2-pick > .d2-svg { height: 100%; max-height: none; min-height: 0; }
+.ss-exp-layout.is-full .d2-wrap > .d2-caption { flex: none; }
 @media (prefers-color-scheme: dark) {
   .d2-glass { fill: rgba(200, 225, 245, 0.08); stroke: #9fb3c8; }
   .d2-vin { fill: #f1dc8c; }

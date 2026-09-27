@@ -33,9 +33,14 @@
   font-weight: 700; font-size: 1rem; text-align: center; white-space: nowrap;
 }
 @media (max-width: 640px) { .ov-text { font-size: 0.9rem; white-space: normal; } .ov-badge { top: 40px; } }
+/* 휴대폰: 드래그 안내 줄이 두세 줄이라 장면 위 안내 글을 그 위로(단계 D — 실행 뒤에도 회로 전체 시점이라 긴 안내 줄이 그대로 보인다) */
+@media (max-width: 640px) { .ov-text { bottom: 64px; } }
+/* 휴대폰 크게 보기(3D 칸이 낮다): 배지를 위로 올려 탁자 오른쪽 뒤 막대 꽂이를 가리지 않게(단계 D) */
+@media (max-width: 640px) { .ss-exp-layout.is-full .ov-badge { top: 10px; } }
 
-/* 관찰 카드 */
+/* 관찰 카드 — 처음에는 중립 안내(.ob-look)만, 맞는 보기로 확인한 뒤에만 본 모습(.ob-reveal)(단계 D) */
 .ob-seen { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--ss-surface-2); font-weight: 600; }
+.ob-reveal:not([hidden]) { display: inline-flex; gap: 10px; align-items: flex-start; }
 .ob-icon { font-size: 1.6rem; line-height: 1.1; }
 
 /* 궁금한 점(한 줄) */
@@ -50,6 +55,11 @@
 .d2-svg { display: block; width: 100%; height: auto; max-height: 52vh; color: var(--ss-text); }
 @media (min-width: 901px) and (orientation: landscape) { .d2-svg { max-height: calc(100vh - var(--ss-header-h) - 240px); min-height: 220px; } }
 @media (orientation: portrait) and (min-width: 641px) { .d2-svg { max-height: 40vh; } }
+/* 크게 보기(한 화면 실험실)의 2D: 회로도가 장면 칸 안에 처음부터 다 보이게 칸 높이에 맞춘다
+   (86px = 공통 틀의 토글 아래 빈 칸, review-dock L3 — sci-6-2-1-2·-5, sci-6-2-2-1과 같은 방식). 기본 화면의 2D는 그대로 */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: calc(100% - 86px); min-height: 140px; display: flex; flex-direction: column; }
+#experiment-root .ss-exp-layout.is-full .d2-wrap > .d2-svg { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
+.ss-exp-layout.is-full .d2-wrap > .d2-caption { flex: none; }
 
 .d2-wire { fill: none; stroke: #33383f; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .d2-wire.d2-red { stroke: #d8434f; }

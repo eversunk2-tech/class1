@@ -8,6 +8,40 @@
 .safety-box li { margin: 2px 0; }
 .opt-icon { font-size: 1.3rem; line-height: 1; }
 
+/* 정리하기 안의 '더 탐구하고 싶은 점': 한 줄 입력(단계 C·새 기준 앱과 같은 모양) */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
+
+/* ── 버저 스위치 버튼 두 개(버저를 골랐을 때만 공통 실행 버튼 대신 — 2026-09-27 사용자, build-D 지침 D2-2 9·10번) ──
+   색은 plan B: 전지 1개 = 연한 연두, 2개 직렬 = 연한 분홍(글자 대비 AA). 기록하기는 보라 그대로. 아이콘은 스위치 기호 SVG(currentColor). */
+.ss-run-btn.sw-hidden { display: none !important; }
+.sw-pair { display: flex; gap: 10px; width: 100%; }
+.sw-pair[hidden] { display: none; }
+.sw-btn {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; padding: 6px 12px; line-height: 1.25; text-align: center;
+}
+.sw-l1 { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sw-ic { width: 1.3em; height: 1.3em; flex: none; }
+.sw-sub { font-size: 0.86em; font-weight: 600; opacity: 0.92; white-space: nowrap; }
+.sw-btn.sw-single { background: linear-gradient(135deg, #d9f99d, #bef264); color: #365314; border: 1px solid rgba(54, 83, 20, 0.22); box-shadow: 0 6px 16px -6px rgba(101, 163, 13, 0.3); }
+.sw-btn.sw-series2 { background: linear-gradient(135deg, #fbcfe8, #f9a8d4); color: #831843; border: 1px solid rgba(131, 24, 67, 0.2); box-shadow: 0 6px 16px -6px rgba(219, 39, 119, 0.28); }
+@media (hover: hover) { .sw-btn:not(:disabled):hover { border-color: currentColor; } }
+/* 크게 보기 장면 안 막대: [스위치 닫기(전지 1개)] [스위치 닫기(2개 직렬)] [📝 기록하기] 한 줄 — 스위치 쪽을 넓게, 기록하기를 좁게.
+   글자는 한 줄("스위치 닫기(전지 1개)"), 칸이 좁으면 괄호 부분만 다음 줄로 */
+.ss-exp-overlay .sw-pair { flex: 2.5 1 300px; width: auto; min-width: 0; gap: 8px; }
+.ss-exp-overlay .sw-btn { flex-direction: row; flex-wrap: wrap; column-gap: 0; padding: 4px 10px; }
+.ss-exp-overlay .sw-sub { font-size: 1em; font-weight: 700; opacity: 1; }
+.ss-exp-overlay.has-sw .ss-btn.ss-record-btn { flex: 0.75 1 110px; }
+/* 좁은/낮은 화면(휴대폰 크게 보기)의 막대: 안쪽 여백을 줄여 기록하기 글자가 한 줄에 들어가게 */
+@media (max-width: 480px), (max-height: 420px) {
+  .ss-exp-overlay.has-sw .ss-btn.ss-record-btn { padding: 0 10px; }
+  .ss-exp-overlay .sw-btn { padding: 4px 8px; }
+}
+@media (prefers-color-scheme: dark) {
+  .sw-btn.sw-single { background: linear-gradient(135deg, #2f4a12, #3d5f17); color: #e2fbb4; border-color: rgba(217, 249, 157, 0.3); box-shadow: 0 6px 16px -6px rgba(163, 230, 53, 0.25); }
+  .sw-btn.sw-series2 { background: linear-gradient(135deg, #5b1233, #74163f); color: #fcd7ec; border-color: rgba(251, 207, 232, 0.3); box-shadow: 0 6px 16px -6px rgba(244, 114, 182, 0.25); }
+}
+
 /* 소리·더 탐구하기 도구 카드(실험 패널 맨 아래) */
 .tools-card { margin-top: 10px; }
 .tools-title { margin: 0 0 6px; font-weight: 700; }
@@ -38,6 +72,9 @@
 .ob-seen { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--ss-surface-2); font-weight: 600; }
 .ob-icon { font-size: 1.6rem; line-height: 1.1; }
 .ob-sound { margin: 0 0 10px; flex-wrap: wrap; }
+/* 맞는 보기로 확인한 뒤에만 보이는 실제 모습(틀린 보기로 확인하면 계속 숨김) */
+.ob-reveal { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--ss-good); font-weight: 600; }
+.ob-reveal-tag { padding: 1px 8px; border-radius: 999px; background: var(--ss-good); color: var(--ss-on-primary); font-size: 0.85rem; font-weight: 700; }
 
 /* ── '더 탐구해 보고 싶어요' 팝업 ── */
 body.px-open { overflow: hidden; }
@@ -77,12 +114,13 @@ body.px-open { overflow: hidden; }
 /* ── 2D 대체 화면(SVG 모형) ── */
 .d2-wrap { position: relative; }
 .d2-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.d2-pick {
+/* 두 회로 그림(2026-09-27: 회로 고르기가 없어져 누르는 칸이 아니라 그림 칸). 그림의 스위치(손잡이·글자)는 누를 수 있다 */
+.d2-panel {
   display: block; width: 100%; padding: 6px 4px; border: 3px solid transparent; border-radius: 14px;
-  background: var(--ss-surface); cursor: pointer; touch-action: manipulation; color: var(--ss-text);
+  background: var(--ss-surface); color: var(--ss-text); text-align: center;
 }
-.d2-pick.is-sel { border-color: var(--ss-primary); }
-.d2-pick:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+.d2-sw { cursor: pointer; }
+.d2-sw-hit { fill: transparent; }
 .d2-name { display: block; font-weight: 700; font-size: 0.86rem; line-height: 1.25; margin-bottom: 2px; }
 .d2-svg { display: block; width: 100%; height: auto; max-height: 44vh; }
 @media (min-width: 901px) and (orientation: landscape) { .d2-svg { max-height: calc(100vh - var(--ss-header-h) - 260px); min-height: 200px; } }
@@ -109,23 +147,31 @@ body.px-open { overflow: hidden; }
 .d2-prop.spin1 { animation: d2-spin 1.4s linear infinite; }
 .d2-prop.spin2 { animation: d2-spin 0.42s linear infinite; }
 @keyframes d2-spin { to { transform: rotate(360deg); } }
+/* 날개 회전 흐림(원) — 평소에는 날개가 돌아 빠르기가 보이므로 숨기고, 움직임 줄이기에서만 두께·진하기로 빠르기 차이를 보인다(3D의 회전 흐림과 같은 뜻) */
+.d2-blur { fill: none; stroke: #7fb0e8; opacity: 0; }
 .d2-buzzer { fill: #39414d; stroke: #22272f; stroke-width: 2; }
 .d2-hole { fill: #11151c; }
+/* 소리 파동(원형 고리, 모형 — 2026-09-27 사용자 결정): 두 회로 모두 고리 3개·같은 크기·같은 간격·같은 빠르기, 소리가 큰 쪽(lv2)만 선이 더 굵다 */
 .d2-wave { fill: none; stroke: var(--ss-primary); stroke-width: 2.5; opacity: 0; }
-.d2-waves.lv1 .d2-wave { animation: d2-ring 1.8s linear infinite; }
-.d2-waves.lv2 .d2-wave { animation: d2-ring 0.9s linear infinite; }
-.d2-waves .d2-wave:nth-child(2) { animation-delay: 0.3s; }
-.d2-waves .d2-wave:nth-child(3) { animation-delay: 0.6s; }
-.d2-waves.lv1 .d2-wave:nth-child(3) { display: none; }
+.d2-waves.lv2 .d2-wave { stroke-width: 4.5; }
+.d2-waves.lv1 .d2-wave, .d2-waves.lv2 .d2-wave { animation: d2-ring 1.2s linear infinite; }
+.d2-waves .d2-wave:nth-child(2) { animation-delay: 0.4s; }
+.d2-waves .d2-wave:nth-child(3) { animation-delay: 0.8s; }
 @keyframes d2-ring { 0% { opacity: 0.7; transform: scale(0.5); transform-origin: 122px 60px; } 100% { opacity: 0; transform: scale(1.25); transform-origin: 122px 60px; } }
 @media (prefers-reduced-motion: reduce) {
   .d2-prop.spin1, .d2-prop.spin2 { animation: none; }
-  .d2-waves.lv1 .d2-wave, .d2-waves.lv2 .d2-wave { animation: none; opacity: 0.55; }
-  .d2-waves.lv1 .d2-wave:nth-child(2), .d2-waves.lv1 .d2-wave:nth-child(3) { opacity: 0; }
+  .d2-blur.lv1 { opacity: 0.35; stroke-width: 3; }
+  .d2-blur.lv2 { opacity: 0.8; stroke-width: 7; }
+  .d2-waves.lv1 .d2-wave, .d2-waves.lv2 .d2-wave { animation: none; opacity: 0.55; } /* 멈춘 그림: 고리 3개 그대로, 굵기로 구분 */
 }
-.d2-bar { fill: var(--ss-surface-2); stroke: var(--ss-border); stroke-width: 1.5; }
-.d2-bar.is-on { fill: var(--ss-primary); }
 .d2-caption { margin: 8px 0 0; text-align: center; font-weight: 700; min-height: 1.5em; }
+/* 크게 보기(한 화면 실험실)의 2D: 두 회로 그림이 장면 칸 안에 처음부터 다 보이게 칸 높이에 맞춘다
+   (86px = 공통 틀의 토글 아래 빈 칸, review-dock L3 — sci-6-2-1-2·-5, sci-6-2-2-1과 같은 방식). 기본 화면의 2D는 그대로 */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: calc(100% - 86px); min-height: 140px; display: flex; flex-direction: column; }
+.ss-exp-layout.is-full .d2-wrap > .d2-row { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.ss-exp-layout.is-full .d2-row > .d2-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+#experiment-root .ss-exp-layout.is-full .d2-panel > .d2-svg { flex: 1 1 0; height: auto; max-height: none; min-height: 72px; } /* 휴대폰 크게 보기(기본 끔)에서 그림이 사라질 만큼 줄지 않게 — 칸이 낮으면 칸 안에서 민다 */
+.ss-exp-layout.is-full .d2-wrap > .d2-caption { flex: none; }
 @media (prefers-color-scheme: dark) {
   .d2-bulb { fill: rgba(255, 246, 216, 0.25); }
   .d2-fil { stroke: #e0c070; }

@@ -652,7 +652,8 @@ html:has([data-stage]:not([hidden]) .ss-exp-layout.is-full) { overflow: hidden; 
    머리말을 접은 상태에서 두 줄 알림은 머리말보다 조금 길 수 있다. pointer-events:none이라 떠 있는 동안에도 뒤의 버튼을 누를 수 있다. */
 .ss-toast {
   position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; transform: translateX(-50%); z-index: 50;
-  max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 18px;
+  /* width: max-content — left:50%만 두면 남은 반쪽 폭에서 줄이 바뀌어 태블릿 세로 두 줄·휴대폰 다섯 줄이 되었다(2026-09-27 D1 보고). 이제 최대 폭까지 편다 */
+  width: max-content; max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 18px;
   background: #1e1d2d; color: #fff; font-weight: 600; box-shadow: 0 6px 24px -6px rgba(30, 20, 80, 0.45); text-align: center;
   pointer-events: none; /* 알림이 떠 있는 동안 아래 버튼을 가려 누르지 못하는 일이 없게 한다 */
 }

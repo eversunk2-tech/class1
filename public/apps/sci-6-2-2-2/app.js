@@ -11,6 +11,14 @@
  *  - 시간 바: 양초·알코올에 각각 불을 붙인 뒤 끌 수 있다. 수치는 보여 주지 않는다. '그 밖에 관찰한 것'은 시간 바를
  *    C.timeNeed분 넘게 움직여 본 뒤에 살펴볼(사진 비교) 수 있다.
  *  - 온도는 숫자로 나타내지 않는다(가까이/멀리의 정성적 모형). 다음 차시 내용·용어는 쓰지 않는다.
+ *
+ * spec.md "개정 2 — 개편 단계 D(2026-09-27)":
+ *  - 📝 기록하기는 기록만 한다: 이 앱은 기록 뒤 조건을 고르지 않는다(기록 뒤 다음 빈칸 자동 선택은 공통 틀 experiment.js의 advance —
+ *    공통 틀에서 없애고 다음 칸은 공통 틀이 안내만 한다, 2026-09-27 사용자 결정).
+ *  - 3D에서 눌러 고르기: 불꽃 자리 = 불꽃의 모습, 불꽃 옆(불이 붙어 있을 때) = 따뜻한 정도, 양초 몸통·알코올(유리병 몸통) = 그 밖에 관찰한 것,
+ *    촛대·뚜껑·어깨·이름표 = 물질만. 실행 중이거나 지금 고른 것과 같으면 누르지 않은 것으로 본다(pickFrom — 관찰 카드가 닫히지 않게).
+ *  - 빨리 감기 바의 '양초 길이·알코올 양 … 줄었어요' 글은 '그 밖에 관찰한 것'을 맞는 보기로 확인·기록한 뒤에만 보인다(그 전에는 무엇을 볼지만).
+ *  - 따뜻한 정도 표시(붉은 번짐·가까이/멀리 이름표·나타나는 때)는 사용자 결정으로 예전 그대로 둔다.
  */
 (function () {
   "use strict";
@@ -175,6 +183,7 @@
   var burnEpoch = 0; // '불 끄고 처음 상태로'를 누르면 늘어난다(그사이 끝난 불 붙이기는 무시)
   var expBusy = false;
   var lastPhotos = null; // { sub, t, before, after } — '그 밖에 관찰한 것' 사진
+  var amountSeen = {}; // sub → true: '그 밖에 관찰한 것'을 맞는 보기로 확인함(빨리 감기 바의 양 변화 글을 보여 준다, 저장하지 않음)
   var rafPending = 0;
   function requestDraw() {
     if (rafPending) return;
@@ -252,13 +261,25 @@
     return tex;
   }
 
+  /* 장면에서 눌러 고르기(3D·2D 공통, 개편 단계 D): 실행 중이거나 지금 고른 것과 같으면 누르지 않은 것으로 본다.
+     공통 틀은 같은 것을 다시 골라도 관찰 카드를 닫으므로, 이미 고른 불꽃을 들여다보려고 눌렀다가 관찰 카드가 사라지지 않게 한다. */
+  function pickFrom(ctx) {
+    return function (p) {
+      if (!p || expBusy) return;
+      var same = Object.keys(p).every(function (k) {
+        return curSel[k] === p[k];
+      });
+      if (!same) ctx.onPick(p);
+    };
+  }
+
   function build3D(container, ctx) {
     return S.Sim3D.create({
       container: container,
       frame: { width: 34, depth: 27, center: [0, 6.6, 0] },
       viewDir: [0, 0.42, 0.91],
       minDistance: 9,
-      onPick: ctx.onPick,
+      onPick: pickFrom(ctx),
       onLost: ctx.onLost,
     }).then(function (v) {
       if (!v) return null;
@@ -286,6 +307,12 @@
       var glass = function (op) {
         return new T.MeshStandardMaterial({ color: 0xdcecff, transparent: true, opacity: op, roughness: 0.08, metalness: 0.05, depthWrite: false });
       };
+      // 눌러 고르는 자리(보이지 않음 — 그리지 않고 누르기만 받는다): 불꽃 자리 → 불꽃의 모습, 불꽃 옆 → 따뜻한 정도
+      var hitMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
+      function flameHit() {
+        // 불꽃(심지 끝 ~ 불꽃 끝)을 넉넉히 감싸는 기둥. 불을 붙이기 전에는 심지 자리
+        return new T.Mesh(new T.CylinderGeometry(1.25, 1.25, 4.2, 16), hitMat);
+      }
 
       /* ── 불꽃(모형) ── */
       function makeFlame(kind) {
@@ -327,6 +354,7 @@
         glow.scale.set(10, 10, 1);
         glow.position.y = 1.4;
         glow.renderOrder = 4;
+        glow.raycast = function () {}; // 넓은 빛 번짐 판은 누르기를 받지 않는다(양초 몸통·불꽃 옆을 누른 것이 가려지지 않게)
         g.add(glow);
         var light = new T.PointLight(kind === "candle" ? 0xffb347 : 0x9fbcff, 0, 22, 1.2);
         light.position.y = 1.4;
@@ -361,10 +389,13 @@
       cup.position.y = 1.15;
       candleG.add(dish, cup);
       var wax = M.material(0xf6f0e1, { roughness: 0.6 });
+      // 양초 몸통·고인 촛농·흘러내린 촛농(누르면 양초 · 그 밖에 관찰한 것 — 시간에 따른 양초의 변화)
+      var waxG = new T.Group();
+      candleG.add(waxG);
       var candleBody = new T.Mesh(new T.CylinderGeometry(1, 1, 1, 32), wax);
-      candleG.add(candleBody);
+      waxG.add(candleBody);
       var pool = new T.Mesh(new T.CylinderGeometry(0.84, 0.84, 0.06, 32), new T.MeshStandardMaterial({ color: 0xfffbea, roughness: 0.1, transparent: true, opacity: 0.9 }));
-      candleG.add(pool);
+      waxG.add(pool);
       var wick = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, WICK_UP, 8), M.material(0x2b2118));
       candleG.add(wick);
       // 촛농(시간이 지나면 흘러내린다)
@@ -376,21 +407,29 @@
       ].map(function (d) {
         var m = new T.Mesh(new T.CapsuleGeometry(0.17, 1, 4, 10), wax);
         m.userData = d;
-        candleG.add(m);
+        waxG.add(m);
         return m;
       });
       var candleFlame = makeFlame("candle");
       candleG.add(candleFlame);
+      var candleFlameHit = flameHit();
+      candleG.add(candleFlameHit);
+      // 누르면 고르기: 촛대·이름표 = 양초(관찰 항목은 그대로), 불꽃 자리 = 불꽃의 모습, 몸통 = 그 밖에 관찰한 것
       v.pickable(candleG, { sub: "candle" });
+      v.pickable(candleFlameHit, { sub: "candle", method: "look" });
+      v.pickable(waxG, { sub: "candle", method: "change" });
 
       /* ── 알코올램프 ── */
       var lampG = new T.Group();
       lampG.position.x = X.alcohol;
       root.add(lampG);
+      // 알코올과 그것을 담은 유리병 몸통(누르면 알코올 · 그 밖에 관찰한 것 — 시간에 따른 알코올 양의 변화)
+      var liqG = new T.Group();
+      lampG.add(liqG);
       var liquidMat = new T.MeshStandardMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.5, roughness: 0.1, depthWrite: false });
       var liquid = new T.Mesh(new T.CylinderGeometry(2.82, 2.9, 1, 40), liquidMat);
       liquid.renderOrder = 1;
-      lampG.add(liquid);
+      liqG.add(liquid);
       var innerWick = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 5.7, 8), M.material(0xe9e2cf));
       innerWick.position.y = 3.3;
       lampG.add(innerWick);
@@ -407,7 +446,8 @@
       holder.position.y = 6.45;
       var lampWick = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 0.9, 12), M.material(0xf2efe6));
       lampWick.position.y = LAMP_WICK_TIP - 0.45;
-      lampG.add(body, shoulder, neck, holder, lampWick);
+      liqG.add(body);
+      lampG.add(shoulder, neck, holder, lampWick);
       // 뚜껑(불을 붙이지 않았을 때 덮여 있다)
       var cap = new T.Group();
       var capMat = glass(0.4);
@@ -423,7 +463,29 @@
       var lampFlame = makeFlame("alcohol");
       lampFlame.position.y = LAMP_WICK_TIP - 0.1;
       lampG.add(lampFlame);
+      var lampFlameHit = flameHit();
+      lampFlameHit.position.y = flameBase("alcohol", 0) + 1.5;
+      lampG.add(lampFlameHit);
+      // 누르면 고르기: 어깨·목·뚜껑·이름표 = 알코올(관찰 항목은 그대로), 불꽃 자리 = 불꽃의 모습, 몸통(알코올) = 그 밖에 관찰한 것
       v.pickable(lampG, { sub: "alcohol" });
+      v.pickable(lampFlameHit, { sub: "alcohol", method: "look" });
+      v.pickable(liqG, { sub: "alcohol", method: "change" });
+
+      // 불꽃 옆(두 기구 사이 안쪽) = 따뜻한 정도. 불이 붙어 있을 때만 누를 수 있다(불꽃이 없으면 따뜻함도 없다)
+      var warmHits = {};
+      C.substances.forEach(function (s) {
+        var m = new T.Mesh(new T.BoxGeometry(4.6, 3.4, 2.4), hitMat);
+        root.add(m);
+        v.pickable(m, { sub: s.id, method: "warm" });
+        m.userData.pickOn = m.userData.pick;
+        m.userData.pick = null;
+        warmHits[s.id] = m;
+      });
+      function placeWarmHit(sub, st) {
+        var m = warmHits[sub];
+        m.position.set(X[sub] + SIDE[sub] * 3.6, flameBase(sub, st.t) + 1.3, 0);
+        m.userData.pick = st.lit ? m.userData.pickOn : null; // null이면 누른 것으로 보지 않는다(뒤의 물체로 넘어간다)
+      }
 
       // 이름표(눌러서 고를 수 있다)
       var labels = {};
@@ -526,6 +588,7 @@
           m.position.set(Math.cos(d.a) * 1.02, top - 0.12 - L / 2, Math.sin(d.a) * 1.02);
         });
         candleFlame.position.y = flameBase("candle", st.t);
+        candleFlameHit.position.y = flameBase("candle", st.t) + 1.5; // 불꽃 자리(누르기)도 양초 길이를 따라 내려온다
         if (!animating.candle) {
           candleFlame.userData.grow = st.lit ? 1 : 0;
           candleFlame.visible = !!st.lit;
@@ -547,6 +610,7 @@
         shown[sub] = { lit: !!st.lit, t: st.t };
         if (sub === "candle") applyCandle(shown[sub]);
         else applyLamp(shown[sub]);
+        placeWarmHit(sub, shown[sub]);
         if (warmSub === sub) {
           if (!st.lit) warmG.visible = false;
           else placeWarm(sub);
@@ -935,10 +999,11 @@
   function build2D(container, ctx) {
     container.textContent = "";
     var btns = {};
+    var onPick = pickFrom(ctx);
     var row = el("div", { class: "b2-row", role: "group", "aria-label": "물질 고르기(2D 모형)" });
     C.substances.forEach(function (s) {
       var b = el("button", { type: "button", class: "b2-pick", "aria-pressed": "false", onclick: function () {
-        ctx.onPick({ sub: s.id });
+        onPick({ sub: s.id });
       } }, [el("span", { "aria-hidden": "true", text: s.icon }), " " + s.device]);
       btns[s.id] = b;
       row.appendChild(b);
@@ -1181,7 +1246,9 @@
       build2D: function (c, ctx) {
         return wrapView(build2D(c, ctx));
       },
-      tip3D: "👆 드래그: 돌려 보기 · 두 번 탭: 처음 방향 · 기구를 눌러 고를 수도 있어요",
+      // 누르는 곳: 불꽃 = 불꽃의 모습, 불꽃 옆 = 따뜻한 정도, 양초 몸통·알코올 = 그 밖에 관찰한 것, 촛대·뚜껑·이름표 = 물질만
+      // (휴대폰 세로에서 예전 문구와 같은 두 줄이 되도록 짧게 — 더 길면 한 줄 늘어 '양초'·'알코올램프' 이름표를 덮는다)
+      tip3D: "👆 드래그: 돌려 보기 · 두 번 탭: 처음 방향 · 탭: 기구·불꽃·불꽃 옆 고르기",
       tip2D: "2D 화면(옆에서 본 모습, 모형)이에요. 위의 버튼으로 물질을 고를 수 있어요.",
     },
     observe: observeCard,
@@ -1262,7 +1329,13 @@
       type: "choice",
       choices: C.observeChoices[sel.method][sel.sub],
       check: function (observed) {
-        return observed === answer ? { ok: true, message: "⭕ 맞아요! 화면에서 본 모습과 같아요. '📝 기록하기'를 눌러 기록해요." } : wrongMsg;
+        if (observed !== answer) return wrongMsg;
+        // 맞는 보기로 확인했을 때만 빨리 감기 바의 '양초 길이·알코올 양' 글을 드러낸다(틀린 답으로 확인하면 계속 숨김 — 답을 먼저 알려 주지 않게)
+        if (sel.method === "change") {
+          amountSeen[sel.sub] = true;
+          if (bar) bar.draw();
+        }
+        return { ok: true, message: "⭕ 맞아요! 화면에서 본 모습과 같아요. '📝 기록하기'를 눌러 기록해요." };
       },
       retryLabel: sel.method === "change" ? null : "🔁 다시 살펴보기",
     };
@@ -1316,7 +1389,7 @@
     var stAmount = el("span", { class: "tb-st" });
     var stRow = el("p", { class: "tb-state" }, [stFlame, stAmount]);
     var msg = el("p", { class: "ss-help tb-msg" });
-    var note = el("p", { class: "tb-note", text: "🏷 모형: 잘 보이도록 실제보다 훨씬 빠르게 줄어들게 나타냈어요." });
+    var note = el("p", { class: "tb-note", text: "🏷 모형: 잘 보이도록 시간을 실제보다 훨씬 빨리 흐르게 나타냈어요." });
     var live = el("p", { class: "ss-sr-only", "aria-live": "polite" });
     var card = el("div", { class: "ss-card tb-card" }, [
       el("div", { class: "tb-head" }, [title, badge]),
@@ -1476,7 +1549,9 @@
         msg.textContent = "'🔥 불 붙이기'를 누르면 바를 끌 수 있어요.";
       } else {
         stFlame.textContent = "🔥 " + minText(t) + " · 불꽃이 계속 타고 있어요";
-        stAmount.textContent = (sub === "candle" ? "🕯️ " : "🧪 ") + amountText(sub, t);
+        // 양 변화 글("처음보다 … 줄었어요")은 '그 밖에 관찰한 것' 보기와 같은 말이라, 그 칸을 맞는 보기로 확인·기록한 뒤에만 보인다
+        // (그 전에는 무엇을 볼지만 — 화면 읽기 프로그램용 aria-valuetext는 장면 설명이라 늘 상태를 말한다)
+        stAmount.textContent = (sub === "candle" ? "🕯️ " : "🧪 ") + (amountSeen[sub] || recOf(sub, "change") ? amountText(sub, t) : sub === "candle" ? "양초의 길이와 옆면을 장면에서 살펴보세요" : "알코올램프 속 알코올의 높이를 장면에서 살펴보세요");
         msg.textContent = explored(sub) ? "✅ 시간이 흐르는 모습을 살펴봤어요. 앞뒤로 끌어 다시 볼 수 있어요." : "바를 오른쪽으로 끌어 가운데 점선까지 가 봐요.";
       }
     }

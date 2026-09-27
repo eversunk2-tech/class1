@@ -24,6 +24,25 @@
 }
 .hud-sw { color: #ffd166; }
 .hud-sw.is-on { color: #7ee3a2; }
+
+/* 스위치 기호(두 단자 + 들린 손잡이 — 6-2-3-2 버저 스위치 버튼과 같은 아이콘, 🔌 대신, 2026-09-27 사용자).
+   글자색을 따른다(currentColor → 가림막 mask). 실험 1 실행(토글) 버튼과 상태 표시(HUD) 앞. 글자가 아니라 꾸밈이라 화면 읽기에는 안 읽힌다.
+   공통 틀이 실행 버튼 글자를 textContent로 다시 쓰므로 버튼 안 요소 대신 ::before로 그린다(app.js markSwitchRun이 .sw-run을 붙임). */
+.ss-run-btn.sw-run::before, .hud-sw::before {
+  content: ""; display: inline-block; width: 1.45em; height: 1.45em; margin-right: 0.25em; vertical-align: -0.24em; /* 기호의 보이는 가운데(24칸 중 약 13.8)를 글자 가운데에 */
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 17h4.2M17.8 17H22'/%3E%3Ccircle cx='7' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Ccircle cx='17' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Cpath d='M7 17 16.2 8.6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 17h4.2M17.8 17H22'/%3E%3Ccircle cx='7' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Ccircle cx='17' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Cpath d='M7 17 16.2 8.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.hud-sw::before { width: 1.35em; height: 1.35em; margin-right: 0.2em; vertical-align: -0.24em; }
+/* 상태 표시가 "스위치: 닫힘"이면 기호도 닫힌 모양(손잡이가 두 단자를 잇는 곧은 선) — 늘 열린 모양이면 글과 반대로 보였다(review-D2 R4).
+   실행 버튼(할 일 "스위치 닫기/열기")은 그대로 열린 모양(6-2-3-2 버튼과 같은 아이콘). */
+.hud-sw.is-on::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 17h4.2M17.8 17H22'/%3E%3Ccircle cx='7' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Ccircle cx='17' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Cpath d='M7 17H17'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 17h4.2M17.8 17H22'/%3E%3Ccircle cx='7' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Ccircle cx='17' cy='17' r='1.9' fill='%23000' stroke='none'/%3E%3Cpath d='M7 17H17'/%3E%3C/svg%3E");
+}
+/* 실행 중(⏳ 스위치를 닫는 중…/여는 중…)에는 스위치 기호를 숨긴다 */
+.ss-run-btn.sw-run:disabled::before { display: none; }
 .ss-view3d .hud { position: absolute; top: 10px; right: 10px; z-index: 3; max-width: calc(100% - 90px); justify-content: flex-end; }
 
 /* ── 관찰 카드 ── */
@@ -97,6 +116,16 @@
 @media (prefers-color-scheme: dark) {
   .s2-table { fill: #4d4436; }
 }
+/* 2D 그림의 물체 누르기(스위치·전지·나침반·둥근 철 고리) — 사진(복사본)에서는 누를 수 없으니 손가락 모양을 쓰지 않는다 */
+.s2-hit { fill: transparent; }
+.side-svg:not(.photo-svg) .s2-tap { cursor: pointer; }
+/* 실험 1 사진의 볼 곳 표시(3D 사진의 점선 원과 같은 뜻) */
+.s2-mark-bg { fill: none; stroke: rgba(255, 255, 255, 0.95); stroke-width: 6; }
+.s2-mark { fill: none; stroke: #e8590c; stroke-width: 3; stroke-dasharray: 9 6; }
+/* 크게 보기(한 화면 실험실)의 2D: 그림을 장면 칸에 맞춘다(86px = 공통 틀의 토글 아래 빈 칸) — 누르는 물체가 처음부터 다 보이게 */
+.ss-exp-layout.is-full .ss-view2d > .s2-wrap { height: calc(100% - 86px); min-height: 150px; display: flex; flex-direction: column; }
+.ss-exp-layout.is-full .s2-wrap > * { flex: none; }
+#experiment-root .ss-exp-layout.is-full .s2-wrap > .side-svg { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
 
 /* 진행 막대 이름("🔒 전지 개수 실험")이 줄바꿈되지 않게 */
 .ss-prow { grid-template-columns: 8.4em 1fr 3.2em; }
@@ -116,10 +145,17 @@
 /* 궁금한 점은 선택 입력 한 줄 */
 .ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 
+/* 낮은 화면(휴대폰 가로): 상태 표시를 조금 작게 — 장면 위쪽 가운데를 비워 두어 확대했을 때 위쪽 이동 화살표(▲)가 상태 표시 아래로
+   밀려 내려와 나침반 이름표를 가리지 않게 */
+@media (max-height: 480px) {
+  .ss-view3d .hud { font-size: 0.8rem; padding: 4px 10px; }
+}
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .hud { font-size: 0.78rem; padding: 4px 8px; }
-  .ss-view3d .hud { max-width: calc(100% - 70px); }
+  /* 두 줄이 되어도 왼쪽 위 '전체 화면 보기' 버튼(폭 약 130px) 쪽으로 넘어가지 않게, "전지 방향: "은 숨겨 두 줄 안에(위쪽 가운데를 덜 가리게) */
+  .ss-view3d .hud { max-width: calc(100% - 150px); }
+  .ss-view3d .hud .hud-pre { display: none; }
   .side-svg { max-height: none; }
   .shot-row .obs-photo { flex: 1 1 100%; }
   .val-num { font-size: 1.7rem; }

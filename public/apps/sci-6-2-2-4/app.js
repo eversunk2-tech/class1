@@ -12,6 +12,18 @@
  *   - 그을음·연기는 그리지 않는다(그을음은 불완전 연소 현상). 촛불이 꺼지는 까닭은 설명하지 않는다(탐구 3에서 다룸).
  *   - 촛불이 꺼질 때까지 기다리는 부분은 "빨리 감기(모형)"로 밝힌다. 양초는 타는 동안 조금 짧아진다(양초의 양이 줄어듦).
  * 3D와 2D는 같은 상태(S)와 같은 순서(sequence)를 쓰고 그리는 방법만 다르다.
+ *
+ * 개편 단계 D(2026-09-27, spec.md 개정 2):
+ *   - 기록하기는 기록만 한다 — 실험 1을 기록해도 앱이 실험 2를 스스로 고르지 않는다(예전 onRecorded의 자동 고르기를 뺌).
+ *     공통 틀도 다음 칸을 고르거나 "다음" 표시를 하지 않는다(사용자 결정) — 앱도 다음 칸 표시를 만들지 않는다.
+ *   - 3D에서 물체를 눌러 실험 고르기: 실험 1 장면의 통 안쪽 벽 푸른색 염화 코발트 종이 → 실험 1(버튼은 그대로).
+ *     실험 2는 버튼으로만 고른다(사용자 결정 — 실험 1 장면에 석회수 병을 두면 실험 1 재료로 오해할 수 있어 뺐다).
+ *     실행 중·이미 고른 실험·숨긴 종이의 누르기는 무시한다(관찰 카드가 사라지지 않게). 누를 수 있다는 안내는 '실험 고르기' 카드
+ *     아래 한 줄(3D이고 아직 아무 실험도 고르지 않았을 때만 — 드래그 안내 줄을 늘리면 휴대폰에서 빨리 감기 배지와 겹친다).
+ *   - "아크릴 통" 이름표는 통 윗면 위가 아니라 통 왼쪽 옆 위쪽에 둔다 — 크게 보기(세로)에서 장면 위 가장자리에 잘리고
+ *     오른쪽 위 상태 표시(HUD)에 가리던 것. 이름표가 3D 칸 가장자리에 걸리거나 장면 위 표시(토글·배지·HUD·빨리 감기 배지·드래그
+ *     안내 글)에 가리면 그 순간 숨긴다(휴대폰·크게 보기).
+ *   - 2D 대체 화면을 크게 보기로 볼 때 그림이 장면 칸 안에 맞게 줄어든다(style.css).
  */
 (function () {
   "use strict";
@@ -102,6 +114,16 @@
     store.set("sceneAt", sceneAt);
   }
   var checkTries = {}; // 관찰 카드에서 틀린 횟수(기록에 함께 저장)
+  // 지금 고른 실험(3D 누르기 가드용 — 공통 틀이 view.highlight로 알려 준다)
+  var selExp = null;
+  var tap3D = false; // 3D 화면이 떠 있어 물체를 눌러 고를 수 있는가(실험 고르기 카드의 안내 한 줄)
+  function setTap3D(on) {
+    if (tap3D === on) return;
+    tap3D = on;
+    setTimeout(function () {
+      if (exp) exp.refresh(); // 안내 한 줄 다시 그리기
+    }, 0);
+  }
 
   var exp = S.Experiment.create({
     root: $("experiment-root"),
@@ -124,6 +146,11 @@
         options: C.experiments.map(function (x) {
           return { id: x.id, label: x.name, icon: expIcon(x.id) };
         }),
+        // 누를 수 있음을 알리는 짧은 말(단계 D) — 드래그 안내 줄은 휴대폰에서 줄이 늘어 빨리 감기 배지와 겹치므로 여기에 둔다.
+        // 3D이고 아직 아무 실험도 고르지 않았을 때만(그때 장면이 실험 1 준비 모습 — 종이를 누르면 실험 1)
+        note: function (sel) {
+          return tap3D && !(sel && sel.exp) ? "👆 장면의 종이를 눌러도 실험 1을 고를 수 있어요." : null;
+        },
       },
     ],
     phases: C.experiments.map(function (x) {
@@ -150,14 +177,7 @@
       return EXP[r.exp].rowLabel + " " + EXP[r.exp].short + " → " + r.observed;
     },
     extras: [safety],
-    onRecorded: function (info) {
-      // 실험 1을 기록하면 실험 2를 미리 골라 둔다(시간 줄이기). 실험 화면은 실험 2 준비 모습으로 바뀐다.
-      if (info && info.phaseCompleted === "A" && !exp.phaseDone("B")) {
-        setTimeout(function () {
-          if (!document.hidden && !exp.isBusy() && !$("experiment-root").closest("section").hidden) exp.select({ exp: "B" });
-        }, 1100);
-      }
-    },
+    // 기록하기는 기록만 한다(2026-09-26 사용자 규칙): 예전에는 실험 1을 기록하면 1.1초 뒤 실험 2를 스스로 골랐다(onRecorded) — 뺐다.
     onChange: lesson.refresh,
   });
 
@@ -454,6 +474,7 @@
       whenVisible: whenVisible,
       highlight: function (s) {
         rememberSel(s);
+        selExp = s && EXP[s.exp] ? s.exp : null;
         if (s && EXP[s.exp] && s.exp !== api.st.exp) {
           setTo(s.exp, false);
           api.home(); // 앞 실험에서 가까이 다가간 시점을 처음 방향으로
@@ -487,6 +508,7 @@
 
   /* ───────── 2D 대체 화면: 옆에서 본 모습 ───────── */
   function build2D(root) {
+    setTap3D(false); // 2D 화면에는 눌러 고르기가 없다(버튼으로 고른다)
     var NS = "http://www.w3.org/2000/svg";
     function n(tag, a, text) {
       var e = document.createElementNS(NS, tag);
@@ -693,11 +715,26 @@
 
   /* ───────── 3D 화면 ───────── */
   function build3D(container, ctx) {
+    // 물체를 눌러 실험 고르기(spec.md 개정 2·보충): 실험 1 장면의 종이 → 실험 1. 버튼과 같은 길(ctx.onPick → 공통 틀의 select)로 간다.
+    var parts = null; // 3D가 준비되면 { paper }
+    var FRAME = { width: 8.4, depth: 6.4, center: [1.75, 1.6, 0] }; // 화면 맞춤 범위(아래 fitDist도 같은 값)
+    function shown(o) {
+      for (var q = o; q; q = q.parent) if (q.visible === false) return false;
+      return true;
+    }
+    function onPick(p) {
+      if (!parts || !p || !EXP[p.exp]) return;
+      var o = parts[p.part];
+      if (!o || !shown(o)) return; // 숨긴 종이(실험 2 장면 — 레이는 숨긴 물체에도 맞는다)
+      if (p.exp === selExp) return; // 이미 고른 실험: 다시 고르면 관찰 카드가 닫히므로 그대로 둔다(실행 중 누르기는 공통 틀이 무시)
+      ctx.onPick({ exp: p.exp });
+    }
     return S.Sim3D.create({
       container: container,
-      frame: { width: 8.4, depth: 6.4, center: [1.75, 1.6, 0] },
+      frame: FRAME,
       viewDir: [0, 0.4, 0.92],
       minDistance: 2.4,
+      onPick: onPick,
       onLost: ctx.onLost,
     }).then(function (v) {
       if (!v) return null;
@@ -758,7 +795,9 @@
       rimT.position.y = G.HC;
       cup.add(wall, lidTop, rimB, rimT);
       var cupLabel = M.label("아크릴 통", { height: 0.36, bold: true });
-      cupLabel.position.set(0, G.HC + 0.4, 0);
+      // 통 왼쪽 옆 위쪽 — 윗면 위에 두면 크게 보기(세로)에서 장면 위 가장자리에 잘리고 오른쪽 위 상태 표시(HUD)에 가렸다(단계 D).
+      // 종이 이름표(통 안쪽 뒤 벽)보다 낮게 두어 휴대폰(이름표 1.5배)에서도 서로 닿지 않는다. 가까이 다가간 시점에서는 숨긴다(아래 onBeforeRender).
+      cupLabel.position.set(-G.R - 0.15, 2.9, 0);
       cup.add(cupLabel);
       v.root.add(cup);
 
@@ -812,10 +851,84 @@
       var LID1 = new T.Vector3(0, G.JAR_H + 0.2, 0); // 병 입구
       lidLabel.position.copy(LID0).add(new T.Vector3(0, 0.4, 0));
 
+      // 눌러 고르기: 종이(이름표 포함) → 실험 1. 실험 2는 버튼으로만(사용자 결정)
+      v.pickable(paper, { exp: "A", part: "paper" });
+      parts = { paper: paper };
+      setTap3D(true);
+
+      // 화면 맞춤 거리(sim3d.js computeFit과 같은 식) — 가까이 다가간 시점인지 알아보는 데 쓴다
+      function fitDist() {
+        var w = container.clientWidth || 1;
+        var h = container.clientHeight || 1;
+        var vf = (v.camera.fov * Math.PI) / 180;
+        var hf = 2 * Math.atan(Math.tan(vf / 2) * (w / h));
+        return Math.max(FRAME.width / 2 / Math.tan(hf / 2), (FRAME.depth * 0.8) / 2 / Math.tan(vf / 2)) * 1.04 + 0.5;
+      }
+
+      // 이름표가 3D 칸 가장자리에 걸리거나(잘림) 장면 위 표시(토글·"모형" 배지·상태 표시·빨리 감기 배지·드래그 안내 글)에 가리면
+      // 그 순간에는 숨긴다 — 잘리거나 겹친 글자를 보이지 않게(휴대폰·크게 보기처럼 칸이 좁을 때). 이동 화살표는 옅어서 넣지 않는다(개정 8 보충).
+      var wp = new T.Vector3();
+      var cp = new T.Vector3();
+      var host = container.closest ? container.closest(".ss-exp-view") || container : container;
+      var overlayRects = [];
+      var overlayAt = -1e9;
+      function overlays() {
+        var now = performance.now();
+        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
+        overlayAt = now;
+        overlayRects = [];
+        var cr = container.getBoundingClientRect();
+        function add(r) {
+          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
+        }
+        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .hud, .hud-ff, .ss-view-tip").forEach(function (el) {
+          if (el.closest("[hidden]") || !el.getClientRects().length) return;
+          if (el.classList.contains("ss-view-tip")) {
+            // 바탕 없는 안내 글은 글자 줄만
+            var rg = document.createRange();
+            rg.selectNodeContents(el);
+            [].forEach.call(rg.getClientRects(), add);
+          } else add(el.getBoundingClientRect());
+        });
+        return overlayRects;
+      }
+      function blocked(sp) {
+        sp.getWorldPosition(wp);
+        cp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
+        var dist = -cp.z;
+        if (dist <= v.camera.near) return true;
+        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
+        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
+        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
+        wp.project(v.camera);
+        if (wp.x - wN / 2 < -0.99 || wp.x + wN / 2 > 0.99 || wp.y - hN / 2 < -0.99 || wp.y + hN / 2 > 0.99) return true; // 가장자리
+        var cw = container.clientWidth || 1;
+        var ch = container.clientHeight || 1;
+        var l = ((wp.x - wN / 2 + 1) / 2) * cw,
+          r = ((wp.x + wN / 2 + 1) / 2) * cw,
+          t = ((1 - wp.y - hN / 2) / 2) * ch,
+          b = ((1 - wp.y + hN / 2) / 2) * ch;
+        var list = overlays();
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
+        }
+        return false;
+      }
+
       // 불꽃이 살짝 흔들리는 모습(렌더할 때마다)
       var st = freshState("A", false);
       var flick = 1;
+      var tags = null; // 이름표 목록(아래에서 만든다)
       v.scene.onBeforeRender = function () {
+        if (tags) {
+          // 종이·병으로 다가간 시점(실행 뒤 관찰, 손가락으로 확대)에서는 통 옆 이름표를 숨긴다(장면 가장자리·이동 화살표 자리)
+          var near = v.camera.position.distanceTo(v.controls.target) < fitDist() * 0.85;
+          tags.forEach(function (t) {
+            var want = t.sp.userData.want !== false && !(t.sp === cupLabel && (near || st.cupY > 0.05)); // 통을 들어 옮기는 동안에도 숨김
+            t.sp.visible = want && !blocked(t.sp);
+          });
+        }
         if (st.flame <= 0) return;
         var tm = performance.now();
         flick = 1 + 0.06 * Math.sin(tm / 85) + 0.035 * Math.sin(tm / 31);
@@ -840,7 +953,8 @@
         var lt = st.lidT;
         lidMesh.position.lerpVectors(LID0, LID1, lt);
         lidMesh.position.y += Math.sin(Math.PI * lt) * 0.7;
-        lidLabel.visible = lt < 0.02;
+        lidLabel.userData.want = lt < 0.02; // 실제로 보일지는 렌더 때(가장자리·장면 위 표시에 걸리면 숨김)
+        lidLabel.visible = lidLabel.userData.want;
         limeMat.color.copy(CLEAR).lerp(MILK, st.milkT);
         limeMat.opacity = 0.22 + 0.7 * st.milkT;
         limeMat.depthWrite = st.milkT > 0.9;
@@ -849,7 +963,7 @@
       hud.set(st, idleText(st));
 
       // 좁은 화면(휴대폰)에서는 이름표를 키운다
-      var tags = [candleLabel, cupLabel, paperLabel, tapeLabel, jarLabel, lidLabel].map(function (sp) {
+      tags = [candleLabel, cupLabel, paperLabel, tapeLabel, jarLabel, lidLabel].map(function (sp) {
         return { sp: sp, sx: sp.scale.x, sy: sp.scale.y };
       });
       var labelK = 0;
@@ -874,6 +988,7 @@
         tween: v.tween,
         hud: hud,
         focus: function (what) {
+          // 과녁 높이 2.2: 앞쪽 통 윗면 테두리가 종이와 종이 이름표 사이를 지나간다(더 높이 보면 테두리가 종이·이름표를 가로지른다 — 단계 D 확인)
           if (what === "paper") return v.focus([G.COVER_X, 2.2, -1.3], 0.62, 700);
           return v.focus([G.JAR_X, 0.7, 0.1], 0.55, 600);
         },
@@ -892,6 +1007,8 @@
           if (labelRO) labelRO.disconnect();
           v.scene.onBeforeRender = function () {};
           hud.remove();
+          parts = null;
+          setTap3D(false);
           v.dispose();
         },
         v.resetView,

@@ -173,8 +173,25 @@
       woodChar: clamp01((h - 0.5) / 0.5), // 머리 부분에 불이 붙은 뒤에 나무 부분 색이 검게 변해 간다(이 실험 시간 안에서는 아직 불이 붙지 않음)
     };
   }
-  // 조건별 지금 모습(아이콘 + 글자: 색만으로 구분하지 않는다)
+  // 장면 위 표시(HUD)·시간 바 상태 줄·알림(aria-live)·시간 바 값 글에 쓰는 지금 모습 — 보이는 사실만(개편 단계 D, 2026-09-27).
+  //   정답 보기와 같은 말("꺼졌어요"·"불이 붙었어요"·"색이 검게 변했어요")과 비교("㉠보다 오래/늦게")는 쓰지 않는다.
+  //   실험해요 1은 시간 바(측정 도구)를 따라 두 촛불의 불꽃 있음·작아지는 중·없음만, 실험해요 2는 가열 과정(가열 전·가열하는 중·가열 끝)만
+  //   — 불꽃·색 변화는 장면에서 직접 본다(재생 중엔 대상만 움직인다). 실제로 본 모습 전체(richStatusOf)는 맞는 보기로 확인한 뒤의
+  //   관찰 카드와 장면 대체 설명(2D 그림·3D 장면 aria-label — 시각 장애 학생도 관찰할 수 있게)에만 쓴다.
   function statusOf(cond, s) {
+    if (cond === "none" || cond === "added") {
+      var f = cond === "none" ? s.fA : s.fB;
+      if (!s.covered) return { icon: "🔥", text: "불꽃 있음" };
+      if (f <= 0) return { icon: "💨", text: "불꽃 없음", off: true };
+      if (f < 0.99) return { icon: "🔥", text: "불꽃이 작아지는 중" };
+      return { icon: "🔥", text: "불꽃 있음" };
+    }
+    if (s.heat <= 0) return { icon: "·", text: "가열 전" };
+    if (s.heat < 1) return { icon: "🌡", text: "가열하는 중" };
+    return { icon: "🌡", text: "가열 끝" };
+  }
+  // 조건별 실제로 본 모습(아이콘 + 글자: 색만으로 구분하지 않는다) — 확인 뒤 관찰 카드·장면 대체 설명 전용(위 주석)
+  function richStatusOf(cond, s) {
     if (cond === "none") {
       if (!s.covered) return { icon: "🔥", text: "불꽃 있음" + (s.lift > 0.99 ? "(덮기 전)" : "") };
       if (s.fA <= 0) return { icon: "💨", text: "불꽃 없음 — 꺼졌어요", off: true };
@@ -250,7 +267,9 @@
   var B_X = 2.6; // ㉡ 통 가운데
   var CANDLE_DX = -0.55; // 통 안 촛불 자리(두 통 모두 같은 자리)
   var BEAKER_DX = 0.8; // ㉡ 통 안 비커 자리
-  var BOX = { w: 3.2, h: 3.0, d: 2.4, raise: 2.1 };
+  // raise: 덮기 전 통을 들어 올린 높이(모형) — 통 아래 끝이 불꽃 끝보다 조금 위(2.1 → 1.75, 단계 D: 들어 올린 통과 이름표가 장면 위 가장자리에서 잘리지 않게)
+  var BOX = { w: 3.2, h: 3.0, d: 2.4, raise: 1.75 };
+  var NAME_IN = 0.35; // ㉠·㉡ 이름표를 통 앞면 위쪽에서 장면 가운데 쪽으로 조금 당긴다(왼쪽 위 토글·오른쪽 위 상태 표시와 떨어지게)
   var PLATE_Y = 2.2; // 철판 윗면
   var PART_D = 1.3; // 철판 가운데로부터 성냥 조각까지 거리(머리·나무 같음)
   var E2_HOME_0 = [0, 1.5, 0.2];
@@ -278,8 +297,8 @@
       viewDir: [0, 0.42, 0.91],
       minDistance: 3,
       onPick: function (p) {
-        // 숨겨진 실험의 물체는 누르지 않은 것으로 본다
-        if (p && p.cond && expOf(p.cond) === sim.show) ctx.onPick(p);
+        // 숨겨진 실험의 물체는 누르지 않은 것으로 본다. 이미 고른 조건을 다시 누르면 그대로 둔다(다시 고르면 공통 틀이 관찰 카드를 닫는다 — review-D1 L2)
+        if (p && p.cond && expOf(p.cond) === sim.show && p.cond !== curSel) ctx.onPick(p);
       },
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -287,6 +306,17 @@
       var T = v.THREE;
       var M = v.make;
       var disposed = false;
+
+      // 누르기(탭) 대상 등록: 숨긴 실험의 물체는 누르기 레이에 걸리지 않게 한다(단계 D). three.js 레이는 숨긴 물체도 맞히므로
+      // 실험해요 2에서 나무 조각을 누르면 그 앞(같은 자리)의 숨은 ㉡ 아크릴 통이 먼저 맞아 아무것도 골라지지 않았다.
+      function pickable(obj, value) {
+        var orig = obj.raycast;
+        obj.raycast = function (rc, hits) {
+          for (var n = obj; n; n = n.parent) if (!n.visible) return;
+          return orig.call(this, rc, hits);
+        };
+        v.pickable(obj, value);
+      }
 
       var table = M.table(14, 8, 0xd9c7a3);
       v.root.add(table);
@@ -355,7 +385,7 @@
         var wick = new T.Mesh(new T.CylinderGeometry(0.018, 0.018, 0.14, 8), M.material(0x222222));
         wick.position.set(CANDLE_DX, 0.91 + 0.07, 0);
         g.add(dish, candle, wick);
-        v.pickable(candle, { cond: d.id });
+        pickable(candle, { cond: d.id });
         var fl = makeFlame();
         fl.position.set(CANDLE_DX, 0.98, 0);
         g.add(fl);
@@ -381,7 +411,7 @@
           var liquid = new T.Mesh(new T.CylinderGeometry(0.4, 0.39, 0.5, 28), M.material(0xe2bf62, { transparent: true, opacity: 0.72 }));
           liquid.position.set(bx, 0.27, 0);
           g.add(glass, liquid);
-          v.pickable(glass, { cond: d.id });
+          pickable(glass, { cond: d.id });
           var bubMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
           var bubGeo = new T.SphereGeometry(0.035, 8, 6);
           for (var i = 0; i < 14; i++) {
@@ -415,17 +445,21 @@
         );
         var edges = new T.LineSegments(boxEdges, new T.LineBasicMaterial({ color: 0x5d9ccc }));
         box.add(shell, edges);
-        v.pickable(shell, { cond: d.id });
-        var name = M.label(COND[d.id].name, { height: 0.5, bold: true, border: d.id === "none" ? "#5b6676" : "#2f6fd6" });
-        name.position.set(0, BOX.h / 2 + 0.42, 0);
-        box.add(name);
+        pickable(shell, { cond: d.id });
         g.add(box);
+        // ㉠·㉡ 이름표: 덮은 통의 앞면 위쪽 자리에 고정(통을 들어 올려도 움직이지 않는다). 통 위에 띄우면 들어 올린 통과 함께 올라가
+        // 장면 위 가장자리에서 잘리거나 왼쪽 위 토글·오른쪽 위 상태 표시에 가렸다(review-dock R1, 단계 D). 불꽃·흰 김보다 위라 가리지 않고,
+        // 통 모서리 선이 이름표를 가로지르지 않는다(덮기 전 통 아래 끝 < 이름표 < 덮은 통 위 끝).
+        var name = M.label(COND[d.id].name, { height: 0.5, bold: true, border: d.id === "none" ? "#5b6676" : "#2f6fd6" });
+        name.position.set(d.x < 0 ? NAME_IN : -NAME_IN, BOX.h - 0.32, BOX.d / 2 + 0.02);
+        g.add(name);
         rig.box = box;
         rig.name = name;
         rigs[d.id] = rig;
       });
-      var sameLbl = M.label("크기가 같은 아크릴 통", { height: 0.36 });
-      sameLbl.position.set(0, 0.25, 1.7);
+      // 두 통 사이 탁자 위(앞쪽 가운데는 "⏩ 빨리 감기(모형)" 표시 자리라 겹쳤다 — 단계 D)
+      var sameLbl = M.label("크기가 같은\n아크릴 통", { height: 0.6 });
+      sameLbl.position.set(0, 0.32, -0.5);
       e1.add(sameLbl);
 
       /* ── 실험해요 2: 삼발이 · 철판 · 알코올램프 · 성냥의 머리/나무 부분 ── */
@@ -500,12 +534,12 @@
       head.scale.set(1.25, 0.8, 1);
       head.position.set(-PART_D, PLATE_Y + 0.14, 0);
       e2.add(head);
-      v.pickable(head, { cond: "head" });
+      pickable(head, { cond: "head" });
       var woodMat = M.material(0xe0b97c, { roughness: 0.85 });
       var wood = new T.Mesh(new T.BoxGeometry(0.17, 0.15, 1.05), woodMat);
       wood.position.set(PART_D, PLATE_Y + 0.075, 0);
       e2.add(wood);
-      v.pickable(wood, { cond: "wood" });
+      pickable(wood, { cond: "wood" });
       var WOOD0 = new T.Color(0xe0b97c);
       var WOOD1 = new T.Color(0x2a221c);
       var HEAD0 = new T.Color(0xa3262c);
@@ -528,16 +562,18 @@
         r.visible = false;
         e2.add(r);
         partRings[d[0]] = r;
-        var lb = M.label(COND[d[0]].name.replace("성냥의 ", "성냥의\n"), { height: 0.62, bold: true, border: "#1f2733" });
-        lb.position.set(d[1] + Math.sign(d[1]) * 1.05, PLATE_Y + 0.45, -0.2);
+        // 철판 바깥 옆(철판보다 조금 아래): 철판 위쪽 뒤에 띄우면 장면 왼쪽 위 토글·오른쪽 위 상태 표시에 가렸다(단계 D).
+        // 철판 가장자리에 가리지 않게 늘 위에 그린다(depthTest: false — 불꽃과는 떨어져 있어 가리지 않는다).
+        var lb = M.label(COND[d[0]].name.replace("성냥의 ", "성냥의\n"), { height: 0.62, bold: true, border: "#1f2733", depthTest: false });
+        lb.position.set(Math.sign(d[1]) * 2.7, PLATE_Y - 0.6, 0.3);
         e2.add(lb);
       });
-      // 모래 상자(안전)
+      // 모래 상자(안전) — 실험해요 2 처음 시점의 왼쪽 가장자리에서 이름표가 잘리지 않게 조금 안쪽으로(-4.3 → -3.9, 단계 D)
       var sand = new T.Mesh(new T.BoxGeometry(1.6, 0.4, 1.2), M.material(0xd8c28f, { roughness: 0.95 }));
-      sand.position.set(-4.3, 0.2, 0.6);
+      sand.position.set(-3.9, 0.2, 0.6);
       e2.add(sand);
       var sandLbl = M.label("모래 상자", { height: 0.32 });
-      sandLbl.position.set(-4.3, 0.75, 0.6);
+      sandLbl.position.set(-3.9, 0.75, 0.6);
       e2.add(sandLbl);
 
       // 좁은 화면(휴대폰)에서는 이름표를 키운다
@@ -570,9 +606,20 @@
 
       /* ── 상태 그리기 ── */
       var last = null;
+      // 3D 장면 대체 설명(스크린 리더): 틀이 붙인 설명 뒤에 지금 장면 모습을 덧붙인다(2D 그림의 aria-label과 같은 내용 — sceneDesc)
+      var canvasEl = v.renderer && v.renderer.domElement;
+      var baseAria = canvasEl ? canvasEl.getAttribute("aria-label") || "" : "";
+      var lastAria = "";
       function render(s) {
         if (disposed) return;
         last = s;
+        if (canvasEl) {
+          var al = baseAria + " " + (s.show === "e1" ? "실험해요 1: " : "실험해요 2: ") + sceneDesc(s);
+          if (al !== lastAria) {
+            lastAria = al;
+            canvasEl.setAttribute("aria-label", al);
+          }
+        }
         e1.visible = s.show === "e1";
         e2.visible = s.show === "e2";
         // e1
@@ -657,8 +704,9 @@
       function spotOf(cond) {
         if (cond === "none") return [A_X * 0.55, 1.4, 0];
         if (cond === "added") return [B_X * 0.55, 1.4, 0];
-        if (cond === "head") return [-PART_D * 0.4, PLATE_Y - 0.1, 0.2];
-        return [PART_D * 0.4, PLATE_Y - 0.1, 0.2];
+        // 실험해요 2 가까이 보기: 고른 쪽으로 살짝만(두 조각과 이름표가 함께 보이게 — 단계 D, 전: 0.4 · fitFor(6.2, 4.2))
+        if (cond === "head") return [-PART_D * 0.15, PLATE_Y - 0.1, 0.2];
+        return [PART_D * 0.15, PLATE_Y - 0.1, 0.2];
       }
       // 실험해요 2는 장치가 작아 처음 시점을 조금 가깝게(철판·램프가 모두 보이게) 잡는다
       function home(ms) {
@@ -668,7 +716,7 @@
       return {
         render: render,
         focus: function (cond, ms) {
-          if (expOf(cond) === "e2") return flyTo(spotOf(cond), fitFor(6.2, 4.2), ms || 700);
+          if (expOf(cond) === "e2") return flyTo(spotOf(cond), fitFor(6.8, 4.5), ms || 700);
           return v.focus(spotOf(cond), 0.8, ms || 700);
         },
         home: home,
@@ -717,7 +765,7 @@
     ].forEach(function (d) {
       var g = svg("g", { class: "d2-pick", "data-cond": d.id });
       g.addEventListener("click", function () {
-        ctx.onPick({ cond: d.id });
+        if (d.id !== curSel) ctx.onPick({ cond: d.id }); // 이미 고른 조건은 그대로(관찰 카드가 닫히지 않게)
       });
       var candleX = d.cx - 50;
       var sel = svg("ellipse", { cx: candleX, cy: TY + 4, rx: 44, ry: 9, class: "d2-selring" });
@@ -807,7 +855,7 @@
     ].forEach(function (d) {
       var g = svg("g", { class: "d2-pick", "data-cond": d[0] });
       g.addEventListener("click", function () {
-        ctx.onPick({ cond: d[0] });
+        if (d[0] !== curSel) ctx.onPick({ cond: d[0] }); // 이미 고른 조건은 그대로(관찰 카드가 닫히지 않게)
       });
       var sel = svg("ellipse", { cx: d[1], cy: PY + 2, rx: 42, ry: 8, class: "d2-selring" });
       g.appendChild(sel);
@@ -913,11 +961,16 @@
       },
     };
   }
-  function ariaOf(s) {
+  // 장면 대체 설명(2D 그림·3D 장면 aria-label): 장면을 "보는 것"과 같으므로 보이는 모습을 말한다(실험해요 1은 시간 바를 따라 지금 모습,
+  // 실험해요 2는 가열하는 동안 본 모습까지 — 시각 장애 학생도 관찰할 수 있게). 화면에 보이는 글에는 쓰지 않는다(statusOf 주석).
+  function sceneDesc(s) {
     if (s.show === "e1") {
-      return "실험해요 1 옆모습(모형): " + (s.covered ? "두 촛불을 크기가 같은 아크릴 통으로 덮었어요. " : "아직 덮지 않았어요. ") + "㉠ " + statusOf("none", s).text + ", ㉡ " + statusOf("added", s).text + ".";
+      return (s.covered ? "두 촛불을 크기가 같은 아크릴 통으로 덮었어요. " : "아직 덮지 않았어요. ") + "㉠ " + statusOf("none", s).text + ", ㉡ " + statusOf("added", s).text + ".";
     }
-    return "실험해요 2 옆모습(모형): 철판 가운데로부터 같은 거리에 성냥의 머리 부분과 나무 부분이 있어요. 머리 부분 " + statusOf("head", s).text + ", 나무 부분 " + statusOf("wood", s).text + ".";
+    return "철판 가운데로부터 같은 거리에 성냥의 머리 부분과 나무 부분이 있어요. 머리 부분 " + richStatusOf("head", s).text + ", 나무 부분 " + richStatusOf("wood", s).text + ".";
+  }
+  function ariaOf(s) {
+    return (s.show === "e1" ? "실험해요 1" : "실험해요 2") + " 옆모습(모형): " + sceneDesc(s);
   }
 
   // 공통 틀에 넘기는 장면: 만든 장면을 curView로 잡고, 공통 틀 view 메서드는 앱 상태로 처리한다
@@ -1092,7 +1145,8 @@
     clearMessage: "실험 장치를 처음 상태로 되돌렸어요. 기록은 그대로 남아 있어요.",
     runTitle: "실험하기",
     busyLabel: function (sel) {
-      return expOf(sel.cond) === "e1" ? "⏳ 덮은 뒤 아래 시간 바를 끝까지 끌어요" : "⏩ 가열하는 중… 잘 지켜보세요";
+      // 크게 보기(가로)에서는 시간 바가 오른쪽 조작 칸에 있어 "아래"라고 하지 않는다(단계 D)
+      return expOf(sel.cond) === "e1" ? "⏳ 시간 바를 오른쪽 끝까지 끌어요" : "⏩ 가열하는 중… 잘 지켜보세요";
     },
     factors: [
       {
@@ -1135,7 +1189,8 @@
       build2D: function (c, ctx) {
         return wrapView(build2D(c, ctx));
       },
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향",
+      // 물체를 눌러 고를 수 있음을 알린다(단계 D). 휴대폰(폭 375px)에서도 두 줄에 들도록 "두 손가락: 확대/축소"는 뺐다(세 줄이면 촛불을 가림)
+      tip3D: "👆 드래그: 돌려 보기 · 두 번 탭: 처음 방향 · 촛불·성냥을 눌러 고르기",
       tip2D: "2D 화면(모형, 옆에서 본 모습)이에요. 촛불이나 성냥 조각을 눌러 고를 수 있어요.",
     },
     observe: observeCard,
@@ -1347,7 +1402,7 @@
     });
     function flash() {
       if (sim.show !== "e1") return;
-      msg.textContent = !sim.covered ? "먼저 오른쪽(또는 아래)의 ▶ 버튼으로 두 촛불을 아크릴 통으로 덮어요." : "덮는 중이에요. 잠시 기다려요.";
+      msg.textContent = !sim.covered ? "먼저 ▶ 버튼으로 두 촛불을 아크릴 통으로 덮어요." : "덮는 중이에요. 잠시 기다려요.";
       barCard.classList.remove("is-flash");
       void barCard.offsetWidth;
       barCard.classList.add("is-flash");
@@ -1364,7 +1419,7 @@
         node.classList.toggle("is-sel", s.sel === ids[i]);
       });
       if (liveChip) {
-        var cs = statusOf(liveChip.cond, s);
+        var cs = richStatusOf(liveChip.cond, s); // 맞는 보기로 확인한 뒤에만 보인다(chipNode)
         liveChip.icon.textContent = cs.icon + " ";
         liveChip.txt.textContent = cs.text;
       }

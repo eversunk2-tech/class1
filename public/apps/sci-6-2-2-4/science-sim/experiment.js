@@ -70,6 +70,8 @@
  *     extras: [node],                                       // 선택: 패널 맨 아래(안전 수칙 등)
  *     toast: function (msg, ms) {},
  *     onRecorded: function (info) {},                       // { record, replaced, phaseCompleted: "A"|null, allDone }
+ *                                                           // 기록 뒤 틀은 다음 칸을 고르지 않는다(2026-09-27 — 조건·장면 그대로, "다음" 안내 표시도 없음).
+ *                                                           // 앱도 여기서 다음 조건을 고르거나 실행하지 않는다(CLAUDE.md "기록 뒤 다음 조건을 자동으로 고르거나 재생하지 않는다").
  *     onChange: function () {},                             // 진행 상황이 바뀔 때(단계 이동 막대 갱신 등)
  *     can3D: true,                                          // false면 처음부터 2D(주소에 ?no3d=1이면 자동 false)
  *     scenePanel: node,                                     // 선택(2026-09-25): 지금 값을 보여 주는 노드(예: 시각·측정값 패널). 전체 화면 모드일 때
@@ -1378,51 +1380,34 @@
         if (!before[i] && phaseDone(ph.id)) completed = ph;
       });
       var desc = o.describeRecord ? o.describeRecord(r.record) : "";
+      // 기록하기는 기록만 한다(2026-09-26·27 사용자 — "어느 조건을 측정하는지 헷갈릴 수 있음", 모든 실험 앱): 다음 칸을 스스로
+      // 고르지 않고 지금 조건·장면을 그대로 둔다. "다음" 안내 표시도 두지 않는다(2026-09-27 사용자 — "'다음' 표시 없어도 교사의 활동 안내 후
+      // 학생들이 순서대로 선택해서 할 수 있을 것 같아"). 알림 글은 예전 그대로.
       if (completed && allDone()) toast("🎉 모든 실험을 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
       else if (completed) {
         var next = o.phases[completed.index + 1];
         toast("🎉 " + SciSim.josa(completed.name, "을", "를") + " 모두 기록했어요!" + (next ? " 이제 " + SciSim.josa(next.name, "이", "가") + " 열렸어요." : ""), 3800);
-        if (next) {
-          var first = next.cells.filter(function (c) {
-            return !cellDone(c, next);
-          })[0];
-          if (first) factorIds.forEach(function (k) { sel[k] = first[k]; });
-        }
       } else {
         toast((r.replaced ? "🔁 다시 기록했어요" : "📝 기록했어요") + (desc ? ": " + desc : ""));
-        advance(s, p);
       }
       pruneHidden();
       afterSelect();
+      // 크게 보기: 관찰 카드가 닫혀 조작 칸이 짧아진 뒤, 조건 고르기 카드들이 칸 밖이면 칸 안에서만 최소로 올려 보인다
+      // (review-D1 M1 — 예전에는 다음 칸이 저절로 골라져 막대의 ▶만 누르면 됐다. 어느 칸을 하라고 가리키지는 않는다). 기본 화면은 예전처럼
+      // 움직이지 않는다. '확인하기' 뒤의 피드백 스크롤(약 0.3초)이 끝난 다음에 올린다(review-D2 R1 — 그 스크롤이 이 올림을 덮었다).
+      if (R.enl.isOn() && !allDone()) {
+        setTimeout(function () {
+          if (!R.enl.isOn()) return;
+          var cards = o.root.querySelectorAll(".ss-exp-panel .ss-step-card");
+          if (!cards.length) return;
+          var first = cards[0].getBoundingClientRect();
+          var last = cards[cards.length - 1].getBoundingClientRect();
+          if (first.height > 0) revealInDock(dockOf(cards[0]), first.top, last.bottom);
+        }, 450);
+      }
       if (o.onRecorded) o.onRecorded({ record: r.record, replaced: r.replaced, phaseCompleted: completed ? completed.id : null, allDone: allDone() });
       if (o.onChange) o.onChange();
     });
-
-    // 다음 빈칸 고르기: 첫 번째 조건만 바꾼 칸 → 같은 단계의 다른 빈칸
-    function advance(s, p) {
-      if (!p) return;
-      var cur = records.countOf(o.cellKey(s));
-      if (cur < p.trials) return; // 같은 조건을 더 재야 하면 그대로 둔다
-      var rest = factorIds.slice(1);
-      var cells = p.cells;
-      var idx = -1;
-      cells.forEach(function (c, i) {
-        if (sameSel(c, s, factorIds)) idx = i;
-      });
-      for (var k = 1; k <= cells.length; k++) {
-        var c = cells[(idx + k) % cells.length];
-        if (sameSel(c, s, rest) && !cellDone(c, p)) {
-          Object.assign(sel, c);
-          return;
-        }
-      }
-      for (var j = 0; j < cells.length; j++) {
-        if (!cellDone(cells[j], p)) {
-          factorIds.forEach(function (key) { sel[key] = cells[j][key]; });
-          return;
-        }
-      }
-    }
 
     /* ── 실험 화면(3D 또는 2D) ── */
     R.btnReset.addEventListener("click", function () {

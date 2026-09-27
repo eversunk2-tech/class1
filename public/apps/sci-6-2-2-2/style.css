@@ -93,6 +93,11 @@
 .d2-svg { display: block; width: 100%; height: auto; }
 .ss-view2d .d2-svg { max-height: 34vh; }
 @media (max-width: 640px) { .ss-view2d .d2-svg { max-height: none; } }
+/* 크게 보기 + 2D: 물질 버튼 줄은 처음부터 보이고, 그림은 장면 칸의 남는 높이에 맞춘다(칸 안에서 밀지 않아도 되게).
+   86px = 공통 틀의 토글 아래 빈 칸(.ss-view2d::before) */
+.ss-exp-layout.is-full .ss-view2d > .d2-wrap { height: calc(100% - 86px); min-height: 150px; }
+.ss-exp-layout.is-full .d2-wrap > * { flex: none; }
+#experiment-root .ss-exp-layout.is-full .d2-wrap > .d2-svg { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
 .d2-bg { fill: #e6edf5; }
 .d2-table { fill: #d9c7a3; }
 .d2-brass { fill: #c9a24a; stroke: #9c7a2a; stroke-width: 1.5; }

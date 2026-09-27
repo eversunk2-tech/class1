@@ -62,6 +62,10 @@
     return mixed ? "look" : "mix";
   }
 
+  function describeRec(r) {
+    return POW[r.powder].name + " · " + TGT[r.target].short + " → " + r.result;
+  }
+
   /* ───────── 기록 ───────── */
   var records = S.RecordStore(store, {
     key: "records",
@@ -182,9 +186,7 @@
     makeRecord: function (sel, observed) {
       return { powder: sel.powder, target: sel.target, result: observed };
     },
-    describeRecord: function (r) {
-      return POW[r.powder].name + " · " + TGT[r.target].short + " → " + r.result;
-    },
+    describeRecord: describeRec,
     miniTable: {
       title: "기록한 칸 한눈에 보기",
       rows: C.powders.map(function (p) {
@@ -197,15 +199,7 @@
         return { powder: r.id, target: c.id };
       },
     },
-    // 한 가루의 한 칸을 기록하면 같은 가루의 나머지 칸을 먼저 고른다(이미 섞었으니 '살펴보기'만 하면 된다)
-    onRecorded: function (info) {
-      var r = info.record;
-      if (!r || info.allDone) return;
-      var other = C.targets.filter(function (t) {
-        return t.id !== r.target && !records.has(keyOf(r.powder, t.id));
-      })[0];
-      if (other) exp.select({ powder: r.powder, target: other.id });
-    },
+    // 기록하기는 기록만 한다(2026-09-26·27 사용자 규칙, 단계 D) — 다음 칸을 스스로 고르지 않고 "다음" 안내 표시도 없다(공통 틀과 같음).
     onChange: lesson.refresh,
   });
 
@@ -222,13 +216,20 @@
     }, 30);
   });
 
-  /* 관찰·기록 카드: 본 모습(글) + 보기 고르기 → 확인하기(본 것과 같아야 기록) */
+  /* 관찰·기록 카드: 살펴볼 곳 안내(중립) + 보기 고르기 → 확인하기(본 것과 같아야 기록)
+     '본 모습' 글(C.seen)은 바로 아래 보기와 같은 말이라(review-A L8) 처음에는 "장면에서 ○○을 살펴보세요"만 보이고,
+     맞는 보기로 '확인하기'를 눌렀을 때만 드러난다(틀린 답으로 확인하면 계속 숨김 — sci-6-2-2-3 chipNode와 같은 방식).
+     시각 장애 학생이 결과를 알 수 있게 장면 자체의 대체 설명(3D 캔버스 aria-label·2D 그림 설명)이 상태를 말한다(pairText). */
   function observeCard(sel) {
     var p = POW[sel.powder];
     var t = TGT[sel.target];
     var question = S.josa(p.name, "과", "와") + " 식초를 섞었을 때 " + (sel.target === "balloon" ? "고무풍선은" : "삼각 플라스크 안은") + " 어떻게 되었나요?";
+    var reveal = el("span", { class: "ob-reveal", hidden: true, text: "본 모습: " + C.seen[sel.powder][sel.target] });
     var body = el("div", { class: "ob-body" }, [
-      el("p", { class: "ob-seen" }, [el("span", { class: "ob-icon", "aria-hidden": "true", text: t.icon }), el("span", { text: "👀 " + C.seen[sel.powder][sel.target] })]),
+      el("p", { class: "ob-seen" }, [
+        el("span", { class: "ob-icon", "aria-hidden": "true", text: t.icon }),
+        el("span", { class: "ob-text" }, [el("span", { text: "👀 장면에서 " + josaObj(t.short) + " 살펴보세요." }), reveal]),
+      ]),
     ]);
     return {
       question: question,
@@ -236,12 +237,23 @@
       type: "choice",
       choices: C.observeChoices[sel.target],
       check: function (observed) {
-        if (observed === expected(sel.powder, sel.target)) return true;
+        if (observed === expected(sel.powder, sel.target)) {
+          reveal.hidden = false; // 맞는 보기로 확인했을 때만 본 모습 글을 보여 준다
+          return true;
+        }
         return "🔍 방금 본 모습과 다른 것 같아요. 장면을 다시 살펴보고, 본 것과 같은 보기를 골라 보세요.";
       },
       okMessage: "⭕ 본 것과 같아요! '기록하기'를 눌러 기록해요.",
       retryLabel: "🔁 다시 섞어 보기",
     };
+  }
+
+  /* 장면 대체 설명(화면 읽기 프로그램용, 3D 캔버스 aria-label·2D 그림 설명): 장면을 "보는 것"과 같으므로 섞은 뒤에는 보이는 상태를
+     말한다(관찰 카드의 본 모습 글은 맞는 보기로 확인한 뒤에만 보인다). */
+  function pairText(powderId, mixed) {
+    var p = POW[powderId];
+    if (!mixed) return p.name + " + 식초: " + S.josa(p.name, "이", "가") + " 든 고무풍선을 식초가 든 삼각 플라스크 입구에 씌워 두었어요(아직 섞지 않음).";
+    return p.name + " + 식초(섞음): " + C.seen[powderId].balloon + " " + C.seen[powderId].flask;
   }
 
   // 실험대를 되돌린 뒤(공통 틀이 화면 상태 "scene"을 비운 다음) 실행 버튼 글자·도움말을 다시 그린다
@@ -266,14 +278,24 @@
     neckLen: 0.55,
   };
 
+  // 이미 고른 칸(가루·살펴볼 것)을 다시 누르면 그대로 둔다 — 다시 고르면 공통 틀이 관찰 카드를 닫는다(review-D1 L2). 3D·2D 공통.
+  var liveSel = null;
+  function samePick(p) {
+    if (!p || !liveSel) return false;
+    return Object.keys(p).every(function (k) {
+      return liveSel[k] === p[k];
+    });
+  }
   function build3D(container, ctx) {
     return S.Sim3D.create({
       container: container,
-      frame: { width: 8.4, depth: 6.8, center: [0, 2.6, 0] },
+      // 화면 맞춤(단계 D): 넓고 낮은 장면 칸(세로 태블릿·크게 보기·휴대폰 가로)에서도 부푼 고무풍선 꼭대기가 장면 위 가장자리·배지에
+      // 닿지 않고, 앞쪽 '식초' 이름표가 드래그 안내 줄·장면 안 막대에 가리지 않게 조금 넓게 본다(예전 depth 6.8·center y 2.6)
+      frame: { width: 8.4, depth: 7.6, center: [0, 2.45, 0] },
       viewDir: [0, 0.36, 0.93],
       minDistance: 3,
       onPick: function (p) {
-        ctx.onPick(p);
+        if (!samePick(p)) ctx.onPick(p);
       },
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -398,10 +420,13 @@
         pivot.add(balPick);
         v.pickable(balPick, { powder: p.id, target: "balloon" });
 
-        // 이름표(색만으로 구분하지 않도록 글자)
+        // 이름표(색만으로 구분하지 않도록 글자) — 삼각 플라스크 목 안쪽 옆(고무풍선을 씌운 곳 바로 아래, 두 쌍 사이 빈 곳).
+        // 단계 D: 예전 자리(탁자 앞 가장자리, 바닥 높이)는 넓고 낮은 장면 칸·휴대폰에서 장면 아래 가장자리·드래그 안내 줄·장면 안 막대에
+        // 잘리거나 가렸다. 이 높이는 늘어진 풍선(바깥쪽)·선 풍선(목 위)·부푼 풍선과 겹치지 않는다(안 바뀌는 이름표).
         var nameLabel = M.label(p.name, { height: 0.42, bold: true });
-        nameLabel.position.set(0, 0.22, 1.62);
+        nameLabel.position.set(-side * (0.45 + nameLabel.scale.x / 2), 2.1, 0.25);
         g.add(nameLabel);
+        v.pickable(nameLabel, { powder: p.id }); // 이름표를 눌러도 그 가루 물질이 골라진다(2D 그림 누르기와 같게 — 살펴볼 것은 그대로)
         var vinegarLabel = M.label("식초", { height: 0.36 });
         vinegarLabel.position.set(0, 0.5, 1.12);
         g.add(vinegarLabel);
@@ -427,6 +452,22 @@
         };
         setBalloon(pairs[p.id], BAL.droop * -side, BAL.limp);
       });
+
+      // 장면 대체 설명(화면 읽기용 — 3D 캔버스의 aria-label): 두 쌍의 지금 모습(섞은 뒤면 보이는 상태)
+      var canvasEl = v.renderer && v.renderer.domElement;
+      function describe() {
+        if (!canvasEl) return;
+        canvasEl.setAttribute(
+          "aria-label",
+          "3D 실험 장면(모형). 드래그하면 돌려 볼 수 있어요. " +
+            C.powders
+              .map(function (p) {
+                return pairText(p.id, !!pairs[p.id] && pairs[p.id].state === "mixed");
+              })
+              .join(" ")
+        );
+      }
+      describe();
 
       // 고무풍선 몸통 크기·각도(피벗 기준). angle: 0이면 똑바로 선 모습
       function setBalloon(o, angle, scale) {
@@ -514,6 +555,7 @@
         o.sediment.scale.y = 0.01;
         o.foam.visible = false;
         o.state = "idle";
+        describe();
       }
       // 섞은 뒤 결과(애니메이션 없이)
       function finalPair(o) {
@@ -534,6 +576,7 @@
           addBubbles(o);
         }
         o.state = "mixed";
+        describe();
       }
 
       // 가루가 풍선에서 식초로 떨어지는 알갱이
@@ -567,6 +610,7 @@
       return {
         whenVisible: v.whenVisible,
         highlight: function (s) {
+          liveSel = s ? { powder: s.powder, target: s.target } : null;
           Object.keys(pairs).forEach(function (id) {
             pairs[id].ring.visible = s.powder === id;
           });
@@ -720,6 +764,7 @@
       return token;
     };
     var panels = {};
+    var descs = [];
     var row = el("div", { class: "d2-row" });
     var caption = el("p", { class: "d2-caption", "aria-live": "polite" });
     C.powders.forEach(function (p, i) {
@@ -749,13 +794,16 @@
       var vin = svg("text", { class: "d2-vin", x: 100, y: 232, "text-anchor": "middle" });
       vin.textContent = "식초";
       var pic = svg("svg", { viewBox: "0 -70 200 360", class: "d2-svg", "aria-hidden": "true" }, [liquid, sediment, foam, bubbles, vin, flask, falling, balWrap, focusBal, focusFlask, name]);
-      var btn = el("button", { type: "button", class: "d2-pick", "aria-pressed": "false", "aria-label": S.josa(p.name, "이", "가") + " 든 고무풍선과 식초(고르기)", onclick: function () { ctx.onPick({ powder: p.id }); } }, [pic]);
+      // 그림 설명(화면 읽기용): 섞은 뒤에는 보이는 상태를 말한다(pairText) — 버튼 이름은 그대로, 설명으로 붙인다
+      var desc = el("span", { class: "ss-sr-only", id: "d2-desc-" + p.id });
+      descs.push(desc);
+      var btn = el("button", { type: "button", class: "d2-pick", "aria-pressed": "false", "aria-label": S.josa(p.name, "이", "가") + " 든 고무풍선과 식초(고르기)", "aria-describedby": "d2-desc-" + p.id, onclick: function () { if (!samePick({ powder: p.id })) ctx.onPick({ powder: p.id }); } }, [pic]);
       row.appendChild(btn);
-      panels[p.id] = { id: p.id, side: side, btn: btn, balGroup: balGroup, balBody: balBody, balPowder: balPowder, sediment: sediment, foam: foam, bubbles: bubbles, falling: falling, liquid: liquid, focusBal: focusBal, focusFlask: focusFlask, state: "idle" };
+      panels[p.id] = { id: p.id, side: side, btn: btn, balGroup: balGroup, balBody: balBody, balPowder: balPowder, sediment: sediment, foam: foam, bubbles: bubbles, falling: falling, liquid: liquid, focusBal: focusBal, focusFlask: focusFlask, desc: desc, state: "idle" };
       resetPanel(panels[p.id]);
     });
     var badge = el("span", { class: "d2-badge", text: C.modelBadge });
-    root.appendChild(el("div", { class: "d2-wrap" }, [badge, row, caption]));
+    root.appendChild(el("div", { class: "d2-wrap" }, [badge, row, caption].concat(descs)));
     caption.textContent = "가루 물질을 고르고 고무풍선을 세워 섞어 보세요.";
 
     function setBal(o, angle, rx, ry) {
@@ -775,6 +823,7 @@
       o.falling.setAttribute("transform", "");
       o.liquid.classList.remove("is-cloudy");
       o.state = "idle";
+      o.desc.textContent = pairText(o.id, false);
     }
     function finalPanel(o) {
       o.balPowder.style.display = "none";
@@ -790,6 +839,7 @@
         o.bubbles.classList.add("is-on");
       }
       o.state = "mixed";
+      o.desc.textContent = pairText(o.id, true);
     }
     function focusOn(sel) {
       Object.keys(panels).forEach(function (id) {
@@ -802,6 +852,7 @@
 
     return {
       highlight: function (s) {
+        liveSel = s ? { powder: s.powder, target: s.target } : null;
         Object.keys(panels).forEach(function (id) {
           panels[id].btn.classList.toggle("is-sel", s.powder === id);
           panels[id].btn.setAttribute("aria-pressed", String(s.powder === id));

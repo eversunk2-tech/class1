@@ -8,6 +8,13 @@
  *  - 실험 1: 전기 회로 카드 (가)~(라) 4칸. 카드를 고르면 그 배선이 3D에 그대로 나타나고, '스위치 닫기'로 확인한다.
  *  - 실험 2: (나)와 같은 배선에서 스위치 자리에 플라스틱·고무·금속 막대를 끼워 3칸. 실험 1을 다 기록해야 열린다.
  *  - 값을 타이핑하지 않는다. 본 것과 같은 보기를 고르고 '기록하기'로 저장한다(7칸).
+ *
+ * 개편 단계 D(2026-09-27, spec.md "개정 2"): 저장 키·저장 구조·기록·detail은 그대로.
+ *  - 관찰 카드·장면 위 안내 글·2D 캡션은 결과(켜짐/안 켜짐)를 먼저 말하지 않는다 — 본 모습 글은 맞는 보기로 확인한 뒤에만.
+ *    결과는 장면 대체 설명(3D 캔버스·2D 그림의 aria-label)이 말한다(화면을 보지 못하는 학생용).
+ *  - 3D에서 물체를 눌러 고르기: 탁자 왼쪽 뒤 '전기 회로 카드' (가)~(라), 실험 2가 열리면 오른쪽 뒤 '막대 꽂이'의 막대·이름표.
+ *  - 실행할 때 전구로 다가가는 연출을 없앴다(카메라를 움직이지 않음 — 처음 시점은 회로 전체, 학생이 확대·이동해 둔 시점은 그대로).
+ *  - 기록 뒤 다음 조건을 고르지 않는다(공통 틀 — "다음" 표시도 없음, 2026-09-27). 앱은 따로 고르는 코드가 없다.
  */
 (function () {
   "use strict";
@@ -143,7 +150,7 @@
     view: {
       build3D: build3D,
       build2D: build2D,
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향",
+      tip3D: "👆 드래그: 돌려 보기 · 두 번 탭: 처음 방향 · 카드·막대를 눌러 고르기",
       tip2D: "2D 화면(모형, 회로를 그림으로 나타낸 모습)이에요.",
     },
     observe: observeCard,
@@ -166,16 +173,18 @@
     onChange: lesson.refresh,
   });
 
-  /* 관찰·기록 카드: 본 모습(글) + 보기 고르기 → 확인하기(본 것과 같아야 기록)
-     관찰 문장은 한 줄로만 보여 준다(읽을 분량을 줄이려고 '본 모습'과 '까닭'을 합쳤다). */
+  /* 관찰·기록 카드: 중립 안내 + 보기 고르기 → 확인하기(본 것과 같아야 기록)
+     단계 D(review-A L8): 보기 바로 위에 정답과 같은 말("전구에 불이 켜졌어요" ↔ 보기 "불이 켜졌다")을 먼저 보여 주지 않는다.
+     처음에는 "장면에서 전구를 살펴보세요"만, 실제 모습 글(💡/⚫ + seen)은 맞는 보기로 '확인하기'를 누른 뒤에만 드러낸다
+     (틀린 보기로 확인하면 계속 숨김 — sci-6-2-2-3 chipNode()와 같은 방식). 장면을 보지 못하는 학생은 장면 대체 설명(sceneText)으로 본다. */
   function observeCard(sel) {
     var it = ITEM[sel.item];
-    var body = el("div", { class: "ob-body" }, [
-      el("p", { class: "ob-seen" }, [
-        el("span", { class: "ob-icon", "aria-hidden": "true", text: it.lit ? "💡" : "⚫" }),
-        el("span", { text: "👀 " + it.seen }),
-      ]),
+    var look = el("span", { class: "ob-look", text: "👀 " + (it.kind === "circuit" ? "스위치를 닫은 뒤 장면에서 전구를 살펴보세요." : "막대를 끼운 뒤 장면에서 전구를 살펴보세요.") });
+    var reveal = el("span", { class: "ob-reveal", hidden: true }, [
+      el("span", { class: "ob-icon", "aria-hidden": "true", text: it.lit ? "💡" : "⚫" }),
+      el("span", { text: "본 모습: " + it.seen }),
     ]);
+    var body = el("div", { class: "ob-body" }, [el("p", { class: "ob-seen" }, [look, reveal])]);
     return {
       question: obsQuestion(sel.item),
       body: body,
@@ -183,7 +192,10 @@
       choices: C.observeChoices.slice(),
       // ctx.tries = 이 관찰 카드에서 틀린 횟수(공통 틀이 센다) → 기록에 함께 담는다
       check: function (observed, ctx) {
-        if (observed === expected(sel.item)) {
+        var ok = observed === expected(sel.item);
+        reveal.hidden = !ok; // 맞는 보기로 확인했을 때만 실제 모습 글(틀린 보기로 다시 확인하면 다시 숨김)
+        look.hidden = ok;
+        if (ok) {
           triesOf[sel.item] = ctx && typeof ctx.tries === "number" ? ctx.tries : 0;
           return true;
         }
@@ -207,25 +219,110 @@
   };
   var WIRE_RED = 0xd8434f;
   var WIRE_BLACK = 0x33383f;
+  var FRAME = { width: 9.8, depth: 7.8, center: [0, 0.7, -0.1] };
+  // 직접 고르기(단계 D, spec §3.3): 전선이 어떤 회로에서도 지나가지 않는 탁자 뒤 양쪽에
+  //  - 왼쪽 뒤: 전기 회로 카드 (가)~(라)(뒷줄 가·나, 앞줄 다·라 — 교과서의 '전기 회로 카드'처럼 회로 그림 + 이름)
+  //  - 오른쪽 뒤: 막대 꽂이(플라스틱·고무·금속 — 실험 2가 열린 뒤에만 보인다. 고른 막대는 스위치 자리로 간다)
+  var CARD = { cols: [-4.12, -2.98], rows: [-3.0, -1.5], w: 1.06, d: 0.78, lean: 0.82 };
+  var STAND = { x: 3.55, z: -2.1, w: 2.3, h: 0.62, d: 0.5, xs: [2.8, 3.55, 4.3] };
+  var ROD_HOVER_Y = 1.5; // 끼우기 전(스위치 자리 위)
+  var ROD_IN_Y = 0.44; // 끼운 뒤(두 집게 사이)
+  var FONT = "system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
 
   function endPoint(which) {
     if (which === "plus") return P.batPlus;
     if (which === "minus") return P.batMinus;
     return null;
   }
+  // 장면 대체 설명(3D 캔버스·2D 그림의 aria-label) — 화면을 보지 못하는 학생에게는 이것이 장면을 '보는 것'이다.
+  // 관찰 카드에서는 보기와 같은 말을 먼저 보여 주지 않지만, 장면 설명은 실행한 뒤의 전구 모습(seen)을 말한다(단계 D 지침 3).
+  function sceneText(it, done, kind) {
+    var head = (kind === "3D" ? "3D 실험 장면" : "2D 그림") + "(모형). ";
+    if (!it) return head + "아직 실험할 것을 고르지 않았어요." + (kind === "3D" ? " 탁자 왼쪽 뒤의 전기 회로 카드 (가)~(라)" + (rodsOpen() ? "나 오른쪽 뒤 막대 꽂이의 막대" : "") + "를 눌러 고를 수 있어요." : "");
+    if (it.kind === "circuit") return head + S.josa(it.label, "을", "를") + " 연결했어요. " + (done ? "스위치를 닫았어요. " + it.seen : "스위치가 열려 있어요.");
+    return head + "스위치를 떼어 낸 자리에 " + S.josa(it.label, "을", "를") + (done ? " 끼웠어요. " + it.seen : " 끼우기 전이에요.");
+  }
+  function rodsOpen() {
+    // 실험 2(막대)는 실험 1을 모두 기록해야 열린다(공통 틀의 단계 잠금). 열리기 전에는 막대를 장면에 두지 않는다(누를 수도 없게).
+    return !!(exp && exp.phaseDone && exp.phaseDone("circuit"));
+  }
+
+  // 회로 카드 그림(모형): 2D 회로도(D2PATH)와 같은 배선을 작게 — 위 전지, 왼쪽 아래 전구, 오른쪽 아래 스위치(3D 처음 시점과 같은 좌우)
+  function drawCard(c, on) {
+    var cv = document.createElement("canvas");
+    cv.width = 256;
+    cv.height = 194;
+    var g = cv.getContext("2d");
+    g.fillStyle = "#fffdf6";
+    g.fillRect(0, 0, cv.width, cv.height);
+    g.lineWidth = on ? 18 : 6;
+    g.strokeStyle = on ? "#2f6fd6" : "#9aa6b4";
+    g.strokeRect(g.lineWidth / 2, g.lineWidth / 2, cv.width - g.lineWidth, cv.height - g.lineWidth);
+    g.fillStyle = "#1f2937";
+    g.font = "800 58px " + FONT;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(c.short, cv.width / 2, 52);
+    var s = Math.min(196 / 460, 104 / 300);
+    g.save();
+    g.translate((cv.width - 460 * s) / 2, 80);
+    g.scale(s, s);
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    g.lineWidth = 17;
+    function wire(d, color) {
+      if (!d || typeof Path2D === "undefined") return;
+      g.strokeStyle = color;
+      g.stroke(new Path2D(d));
+    }
+    var w = c.wire;
+    wire(D2PATH.a[w.a], w.color === "black" ? "#33383f" : "#d8434f");
+    wire(D2PATH.b, "#33383f");
+    wire(w.c ? D2PATH.c[w.c] : "", "#33383f");
+    g.fillStyle = "#2f6fd6";
+    g.fillRect(176, 32, 108, 36); // 전지
+    g.fillStyle = "#e7edf3";
+    g.strokeStyle = "#6f7f91";
+    g.lineWidth = 8;
+    g.beginPath();
+    g.arc(80, 204, 28, 0, Math.PI * 2); // 전구
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#3b4350";
+    g.fillRect(36, 230, 88, 22);
+    g.fillRect(336, 232, 88, 20); // 스위치 받침
+    g.strokeStyle = "#8d99a8";
+    g.lineWidth = 12;
+    g.beginPath();
+    g.moveTo(342, 240);
+    g.lineTo(404, 208); // 스위치(열림)
+    g.stroke();
+    g.restore();
+    return cv;
+  }
 
   function build3D(container, ctx) {
+    // 3D에서 물체를 눌러 고르기(단계 D): 카드 → 그 회로, 막대 → 그 막대. 버튼과 같은 길(ctx.onPick → 공통 틀의 pick/select, 실행 중이면 공통 틀이 무시).
+    var live = { sel: null, ready: false };
+    function onPick(p) {
+      if (!live.ready || !p || !p.item || !ITEM[p.item]) return;
+      if (live.sel && live.sel.item === p.item) return; // 이미 고른 것: 다시 고르면 관찰 카드가 닫히므로 그대로 둔다(sci-6-2-2-4와 같음)
+      if (ITEM[p.item].kind === "rod" && !rodsOpen()) return; // 아직 열리지 않은 실험 2(막대는 숨겨져 있어 보통은 맞지도 않는다)
+      ctx.onPick({ item: p.item });
+    }
     return S.Sim3D.create({
       container: container,
-      frame: { width: 9.8, depth: 7.8, center: [0, 0.7, -0.3] },
+      frame: FRAME,
       viewDir: [0, 0.66, 0.75],
       minDistance: 3.2,
+      onPick: onPick,
       onLost: ctx.onLost,
     }).then(function (v) {
       if (!v) return null;
       var T = v.THREE;
       var M = v.make;
       var disposed = false;
+      var canvas = container.querySelector("canvas.ss-canvas");
 
       var tableMesh = M.table(14, 10, 0xd9c7a3);
       v.root.add(tableMesh);
@@ -329,12 +426,6 @@
       var lever = new T.Mesh(new T.BoxGeometry(1.4, 0.09, 0.22), metalMat);
       lever.position.set(0.7, 0, 0);
       leverPivot.add(lever);
-      var rodMat = M.material(0xf08a3c, { roughness: 0.6 });
-      var rod = new T.Mesh(new T.CylinderGeometry(0.14, 0.14, 1.5, 18), rodMat);
-      rod.rotation.z = Math.PI / 2;
-      rod.position.set(0, 0.44, 0);
-      rod.visible = false;
-      swG.add(rod);
       var lbSw = M.label("스위치", { height: 0.4 });
       lbSw.position.set(0, 0.2, 0.8);
       swG.add(lbSw);
@@ -342,6 +433,93 @@
       lbRod.position.set(0, 1.1, 0);
       lbRod.visible = false;
       swG.add(lbRod);
+
+      // 누르기(탭) 대상 등록: 숨긴 물체는 레이에 걸리지 않게 한다(three.js 레이는 숨긴 물체도 맞힌다 — sci-6-2-2-3과 같은 방식)
+      function pickable(obj, value) {
+        obj.traverse(function (o) {
+          if (!o.isMesh && !o.isSprite) return;
+          var orig = o.raycast;
+          o.raycast = function (rc, hits) {
+            for (var n = o; n; n = n.parent) if (n.visible === false) return;
+            return orig.call(this, rc, hits);
+          };
+        });
+        v.pickable(obj, value);
+      }
+      // 눈에 안 보이는 누르기 영역(가는 막대도 손가락으로 누르기 쉽게) — 그리지 않고 레이만 맞는다
+      var hitMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
+      var owned = []; // 이 장면이 만든 텍스처·지오메트리(해제용)
+
+      /* 전기 회로 카드 (가)~(라) — 탁자 왼쪽 뒤, 작은 받침에 기대 세운 카드(누르면 그 회로) */
+      var cards = {};
+      var cardGeo = new T.BoxGeometry(CARD.w, 0.035, CARD.d);
+      var standGeo = new T.BoxGeometry(CARD.w + 0.08, 0.1, 0.3);
+      var woodMat = M.material(0xb98a55, { roughness: 0.75 });
+      var paperEdge = M.material(0xf1ead8, { roughness: 0.9 });
+      owned.push(cardGeo, standGeo);
+      C.circuits.forEach(function (c, i) {
+        var g = new T.Group();
+        g.position.set(CARD.cols[i % 2], 0, CARD.rows[Math.floor(i / 2)]);
+        v.root.add(g);
+        var base = new T.Mesh(standGeo, woodMat); // 카드 아래쪽을 받치는 받침
+        base.position.set(0, 0.05, 0.12);
+        g.add(base);
+        var texOff = new T.CanvasTexture(drawCard(c, false));
+        var texOn = new T.CanvasTexture(drawCard(c, true));
+        [texOff, texOn].forEach(function (t) {
+          t.colorSpace = T.SRGBColorSpace;
+          t.anisotropy = 4;
+          owned.push(t);
+        });
+        var face = new T.MeshStandardMaterial({ map: texOff, roughness: 0.85 });
+        var pivot = new T.Group(); // 카드 아래 모서리(앞)를 축으로 뒤로 기댄다 → 그림이 처음 시점 쪽을 향한다
+        pivot.position.set(0, 0.08, 0.12);
+        pivot.rotation.x = CARD.lean;
+        g.add(pivot);
+        var card = new T.Mesh(cardGeo, [paperEdge, paperEdge, face, paperEdge, paperEdge, paperEdge]);
+        card.position.set(0, 0.02, -CARD.d / 2);
+        pivot.add(card);
+        pickable(g, { item: c.id });
+        cards[c.id] = { group: g, face: face, texOff: texOff, texOn: texOn, mats: [face] };
+      });
+
+      /* 막대 꽂이(실험 2) — 탁자 오른쪽 뒤. 고른 막대는 스위치 자리로 간다(끼우기 전: 위에 떠 있음, 실행: 두 집게 사이로) */
+      var standG = new T.Group();
+      standG.position.set(STAND.x, 0, STAND.z);
+      v.root.add(standG);
+      var standBox = new T.Mesh(new T.BoxGeometry(STAND.w, STAND.h, STAND.d), woodMat);
+      standBox.position.y = STAND.h / 2;
+      standG.add(standBox);
+      var rodGeo = new T.CylinderGeometry(0.14, 0.14, 1.5, 18);
+      var rodHitGeo = new T.CylinderGeometry(0.34, 0.34, 1.62, 10);
+      var labelHitGeo = new T.BoxGeometry(STAND.w / 3 - 0.04, STAND.h + 0.04, STAND.d + 0.04);
+      owned.push(rodGeo, rodHitGeo, labelHitGeo);
+      var rods = {};
+      C.rods.forEach(function (r, i) {
+        var mat = M.material(r.color, { roughness: r.id === "metal" ? 0.25 : 0.7, metalness: r.id === "metal" ? 0.7 : 0.05 });
+        var mesh = new T.Mesh(rodGeo, mat);
+        mesh.add(new T.Mesh(rodHitGeo, hitMat));
+        v.root.add(mesh);
+        pickable(mesh, { item: r.id });
+        var hit = new T.Mesh(labelHitGeo, hitMat); // 꽂이의 그 막대 자리를 눌러도 그 막대
+        hit.position.set(STAND.xs[i] - STAND.x, STAND.h / 2, 0);
+        standG.add(hit);
+        pickable(hit, { item: r.id });
+        var tag = M.label(r.short, { height: 0.34, bold: true }); // 꽂이 앞 이름표(안 바뀌는 이름 — 누르면 그 막대)
+        tag.position.set(STAND.xs[i] - STAND.x, 0.3, STAND.d / 2 + 0.16);
+        standG.add(tag);
+        pickable(tag, { item: r.id });
+        rods[r.id] = { mesh: mesh, mat: mat, hole: [STAND.xs[i], STAND.h + 0.75 - 0.3, STAND.z] };
+      });
+      // 막대 자리: 꽂이(세움) 또는 스위치 자리(눕힘 — y는 떠 있음/끼움)
+      function rodAtStand(r) {
+        r.mesh.rotation.set(0, 0, 0);
+        r.mesh.position.fromArray(r.hole);
+      }
+      function rodAtSlot(r, y) {
+        r.mesh.rotation.set(0, 0, Math.PI / 2);
+        r.mesh.position.set(P.swL[0] + (P.swR[0] - P.swL[0]) / 2, y, P.swL[2]);
+      }
 
       /* 전선(집게 달린 전선) — 두 점을 잇는 관 + 양 끝 집게 */
       var clipGeo = new T.BoxGeometry(0.2, 0.26, 0.16);
@@ -409,7 +587,7 @@
       function placeArrows() {
         if (disposed) return;
         for (var i = 0; i < arrows.length; i++) {
-          var t = (flowT + i / arrows.length) % 1;
+          var t = (((flowT + i / arrows.length) % 1) + 1) % 1; // 0 이상 1 미만(음수면 곡선 위치가 NaN이 되어 오류가 났다)
           if (!isFinite(t)) return;
           var p = flowCurve.getPointAt(t);
           var tan = flowCurve.getTangentAt(t);
@@ -429,7 +607,8 @@
       function flowTick(now) {
         loopId = 0;
         if (disposed || !arrowGroup.visible) return;
-        var dt = Math.min(0.05, (now - lastT) / 1000);
+        // requestAnimationFrame의 시각이 시작 때 잰 performance.now()보다 이를 수 있다 → 음수 dt는 0으로(단계 D: 3D를 다시 열 때마다 난 오류)
+        var dt = Math.max(0, Math.min(0.05, (now - lastT) / 1000));
         lastT = now;
         flowT = (flowT + (isFinite(dt) ? dt : 0) * 0.22) % 1;
         placeArrows();
@@ -465,17 +644,29 @@
       // 실험 2에서는 교과서처럼 스위치를 떼어 내고(받침·단자·레버 숨김) 전선 집게 사이에 막대만 끼운다
       function showRod(it) {
         var isRod = !!(it && it.kind === "rod");
-        rod.visible = isRod;
         lbRod.visible = isRod;
         lever.visible = !isRod;
         lbSw.visible = !isRod;
         swBase.visible = !isRod;
         swPostL.visible = !isRod;
         swPostR.visible = !isRod;
-        if (!isRod) return;
-        rodMat.color.set(it.color);
-        rodMat.metalness = it.id === "metal" ? 0.7 : 0.05;
-        rodMat.roughness = it.id === "metal" ? 0.25 : 0.7;
+      }
+      // 카드·막대 꽂이: 고른 카드는 파란 테두리로 조금 들고, 고른 막대는 스위치 자리로(done이면 끼운 모습). 막대는 실험 2가 열린 뒤에만 보인다.
+      function placeProps(it, done) {
+        Object.keys(cards).forEach(function (id) {
+          var on = !!(it && it.id === id);
+          var cd = cards[id];
+          if (cd.face.map !== (on ? cd.texOn : cd.texOff)) cd.face.map = on ? cd.texOn : cd.texOff;
+          cd.group.position.y = on ? 0.06 : 0;
+        });
+        var open = rodsOpen() || !!(it && it.kind === "rod");
+        standG.visible = open;
+        Object.keys(rods).forEach(function (id) {
+          var r = rods[id];
+          r.mesh.visible = open;
+          if (it && it.id === id) rodAtSlot(r, done ? ROD_IN_Y : ROD_HOVER_Y);
+          else rodAtStand(r);
+        });
       }
       // 아직 아무것도 고르지 않은 처음 상태
       function emptyScene() {
@@ -483,6 +674,7 @@
         wireB.hide();
         wireC.hide();
         showRod(null);
+        placeProps(null, false);
         setSwitch(false);
         setLit(0);
       }
@@ -490,33 +682,49 @@
       function applyScene(sel, done) {
         if (!sel || !sel.item || !ITEM[sel.item]) {
           emptyScene();
+          describe(null, false);
           return;
         }
         var it = ITEM[sel.item];
+        showRod(it);
+        placeProps(it, !!done);
         if (it.kind === "circuit") {
-          showRod(null);
           setWiring(it.wire);
           setSwitch(!!done);
-          rod.position.y = 0.44;
         } else {
-          showRod(it);
           setWiring({ a: "plus", c: "minus" });
           setSwitch(true);
-          rod.position.y = done ? 0.44 : 1.5;
         }
         setLit(done && it.lit ? 1 : 0);
+        describe(it, !!done);
       }
+      // 장면 대체 설명(3D 캔버스 aria-label) — 장면을 '보는 것'과 같으므로 실행한 뒤의 전구 모습도 말한다(관찰 카드의 글은 숨긴 대신)
+      function describe(it, done) {
+        if (canvas) canvas.setAttribute("aria-label", sceneText(it, done, "3D") + " 드래그하면 돌려 볼 수 있어요.");
+      }
+
+      // 실행할 때 카메라를 움직이지 않는다(단계 D): 전구로 다가가는 연출은 없앴고(배선 비교가 핵심이고, 다가가면 이름표가 안내 줄·이동 화살표에
+      // 가렸다), 학생이 확대·이동해 둔 시점도 그대로 둔다 — sci-6-2-3-3 스위치 여닫기와 같은 원칙(2026-09-27 사용자: "학생이 스스로 필요시
+      // 확대할 수 있으니", review-D2 L5). 처음 시점은 회로 전체가 보인다.
 
       var doneCells = {};
       var curSel = null;
+      var saidFor = null; // 장면 위 안내 글이 가리키는 칸(다른 것을 고르면 지운다)
       emptyScene();
+      describe(null, false);
       v.render();
+      live.ready = true;
 
       var runToken = 0;
       return {
         whenVisible: v.whenVisible,
         highlight: function (s) {
           curSel = s && s.item ? { item: s.item } : null;
+          live.sel = curSel;
+          if (saidFor && (!curSel || curSel.item !== saidFor)) {
+            say("");
+            saidFor = null;
+          }
           applyScene(curSel, curSel && doneCells[curSel.item]);
           v.render();
         },
@@ -524,10 +732,10 @@
           var my = ++runToken;
           var it = ITEM[sel.item];
           curSel = { item: sel.item };
+          live.sel = curSel;
           applyScene(curSel, false);
           say("");
-          await v.focus([0, 0.7, -0.1], 0.86, 420);
-          if (my !== runToken) return;
+          saidFor = sel.item;
           if (it.kind === "circuit") {
             say("① 스위치를 닫아요");
             await v.tween(520, function (t) {
@@ -535,9 +743,9 @@
             });
           } else {
             say("① " + S.josa(it.label, "을", "를") + " 끼워요");
-            rod.visible = true;
+            var r = rods[it.id];
             await v.tween(600, function (t) {
-              rod.position.y = 1.5 + (0.44 - 1.5) * t;
+              r.mesh.position.y = ROD_HOVER_Y + (ROD_IN_Y - ROD_HOVER_Y) * t;
             });
           }
           if (my !== runToken) return;
@@ -555,21 +763,15 @@
           if (my !== runToken) return;
           doneCells[sel.item] = true;
           applyScene(curSel, true);
-          say(it.lit ? "💡 전구에 불이 켜졌어요" : "⚫ 전구에 불이 켜지지 않았어요");
-          // 불이 켜졌을 때만 전구를 잠깐 가까이 보여 주고, 곧바로 회로 전체가 보이는 시점으로 돌아온다.
-          // (어디가 이어지고 끊겼는지 비교하는 것이 이 차시의 핵심이라 배선이 화면 밖으로 나가면 안 된다)
-          if (it.lit) {
-            await v.focus([-2.8, 1.05, 1.7], 0.66, 460);
-            await v.wait(600);
-          }
-          if (my !== runToken) return;
-          await v.focus([0, 0.7, -0.1], 0.95, 480);
+          // 끝난 뒤에도 전구의 결과는 글로 말하지 않는다(보기 "불이 켜졌다/켜지지 않았다"와 같은 말이 되므로 — 장면에서 직접 본다). 한 일만 남긴다.
+          say(it.kind === "circuit" ? "🔌 스위치를 닫았어요" : "🪵 " + S.josa(it.label, "을", "를") + " 끼웠어요");
           v.render();
         },
         showInstant: function (sel) {
           if (!sel || !sel.item || !ITEM[sel.item]) return;
           doneCells[sel.item] = true;
           curSel = { item: sel.item };
+          live.sel = curSel;
           applyScene(curSel, true);
           v.render();
         },
@@ -577,6 +779,7 @@
           runToken++;
           doneCells = {};
           say("");
+          saidFor = null;
           applyScene(curSel, false);
           v.flyHome(400);
           v.render();
@@ -585,6 +788,7 @@
         dispose: function () {
           runToken++;
           disposed = true;
+          live.ready = false;
           if (loopId) cancelAnimationFrame(loopId);
           loopId = 0;
           wireA.dispose();
@@ -593,6 +797,10 @@
           clipGeo.dispose();
           arrowGeo.dispose();
           arrowMat.dispose();
+          hitMat.dispose();
+          owned.forEach(function (x) {
+            x.dispose();
+          });
           if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
           v.dispose();
         },
@@ -664,7 +872,8 @@
     var termSL = svg("circle", { class: "d2-term", cx: 340, cy: 242, r: 6 });
     var termSR = svg("circle", { class: "d2-term", cx: 420, cy: 242, r: 6 });
 
-    var pic = svg("svg", { viewBox: "0 0 460 290", class: "d2-svg", "aria-hidden": "true" }, [
+    // 그림 대체 설명(role=img + aria-label, sceneText) — 캡션은 결과를 말하지 않고, 그림 설명이 전구 모습을 말한다(단계 D)
+    var pic = svg("svg", { viewBox: "0 0 460 290", class: "d2-svg", role: "img", "aria-label": sceneText(null, false, "2D") }, [
       wireA,
       wireB,
       wireC,
@@ -713,6 +922,7 @@
         swName.textContent = "스위치";
         setOpen(true);
         setLit(false);
+        pic.setAttribute("aria-label", sceneText(null, false, "2D"));
         return;
       }
       var w = it.kind === "circuit" ? it.wire : { a: "plus", c: "minus" };
@@ -735,6 +945,7 @@
         setOpen(!done);
       }
       setLit(!!done && it.lit);
+      pic.setAttribute("aria-label", sceneText(it, !!done, "2D"));
     }
     function setOpen(open) {
       lever.setAttribute("x2", open ? "405" : "412");
@@ -777,7 +988,8 @@
         if (my !== token) return;
         doneCells[sel.item] = true;
         apply(curSel, true);
-        caption.textContent = "② 전구를 잘 살펴보세요… " + (it.lit ? "💡 전구에 불이 켜졌어요." : "⚫ 전구에 불이 켜지지 않았어요.");
+        // 결과(켜짐/안 켜짐)는 캡션에 쓰지 않는다 — 보기와 같은 말이 되므로(단계 D). 그림과 그림 설명(aria-label)으로 본다.
+        caption.textContent = "② " + (it.kind === "circuit" ? "스위치를 닫았어요." : S.josa(it.label, "을", "를") + " 끼웠어요.") + " 전구를 잘 살펴보세요.";
         await sleep(420);
       },
       showInstant: function (sel) {

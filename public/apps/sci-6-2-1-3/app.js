@@ -6,7 +6,7 @@
  *
  * spec "개정 1": 12달 모두 측정. 달을 누르면 그 달 21일 태양이 해 뜰 때부터 해 질 때까지 하루 길을 따라 움직인다(약 1.2초 빨리 감기, 모형).
  *   spec 개정 5: 움직이는 동안에는 태양만 움직이고, 움직임이 끝나면 태양이 남중 자리에 나타나 그때 한 번만 빛줄기·호·옆에서 본 모습·
- *   값(남중 고도·낮의 길이)이 나타난다 → '📝 기록하기'는 기록만 한다(fix-1의 다음 달 자동 재생은 없앴다 — 다음 달은 학생이 직접 누른다).
+ *   값(남중 고도·낮의 길이)이 나타난다 → '📝 기록하기'는 기록만 한다(fix-1의 다음 달 자동 재생은 없앴다 — 다음 달은 학생이 직접 누른다. '다음' 깜박임·안내도 없다 — 2026-09-27).
  *   학생은 값을 타이핑하지 않는다.
  *   공통 틀의 Experiment(조건 고르기 → 실행 → 관찰 카드 → 확인 → 기록)는 이 흐름과 맞지 않아 쓰지 않고,
  *   같은 CSS 틀(.ss-exp-layout 등)과 Sim3D·RecordStore만 쓴다(공통 틀은 고치지 않음).
@@ -506,21 +506,9 @@
   var busy = false;
   var shownMonth = null; // 하늘 모형에 지금 그려져 있는 달
   var phase = "idle"; // 값 패널: idle(움직이는 중·아직 안 봄) | done(움직임이 끝나 남중 모습과 값이 나타남)
-  function nextTodo(after) {
-    var order = MONTHS.map(function (m) {
-      return m.month;
-    });
-    var start = after ? order.indexOf(after) + 1 : 0;
-    for (var k = 0; k < order.length; k++) {
-      var m = order[(start + k) % order.length];
-      if (!recOf(m)) return m;
-    }
-    return null;
-  }
   function drawExp() {
     var n = recordedMonths().length;
     var total = MONTHS.length;
-    var todo = nextTodo(selMonth);
     MONTHS.forEach(function (m) {
       var b = R.monthBtns[m.month];
       var rec = !!recOf(m.month);
@@ -528,7 +516,6 @@
       b.setAttribute("aria-pressed", String(selMonth === m.month));
       b.setAttribute("aria-disabled", String(busy));
       b.classList.toggle("is-rec", rec);
-      b.classList.toggle("is-next", !busy && !rec && todo === m.month && (selMonth == null || !!recOf(selMonth)));
       b.querySelector(".month-state").textContent = rec ? "✓" : "";
       b.setAttribute("aria-label", m.month + "월, " + s.name + (rec ? ", 기록함" : ", 아직 기록 안 함"));
     });
@@ -578,9 +565,8 @@
     R.pathLegend.hidden = pathMode !== "compare3";
     if (!busy && m && phase === "done") {
       if (recOf(m)) {
-        // 기록하기는 기록만 한다(개정 5) — 다음 달은 학생이 직접 누른다(다음 달 버튼은 테두리가 깜박인다)
-        var nx = nextTodo(m);
-        R.recordMsg.textContent = "✔ " + m + "월을 기록했어요." + (nx ? " 다음은 " + nx + "월을 눌러 보세요." : " 12달을 모두 기록했어요.");
+        // 기록하기는 기록만 한다(개정 5) — 다음 달은 학생이 직접 고른다('다음' 표시·안내 없음, 2026-09-27 사용자 결정)
+        R.recordMsg.textContent = "✔ " + m + "월을 기록했어요." + (n >= total ? " 12달을 모두 기록했어요." : "");
       } else R.recordMsg.textContent = "값을 확인했으면 '📝 기록하기'를 눌러요.";
     } else if (!busy) R.recordMsg.textContent = "";
   }
@@ -675,7 +661,7 @@
     if (n >= MONTHS.length && !r.replaced) toast("🎉 12달을 모두 기록했어요! '다음 단계'로 가서 결과를 분석해 보세요.", 3800);
     else toast((r.replaced ? "🔁 다시 기록했어요: " : "📝 기록했어요: ") + m + "월 남중 고도 " + f1(d.altitude) + "°, 낮의 길이 " + dayLabel(d.dayMinutes));
     if (view) view.setGhosts(pathList(shownMonth));
-    drawExp(); // 기록만 한다(개정 5 — 다음 달 자동 재생 없음). 안내 줄: "✔ ○월을 기록했어요. 다음은 ○월을 눌러 보세요."
+    drawExp(); // 기록만 한다(개정 5 — 다음 달 자동 재생 없음). 안내 줄: "✔ ○월을 기록했어요."('다음' 안내 없음 — 2026-09-27)
     lesson.refresh();
   });
   function setPathMode(mode) {

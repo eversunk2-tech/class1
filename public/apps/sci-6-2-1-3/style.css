@@ -33,9 +33,6 @@
   border-color: var(--sc); background: color-mix(in srgb, var(--sc) 22%, var(--ss-surface)); box-shadow: inset 0 0 0 2px var(--sc);
 }
 .month-btn[aria-disabled="true"] { cursor: wait; opacity: 0.7; }
-.month-btn.is-next { animation: nextPulse 1.6s ease-in-out infinite; border-style: dashed; border-color: var(--ss-primary); }
-@keyframes nextPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-primary) 45%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ss-primary) 0%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .month-btn.is-next { animation: none; } }
 .month-btn:focus-visible { outline: 3px solid var(--ss-primary); outline-offset: 2px; }
 /* 한 칸 배치(세로 태블릿 등)에서 폭이 넉넉하면 12달을 한 줄로. 가로 태블릿 오른쪽 칸·휴대폰은 계절 두 개씩 두 줄 */
 @media (min-width: 561px) and (max-width: 900px), (min-width: 561px) and (orientation: portrait) {

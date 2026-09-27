@@ -1,13 +1,16 @@
 /*
  * app.js — sci-6-2-3-2 "전기 회로에 전지 한 개를 더 연결하면 어떻게 될까?" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·실험 패널·기록·저장·로그인/진행 저장을 맡고, 이 파일은
- *   ① 3D/2D 장면(전지 한 개 회로 · 전지 두 개 직렬연결 회로 + 전구/전동기/버저)
- *   ② 관찰 카드  ③ 버저 소리(WebAudio, 학생이 버튼을 누른 뒤에만)  ④ '더 탐구해 보고 싶어요' 팝업
- *   ⑤ 분석 표·완료 저장  만 만든다.
- * 관찰 결과 문구는 모두 LessonConfig.results(교과서·실험관찰 예시)에서만 가져온다.
+ *   ① 3D/2D 장면(전지 한 개 회로 · 전지 두 개 직렬연결 회로 + 전구/전동기/버저, 3D는 앞 가운데 부품 상자)
+ *   ② 관찰 카드(두 회로 비교)  ③ 버저 소리(WebAudio, 학생이 버튼을 누른 뒤에만, 한 회로씩 차례로)
+ *   ④ '더 탐구해 보고 싶어요' 팝업  ⑤ 분석 표·완료 저장  만 만든다.
  *
- * 조건(factor) 2개: 부품(전구/전동기/버저) × 회로(전지 한 개 / 전지 두 개 직렬) = 6칸.
- * 두 회로는 실험대에 나란히 놓여 있어 언제든 비교할 수 있고, 고른 회로의 스위치만 닫는다.
+ * 2026-09-27 사용자 결정(spec.md 개정 2 — 단계 D): 조건(factor)은 부품(전구/전동기/버저) 1개 = 3칸.
+ * 실행하면 두 회로의 스위치를 함께 닫아 나란히 비교하고, 관찰 카드는 부품마다 "더 ○○한 회로는 전지를 어떻게 연결했을 때인가요?"를
+ * 묻는다(보기: 전지 1개 연결 / 전지 2개 직렬연결). 버저 소리는 섞이지 않게 한 회로씩 차례로 내고, 소리가 나는 회로를 표시한다.
+ * 부품 위 세기 표시(▮▯▯)는 없앴다 — 전구 빛, 날개 빠르기, 버저 소리 파동으로 비교한다. 소리 파동(원형 고리, 모형)은 두 회로가
+ * 크기·개수·간격·퍼지는 빠르기가 모두 같고 소리가 큰 쪽만 고리 선이 더 굵으며, 버저 소리는 높이가 같고 크기(음량)만 다르다
+ * (2026-09-27 사용자 후속 결정 — 실제로도 소리가 커지면 세기만 커지고 퍼지는 빠르기·높이는 그대로다).
  */
 (function () {
   "use strict";
@@ -18,6 +21,24 @@
     return document.getElementById(id);
   };
 
+  // 예전 판(6칸 기록·'궁금한 점' 단계, sci623sim2:v1)의 이 기기 사본을 지운다(2026-09-27 — sci-6-1-1-1과 같은 방식, 단계 C Review M1).
+  // 남겨 두면 로그아웃할 때 사이트가 예전 판 사본을 올리려다 "다른 기기에서 저장한 기록과 달라요" 창을 띄우고, '확인'을 누르면
+  // 새 판 진행 기록이 예전 것으로 덮일 수 있다. 예전 판은 새 판에서 쓰지 않는다(저장 키 버전을 올림). 이 앱의 예전 키만 지운다(localStorage.clear() 금지).
+  (function () {
+    var OLD = ["sci623sim2:v1"];
+    try {
+      var drop = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        for (var j = 0; j < OLD.length; j++) if (k && (k === OLD[j] || k.indexOf(OLD[j] + ":") === 0)) drop.push(k);
+      }
+      drop.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+    } catch (e) {
+      /* 저장소를 못 쓰면 지울 것도 없다 */
+    }
+  })();
   var store = S.createStore(C.storageKey);
   if (!store.available) $("storage-warning").hidden = false;
   var lesson = S.Lesson.create({ appId: C.appId, store: store, toastEl: $("toast") });
@@ -32,15 +53,16 @@
   C.circuits.forEach(function (c, i) {
     CIR[c.id] = Object.assign({ index: i }, c);
   });
-  function keyOf(partId, circuitId) {
-    return partId + "|" + circuitId;
+  var CHOICES = C.circuits.map(function (c) {
+    return c.choice;
+  });
+  function cmp(partId) {
+    return C.compare.parts[partId];
   }
-  function phaseOf(partId) {
-    return PART[partId] ? PART[partId].phase : "A";
-  }
-  function expected(partId, circuitId) {
-    var r = C.results[partId];
-    return r ? r[circuitId] || null : null;
+  // 보기(전지 1개 연결 / 전지 2개 직렬연결) → 전지 아이콘(분석 표에서 글자 앞에 — 색이 아니라 모양으로도 구분)
+  function choiceIcon(choice) {
+    for (var i = 0; i < C.circuits.length; i++) if (C.circuits[i].choice === choice) return C.circuits[i].icon;
+    return null;
   }
   function reduceMotion() {
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -50,16 +72,29 @@
       setTimeout(r, document.hidden ? 0 : ms);
     });
   }
+  // 두 회로의 스위치를 닫아 결과가 보이는 부품(partId → true, 전구·전동기). 3D·2D가 함께 쓴다(한 번에 한 화면만 있다) — 관찰 카드 확인에도 쓴다.
+  var lit = {};
+  var activeView = null; // 지금 실험 화면(3D 또는 2D) — 버저 스위치 상태를 다시 그릴 때 부른다
+  /* 버저 스위치(2026-09-27 사용자 — build-D 지침 D2-2 9·10번): 버저는 두 회로의 스위치를 하나씩 따로 여닫는다.
+     closed = 지금 닫힌 회로(null | "single" | "series2" — 하나를 닫으면 다른 하나는 저절로 열린다),
+     heard = 이번 버저 관찰에서 닫아 들어 본 회로(두 회로를 모두 들어 본 뒤에 관찰 카드 확인),
+     pending = 버튼·손잡이로 누른 회로(공통 틀 run()이 view.run으로 넘길 때 읽고 비운다). 저장하지 않는다(새로 고침하면 모두 열림). */
+  var buzz = { closed: null, heard: { single: false, series2: false }, pending: null };
+  var selPart = null; // 공통 틀에서 지금 고른 부품(syncRunUI가 적어 둔다)
 
   /* ───────── 버저 소리(WebAudio) ─────────
-   * · 학생이 버튼(스위치 닫기 / 소리 다시 듣기)을 누른 뒤에만 소리가 난다(자동 재생 없음).
-   * · 전지 한 개 0.15, 전지 두 개 직렬 0.35 — 교실에서 시끄럽지 않게 작은 음량으로 크기 차이만 낸다.
-   * · 끈 상태는 이 앱의 저장소(store)에 기억한다. 소리를 꺼도 화면의 파동·소리 크기 표시로 차이를 알 수 있다.
+   * · 학생이 버튼(스위치 닫기)이나 스위치 손잡이를 누른 뒤에만 소리가 난다(자동 재생 없음).
+   * · 스위치가 닫혀 있는 동안 계속 울린다(사용자 "스위치 닫고 있는 동안 계속 울리는 것으로 해줘") — 열면 멈추고, 다른 쪽을 닫으면 그쪽 소리로 바뀐다.
+   * · 전지 한 개 0.15, 전지 두 개 직렬 0.35 — 교실에서 시끄럽지 않게 작은 음량으로 크기 차이만 낸다. 소리의 높이는 두 회로가 같다
+   *   (BUZZ_HZ — 2026-09-27 사용자 후속 결정: 전에는 660/700 Hz로 높이도 달라 "큰 소리 = 높은 소리"로 오해할 수 있었다).
+   * · 끈 상태는 이 앱의 저장소(store)에 기억한다. 소리를 꺼도 화면의 소리 파동(고리 선의 굵기)으로 비교할 수 있다.
+   * · 부품을 바꾸거나 실험하기를 떠나거나 화면이 숨으면 스위치를 열어 소리를 멈춘다(openBuzz).
    */
+  var BUZZ_HZ = 660; // 버저 소리의 높이 — 두 회로가 같다(크기만 다르다)
   var sound = {
     on: store.get("sound", true) !== false,
     ctx: null,
-    node: null,
+    node: null, // { osc, gain, circuit } — 지금 울리는 소리
     buttons: [],
   };
   function audioCtx() {
@@ -81,16 +116,16 @@
     }
     return sound.ctx;
   }
-  // 실험 화면 안에서 누르는 모든 버튼을 '학생의 조작'으로 보고 오디오를 깨운다(소리는 버저 실험에서만 난다)
-  document.addEventListener(
-    "pointerdown",
-    function (e) {
-      if (!sound.on) return;
-      var t = e.target;
-      if (t && t.closest && t.closest("#experiment-root")) audioCtx();
-    },
-    true
-  );
+  // 실험 화면 안에서 누르는 모든 버튼을 '학생의 조작'으로 보고 오디오를 깨운다(소리는 버저 실험에서만 난다).
+  // 키보드(Enter·Space)로 누를 때도 깨우도록 click·keydown도 본다.
+  function wakeAudio(e) {
+    if (!sound.on) return;
+    var t = e.target;
+    if (t && t.closest && t.closest("#experiment-root")) audioCtx();
+  }
+  ["pointerdown", "click", "keydown"].forEach(function (type) {
+    document.addEventListener(type, wakeAudio, true);
+  });
   function stopBuzzer() {
     if (!sound.node) return;
     var n = sound.node;
@@ -103,43 +138,72 @@
       /* 무시 */
     }
   }
-  function playBuzzer(circuitId, ms) {
-    if (!sound.on) return false;
+  // 닫힌 회로의 버저 소리를 멈출 때까지 계속 낸다(음량만 회로마다 다르다). 오디오가 아직 깨지 않았으면 깨운 뒤 다시 본다.
+  function startTone(circuitId) {
     var ctx = audioCtx();
-    if (!ctx || ctx.state !== "running") return false;
+    if (!ctx) return false;
+    if (ctx.state !== "running") {
+      if (ctx.resume) {
+        try {
+          ctx.resume().then(syncTone, function () {});
+        } catch (e) {
+          /* 무시 */
+        }
+      }
+      return false;
+    }
     stopBuzzer();
     var peak = circuitId === "series2" ? 0.35 : 0.15;
-    var dur = (ms || 1200) / 1000;
     var t0 = ctx.currentTime;
     var osc = ctx.createOscillator();
     osc.type = "square";
-    osc.frequency.setValueAtTime(circuitId === "series2" ? 700 : 660, t0);
+    osc.frequency.setValueAtTime(BUZZ_HZ, t0);
     var lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.setValueAtTime(1400, t0);
     var gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t0);
     gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.04);
-    gain.gain.setValueAtTime(peak, t0 + dur - 0.12);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(lp);
     lp.connect(gain);
     gain.connect(ctx.destination);
     osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
-    sound.node = { osc: osc, gain: gain };
+    sound.node = { osc: osc, gain: gain, circuit: circuitId };
     osc.onended = function () {
       if (sound.node && sound.node.osc === osc) sound.node = null;
     };
     return true;
+  }
+  // 버저 소리를 지금 상태에 맞춘다: 버저를 골랐고, 실험하기가 보이고, 스위치가 닫혀 있고, 소리가 켜져 있으면 그 회로 소리, 아니면 멈춤
+  function buzzStageOn() {
+    var sec = document.querySelector('[data-stage="experiment"]');
+    return !!(sec && !sec.hidden) && !document.hidden;
+  }
+  function syncTone() {
+    var want = selPart === "buzzer" && buzz.closed && sound.on && buzzStageOn() ? buzz.closed : null;
+    if (!want) {
+      stopBuzzer();
+      return;
+    }
+    if (sound.node && sound.node.circuit === want) return;
+    startTone(want);
+  }
+  // 두 스위치를 열고 소리를 멈춘다(부품 바꾸기·실험하기 떠나기·화면 숨김·되돌리기). resetHeard면 '들어 본 회로'도 비운다.
+  function openBuzz(resetHeard) {
+    buzz.closed = null;
+    buzz.pending = null;
+    if (resetHeard) buzz.heard = { single: false, series2: false };
+    stopBuzzer();
+    if (activeView && activeView.refreshBuzz) activeView.refreshBuzz();
+    updateSwitchButtons();
   }
   function soundLabel() {
     return sound.on ? "🔈 소리 끄기" : "🔇 소리 켜기";
   }
   function soundHelp() {
     return sound.on
-      ? "버저 실험에서 작은 소리가 나요. 교실에서 시끄러우면 소리를 꺼도 화면으로 크기 차이를 알 수 있어요."
-      : "소리가 꺼져 있어요. 화면의 소리 파동과 '소리 크기' 표시로 차이를 알 수 있어요.";
+      ? "버저 실험에서는 스위치를 닫은 회로의 버저에서 작은 소리가 계속 나요(스위치를 열면 멈춰요). 교실에서 시끄러우면 소리를 꺼도 화면의 소리 파동(고리 선의 굵기)으로 비교할 수 있어요."
+      : "소리가 꺼져 있어요. 화면의 소리 파동(고리 선의 굵기)으로 비교할 수 있어요.";
   }
   function refreshSoundButtons() {
     sound.buttons.forEach(function (b) {
@@ -150,8 +214,8 @@
   function toggleSound() {
     sound.on = !sound.on;
     store.set("sound", sound.on);
-    if (!sound.on) stopBuzzer();
-    else audioCtx();
+    if (sound.on) audioCtx();
+    syncTone(); // 끄면 멈추고, 켜면 닫혀 있는 회로의 소리를 다시 낸다(스위치는 그대로)
     refreshSoundButtons();
     var help = $("sound-help");
     if (help) help.textContent = soundHelp();
@@ -163,22 +227,101 @@
     return b;
   }
 
-  /* ───────── 기록 ───────── */
+  /* ───────── 버저 스위치 버튼 두 개(버저를 골랐을 때만 공통 실행 버튼 대신 — build-D 지침 D2-2 9·10번) ─────────
+   * "스위치 닫기(전지 1개)"·"스위치 닫기(2개 직렬)"(사용자 문구) — 누르면 그 버튼이 "스위치 열기(○○)"로 바뀐다. 하나를 닫으면 다른 하나는
+   * 저절로 열린다. 누름은 공통 틀의 실행 버튼(exp.runButton, 숨김)을 대신 눌러 틀의 run() 흐름(실행 중 잠금·관찰 카드 다시 준비)을 그대로 탄다
+   * — 어느 회로인지는 buzz.pending으로 view.run에 넘긴다. 크게 보기에서는 장면 안 막대에 한 줄([스위치][스위치][기록하기]),
+   * 기본 화면에서는 실행 카드 안에 좌우로(글자 두 줄: "스위치 닫기" / "(전지 1개)"). 글자가 할 일을 말하므로 aria-pressed는 쓰지 않는다. */
+  function switchIcon() {
+    var NS = "http://www.w3.org/2000/svg";
+    var s = document.createElementNS(NS, "svg");
+    [["viewBox", "0 0 24 24"], ["fill", "none"], ["stroke", "currentColor"], ["stroke-width", "2.2"], ["stroke-linecap", "round"], ["stroke-linejoin", "round"], ["class", "sw-ic"], ["aria-hidden", "true"], ["focusable", "false"]].forEach(function (a) {
+      s.setAttribute(a[0], a[1]);
+    });
+    var p1 = document.createElementNS(NS, "path");
+    p1.setAttribute("d", "M2 17h4.2M17.8 17H22");
+    var c1 = document.createElementNS(NS, "circle");
+    [["cx", "7"], ["cy", "17"], ["r", "1.9"], ["fill", "currentColor"], ["stroke", "none"]].forEach(function (a) {
+      c1.setAttribute(a[0], a[1]);
+    });
+    var c2 = c1.cloneNode();
+    c2.setAttribute("cx", "17");
+    var p2 = document.createElementNS(NS, "path");
+    p2.setAttribute("d", "M7 17 16.2 8.6");
+    [p1, c1, c2, p2].forEach(function (n) {
+      s.appendChild(n);
+    });
+    return s;
+  }
+  var swButtons = C.circuits.map(function (c) {
+    var main = el("span", { class: "sw-main" });
+    var btn = el("button", { type: "button", class: "ss-btn ss-btn-big sw-btn sw-" + c.id, "data-circuit": c.id }, [
+      el("span", { class: "sw-l1" }, [switchIcon(), main]),
+      el("span", { class: "sw-sub", text: "(" + c.sw + ")" }),
+    ]);
+    btn.addEventListener("click", function () {
+      pressSwitch(c.id);
+    });
+    return { id: c.id, btn: btn, main: main };
+  });
+  var swPair = el(
+    "div",
+    { class: "sw-pair", role: "group", "aria-label": "버저 스위치", hidden: true },
+    swButtons.map(function (b) {
+      return b.btn;
+    })
+  );
+  function updateSwitchButtons() {
+    swButtons.forEach(function (b) {
+      b.main.textContent = buzz.closed === b.id ? "스위치 열기" : "스위치 닫기";
+    });
+  }
+  updateSwitchButtons();
+  // 버저 스위치 누르기(버튼·3D/2D 손잡이): 실행 중이면 무시. 공통 틀 run()을 거쳐 view.run이 그 회로만 여닫는다.
+  function pressSwitch(circuitId) {
+    if (!exp || exp.isBusy() || selPart !== "buzzer") return;
+    var b = exp.runButton;
+    if (!b || b.disabled) return;
+    buzz.pending = circuitId;
+    b.click();
+  }
+
+  /* ───────── 기록(부품마다 1칸: 두 회로를 비교해 고른 답) ───────── */
   var records = S.RecordStore(store, {
     key: "records",
     keyOf: function (r) {
-      return keyOf(r.part, r.circuit);
+      return r.part;
     },
     onChange: function () {
       lesson.refresh();
     },
   });
 
-  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리 / 5. 궁금한 점 ───────── */
+  /* ───────── 1. 예상하기 / 3. 분석 / 4. 정리(결론 + '더 탐구하고 싶은 점' 한 줄) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    lesson.refresh();
+    showFinish();
+  });
   var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
+  // '더 탐구하고 싶은 점'은 정리하기 안의 한 줄 입력(2026-09-27 — 단계 C·새 기준 앱과 같은 모양):
+  // 공통 틀의 여러 줄 입력칸을 한 줄로 쓰고, Enter로 줄을 바꾸지 않게 한다. 비우면 마칠 수 없다(공통 틀 lesson.js가 본다).
+  (function () {
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+  })();
+  // 결론을 제출해야 '더 탐구하고 싶은 점'과 '학습 마치기'가 보인다
+  function showFinish() {
+    $("finish-wrap").hidden = !conclude.isDone();
+  }
+  showFinish();
 
   /* ───────── '더 탐구해 보고 싶어요' 팝업(교과서 밖 참고 · 기록·채점 없음) ───────── */
   var modal = null;
@@ -332,15 +475,14 @@
     ]);
   }
 
+  // 부품마다 한 단계·한 칸(전구 → 전동기 → 버저, 앞 부품을 기록해야 다음 부품이 열린다 — 교과서 순서 그대로)
   var PHASES = C.parts.map(function (p) {
     return {
       id: p.phase,
       name: C.phases[p.phase].name,
       title: p.name + " 비교하기",
       lead: C.phases[p.phase].lead,
-      cells: C.circuits.map(function (c) {
-        return { part: p.id, circuit: c.id };
-      }),
+      cells: [{ part: p.id }],
     };
   });
 
@@ -370,107 +512,131 @@
             },
           };
         }),
-      },
-      {
-        id: "circuit",
-        title: "전기 회로 고르기",
-        short: "전기 회로",
-        options: C.circuits.map(function (c) {
-          return {
-            id: c.id,
-            label: c.name,
-            icon: function () {
-              return el("span", { class: "opt-icon", "aria-hidden": "true", text: c.icon });
-            },
-          };
-        }),
-        phaseTag: false,
+        // 틀이 조건 칸을 다시 그릴 때마다(고르기·실행·기록) 불린다 — 버저면 실행 칸을 스위치 두 개로(도움말 글은 없음)
+        note: function (sel) {
+          syncRunUI(sel);
+          return null;
+        },
       },
     ],
     phases: PHASES,
     doneLead: C.doneLead,
     cellKey: function (sel) {
-      return keyOf(sel.part, sel.circuit);
+      return sel.part;
     },
     runLabel: function (sel) {
-      return "▶ 스위치 닫기 (" + CIR[sel.circuit].short + " · " + PART[sel.part].name + ")";
+      return "▶ 두 회로의 스위치 함께 닫기 (" + PART[sel.part].name + ")";
     },
-    busyLabel: "스위치를 닫았어요… 잘 지켜보세요 👀",
+    busyLabel: function (sel) {
+      return "스위치를 닫았어요… 잘 지켜보세요 👀"; // 버저는 이 버튼이 숨고 스위치 버튼 두 개가 대신한다(syncRunUI)
+    },
+    // 실행하는 동안 버저 스위치 버튼도 잠근다(틀이 조건 버튼·실행 버튼을 잠그는 것과 같게)
+    onBusy: function (on) {
+      swButtons.forEach(function (b) {
+        b.btn.disabled = on;
+      });
+    },
     view: {
       build3D: build3D,
       build2D: build2D,
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 회로판을 눌러 회로를 고를 수도 있어요",
-      tip2D: "2D 화면(모형)이에요. 회로 그림을 눌러 회로를 고를 수 있어요.",
+      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 부품이나 스위치를 눌러도 돼요",
+      tip2D: "2D 화면(모형)이에요. 두 회로를 나란히 비교해요. 그림의 스위치를 눌러도 돼요.",
     },
     observe: observeCard,
     makeRecord: function (sel, observed) {
-      return { part: sel.part, circuit: sel.circuit, result: observed };
+      return { part: sel.part, answer: observed };
     },
     describeRecord: function (r) {
-      return PART[r.part].name + " · " + CIR[r.circuit].short + " → " + r.result;
+      return cmp(r.part).short + " → " + r.answer;
     },
     miniTable: {
       title: "기록한 칸 한눈에 보기",
       rows: C.parts.map(function (p) {
         return { id: p.id, label: p.icon + " " + p.name };
       }),
-      cols: C.circuits.map(function (c) {
-        return { id: c.id, label: c.short };
-      }),
-      sel: function (r, c) {
-        return { part: r.id, circuit: c.id };
+      cols: [{ id: "both", label: "두 회로 비교" }],
+      sel: function (r) {
+        return { part: r.id };
       },
-    },
-    // 한 회로를 기록하면 같은 부품의 다른 회로를 이어서 고른다(바로 비교하게)
-    onRecorded: function (info) {
-      var r = info.record;
-      if (!r || info.allDone) return;
-      var other = C.circuits.filter(function (c) {
-        return c.id !== r.circuit && !records.has(keyOf(r.part, c.id));
-      })[0];
-      if (other) exp.select({ part: r.part, circuit: other.id });
     },
     onChange: lesson.refresh,
   });
+  syncRunUI({}); // 스위치 버튼 두 개를 실행 버튼 곁에 두고(숨김) 지금 고른 부품에 맞춘다
 
-  /* 관찰·기록 카드: 본 모습(글) + 보기 고르기 → 확인하기(본 것과 같아야 기록) */
+  /* 관찰·기록 카드: 두 회로 비교 질문 + 보기 두 개(전지 1개 연결 / 전지 2개 직렬연결) → 확인하기 → 기록하기.
+     보기 바로 위에는 중립 안내만("두 회로의 ○○을 비교해 보세요."). 실제 모습 글은 맞는 보기로 '확인하기'를 누른 뒤에만 드러낸다
+     (틀린 보기로 확인하면 계속 숨김 — review-A L8, sci-6-2-2-3 chipNode와 같은 방식). 장면의 대체 설명은 두 회로의 모습을 말한다(describe). */
   function observeCard(sel) {
     var p = PART[sel.part];
-    var c = CIR[sel.circuit];
-    var seen = C.seen[sel.part][sel.circuit];
-    var qWord = sel.part === "bulb" ? "전구의 밝기는" : sel.part === "motor" ? "전동기에 달린 날개는" : "버저의 소리는";
+    var q = cmp(sel.part);
+    var reveal = el("p", { class: "ob-reveal", hidden: true }, [el("span", { class: "ob-reveal-tag", text: "본 모습" }), el("span", { text: q.seen })]);
     var body = el("div", { class: "ob-body" }, [
-      el("p", { class: "ob-where" }, [el("span", { class: "ob-chip", text: c.short }), el("span", { text: S.josa(p.name, "을", "를") + " 연결한 회로예요." })]),
-      el("p", { class: "ob-seen" }, [el("span", { class: "ob-icon", "aria-hidden": "true", text: p.icon }), el("span", { text: "👀 " + seen })]),
+      el("p", { class: "ob-where" }, [el("span", { class: "ob-chip", text: p.icon + " " + p.name }), el("span", { text: "두 회로에 같은 " + S.josa(p.name, "을", "를") + " 연결했어요." })]),
+      el("p", { class: "ob-seen" }, [el("span", { class: "ob-icon", "aria-hidden": "true", text: "👀" }), el("span", { text: q.look })]),
+      reveal,
     ]);
-    if (sel.part === "buzzer") {
-      var again = el("button", {
-        type: "button",
-        class: "ss-btn",
-        text: "🔊 소리 다시 듣기",
-        onclick: function () {
-          if (!sound.on) {
-            toast("지금은 소리가 꺼져 있어요. 아래 '🔇 소리 켜기'를 먼저 눌러 주세요.", 3200);
-            return;
-          }
-          if (!playBuzzer(sel.circuit, 1100)) toast("이 기기에서는 소리를 낼 수 없어요. 화면의 소리 파동으로 크기를 비교해 보세요.", 3600);
-        },
-      });
-      body.appendChild(el("div", { class: "ss-row ob-sound" }, [again, soundButton("ss-btn ss-btn-ghost")]));
-    }
+    var isBuzz = sel.part === "buzzer";
+    // 버저: '소리 다시 듣기'는 없다(스위치를 닫아 두는 동안 계속 울림 — 2026-09-27 사용자). 소리 끄기/켜기만 곁에 둔다.
+    if (isBuzz) body.appendChild(el("div", { class: "ss-row ob-sound" }, [soundButton("ss-btn ss-btn-ghost")]));
     return {
-      question: c.name + "에서 " + qWord + " 어떠했나요?",
+      question: q.question,
       body: body,
       type: "choice",
-      choices: C.observeChoices[phaseOf(sel.part)],
+      choices: CHOICES,
       check: function (observed) {
-        if (observed === expected(sel.part, sel.circuit)) return true;
-        return "🔍 방금 본 모습과 다른 것 같아요. 장면을 다시 살펴보고, 본 것과 같은 보기를 골라 보세요.";
+        // 버저는 두 회로를 모두 한 번 이상 닫아 들어 본 뒤에 확인한다. 전구·전동기는 두 회로를 함께 닫은 뒤에(원래 실행 뒤에만 카드가 뜬다).
+        if (isBuzz ? !(buzz.heard.single && buzz.heard.series2) : !lit[sel.part]) return isBuzz ? q.notBoth : C.compare.notYet;
+        if (observed === C.compare.answer) {
+          reveal.hidden = false;
+          return true;
+        }
+        reveal.hidden = true; // 맞힌 뒤 틀린 보기로 다시 확인하면 다시 숨긴다(review-D2 L1)
+        return q.wrong;
       },
-      okMessage: "⭕ 본 것과 같아요! '기록하기'를 눌러 기록해요.",
-      retryLabel: "🔁 다시 실험해 보기",
+      okMessage: C.compare.okMessage,
+      // 버저는 '다시 실험해 보기'를 두지 않는다 — 스위치 버튼이 곧 다시 해 보는 버튼이다(sci-6-2-3-3 실험 1과 같게)
+      retryLabel: isBuzz ? undefined : "🔁 다시 실험해 보기",
     };
   }
+  // 3D·2D 장면의 스위치(손잡이)를 누르면: 버저는 그 회로만 여닫기(스위치 버튼과 같다), 전구·전동기는 실행 버튼과 같다
+  // (공통 틀의 실행 버튼 훅 exp.runButton — 실행 중이면 무시)
+  function tapSwitch(circuitId) {
+    if (!exp || exp.isBusy()) return;
+    if (selPart === "buzzer" && circuitId) {
+      pressSwitch(circuitId);
+      return;
+    }
+    var b = exp.runButton;
+    if (b && !b.disabled) b.click();
+    else toast("먼저 연결할 부품을 골라요.", 2600);
+  }
+
+  /* 실행 칸 맞추기(틀이 조건 칸을 다시 그릴 때마다 — factors[0].note): 버저를 고르면 공통 실행 버튼을 숨기고 그 자리에 스위치 버튼
+     두 개를, 다른 부품이면 원래 실행 버튼을. 부품이 바뀌면 버저 스위치를 모두 열고 '들어 본 회로'를 비운다. */
+  function syncRunUI(sel) {
+    var part = sel && sel.part ? sel.part : null;
+    if (part !== selPart) {
+      var was = selPart;
+      selPart = part;
+      if (was === "buzzer" || part === "buzzer") openBuzz(true);
+    }
+    if (!exp) return; // 틀이 만들어지는 중(create 안의 첫 그리기)
+    var isBuzz = selPart === "buzzer";
+    swPair.hidden = !isBuzz;
+    exp.runButton.classList.toggle("sw-hidden", isBuzz);
+    placeSwitches();
+  }
+  // 스위치 버튼 두 개는 늘 공통 실행 버튼 바로 앞에 둔다 — 실행 버튼은 크게 보기를 켜고 끌 때 틀이 막대 ↔ 실행 카드로 옮긴다(ss:scenefull)
+  function placeSwitches() {
+    if (!exp) return;
+    var run = exp.runButton;
+    if (run.parentNode && (swPair.parentNode !== run.parentNode || swPair.nextSibling !== run)) run.parentNode.insertBefore(swPair, run);
+    var bar = $("experiment-root").querySelector(".ss-exp-overlay");
+    if (bar) bar.classList.toggle("has-sw", !swPair.hidden && swPair.parentNode === bar);
+  }
+  document.addEventListener("ss:scenefull", function () {
+    setTimeout(placeSwitches, 0);
+  });
 
   // 실험대를 되돌린 뒤(공통 틀이 화면 상태 "scene"을 비운 다음) 실행 버튼 글자·도움말을 다시 그린다
   function refreshSoon() {
@@ -478,24 +644,54 @@
       if (exp && exp.refresh) exp.refresh();
     }, 0);
   }
+  function noop() {}
+  // 장면 대체 설명(화면 읽기 프로그램용 — 3D 캔버스 aria-label, 2D 숨은 설명). 장면을 "보는 것"과 같으므로 스위치를 닫은 뒤에는
+  // 두 회로의 모습(어느 쪽이 더 밝은지 등)을 말한다. 관찰 카드의 글은 중립이다(observeCard).
+  function sceneText(kind, partId) {
+    var p = PART[partId] || PART[C.parts[0].id];
+    var others = C.parts.filter(function (x) {
+      return x.id !== p.id;
+    });
+    var t = kind + " 실험 장면(모형). 왼쪽은 " + C.circuits[0].name + ", 오른쪽은 " + C.circuits[1].name + "예요. 두 회로에 " + S.josa(p.name, "을", "를") + " 연결했어요. ";
+    if (p.id === "buzzer") t += buzz.closed ? cmp("buzzer").altOne[buzz.closed] + " " : "두 회로의 스위치는 열려 있어요. 스위치를 하나씩 닫아 소리를 들어 볼 수 있어요. ";
+    else t += lit[p.id] ? "두 회로의 스위치를 함께 닫았어요. " + cmp(p.id).alt + " " : "두 회로의 스위치는 열려 있어요. ";
+    if (kind === "3D") t += "두 회로 앞 가운데의 부품 상자에 " + S.josa(others[0].name, "과", "와") + " " + S.josa(others[1].name, "이", "가") + " 있어요(눌러서 바꿔 끼울 수 있어요). 드래그하면 돌려 볼 수 있어요.";
+    return t.trim();
+  }
 
   /* ───────── 3D 장면 ─────────
-   * 실험대 위에 회로판 2개(왼쪽: 전지 한 개, 오른쪽: 전지 두 개 직렬)를 나란히 놓고,
-   * 두 회로에 같은 부품(전구·전동기·버저)을 하나씩 연결한 모습을 보여 준다.
-   * 부품을 바꾸면 두 회로의 부품이 함께 바뀐다(실제 실험과 같게).
+   * 실험대 위에 회로판 2개(왼쪽: 전지 한 개, 오른쪽: 전지 두 개 직렬)를 나란히 놓고, 두 회로에 같은 부품(전구·전동기·버저)을
+   * 하나씩 연결한 모습을 보여 준다. 부품을 바꾸면 두 회로의 부품이 함께 바뀐다(실제 실험과 같게). 두 회로 앞 가운데의
+   * 부품 상자에는 지금 연결하지 않은 부품이 놓여 있고, 누르면 그 부품을 고른다. 스위치(손잡이)를 누르면 전구·전동기는 실행과 같고
+   * (두 회로를 함께 닫기), 버저는 그 회로의 스위치 버튼과 같다(그 회로만 닫기/열기 — 후속 2).
    */
   var BOARD = { w: 4.9, d: 3.5, h: 0.24, x: 3.0 }; // 회로판 크기·간격
   var WIRE_Y = 0.36;
-  var SPEED = { motor: { single: 7, series2: 18 }, wave: { single: 1, series2: 2.1 } };
+  var SPEED = { motor: { single: 7, series2: 18 } };
+  // 버저 소리 파동(원형 고리, 모형 — 2026-09-27 사용자 결정 "고리의 크기, 개수, 간격은 모두 동일하게 하고, 선의 굵기를 조금 더 굵게 표현해줘"):
+  // 두 회로 모두 고리 3개가 같은 크기(minR→maxR)·같은 간격(1/3)·같은 빠르기(speed, 초당 바퀴)·같은 진하기로 퍼지고,
+  // 소리가 큰 쪽(전지 두 개 직렬)만 고리 선(토러스 굵기)이 더 굵다.
+  var WAVE = { speed: 1.2, minR: 0.45, maxR: 1.4, peak: 0.6, tube: { 1: 0.035, 2: 0.08 } };
+  var LEVER_OPEN = 0.6; // 열린 스위치 손잡이 각도(라디안)
+  var TRAY = { z: 2.6, gap: 1.0, scale: 0.55, top: 0.1 }; // 부품 상자(두 회로판 앞 가운데 — 두 회로 이름표 사이)
 
   function build3D(container, ctx) {
+    var live = { part: null }; // 지금 회로에 끼운 부품(setPart) — 누르기 가드용
     return S.Sim3D.create({
       container: container,
-      frame: { width: 11.6, depth: 6.4, center: [0, 0.8, 0] },
+      // 화면 맞춤 범위: 앞 가운데 부품 상자(이름표 포함)까지 들어오게 가운데를 앞으로 0.7 옮겼다(2026-09-27 — 좁고 낮은 장면 칸에서
+      // 상자가 아래 가장자리·드래그 안내 줄에 가리지 않게. 회로판 뒤쪽은 위 여백이 넉넉하다)
+      frame: { width: 11.6, depth: 6.4, center: [0, 0.8, 0.7] },
       viewDir: [0, 0.58, 0.81],
       minDistance: 3.2,
       onPick: function (p) {
-        ctx.onPick(p);
+        if (!p) return;
+        if (p.run) {
+          tapSwitch(p.circuit); // 버저면 누른 회로만 여닫기, 전구·전동기면 실행과 같다
+          return;
+        }
+        // 이미 끼운 부품을 다시 누르면 그대로 둔다(다시 고르면 공통 틀이 관찰 카드를 닫는다 — review-D2 M1, sci-6-2-3-1·-3과 같게)
+        if (p.part && p.part !== live.part) ctx.onPick({ part: p.part });
       },
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -504,9 +700,9 @@
       var M = v.make;
       var disposed = false;
       var currentPart = null;
-      var done = {}; // cellKey → true (스위치를 닫아 결과가 남아 있는 칸)
 
-      var tableMesh = M.table(15, 9.5, 0xd9c7a3);
+      var tableMesh = M.table(15, 11, 0xd9c7a3); // 앞쪽 부품 상자까지(화면 맞춤 가운데를 앞으로 옮긴 만큼 탁자도 앞으로 — 넓은 칸에서 탁자 앞 가장자리가 보이지 않게)
+      tableMesh.position.z = 0.7;
       v.root.add(tableMesh);
       v.onThemeChange(function (dark) {
         tableMesh.material.color.set(dark ? 0x5b5042 : 0xd9c7a3);
@@ -519,6 +715,26 @@
       function say(text) {
         ovText.textContent = text || "";
         ovText.hidden = !text;
+      }
+      var canvasEl = v.renderer && v.renderer.domElement;
+      function describe() {
+        if (canvasEl) canvasEl.setAttribute("aria-label", sceneText("3D", currentPart));
+      }
+
+      // 누르기(탭) 대상: 보이지 않는 상자(누르는 곳)를 물체에 붙인다. three.js 레이는 숨긴 물체도 맞히므로
+      // 조상 중 하나라도 숨어 있으면(연결하지 않은 부품 등) 맞지 않게 한다(sci-6-2-2-3과 같은 방식).
+      var hitMat = new T.MeshBasicMaterial({ visible: false });
+      function hitBox(parent, w, h, d, x, y, z, value) {
+        var m = new T.Mesh(new T.BoxGeometry(w, h, d), hitMat);
+        m.position.set(x || 0, y, z || 0);
+        var orig = m.raycast;
+        m.raycast = function (rc, hits) {
+          for (var n = m; n; n = n.parent) if (!n.visible) return;
+          return orig.call(this, rc, hits);
+        };
+        parent.add(m);
+        v.pickable(m, value);
+        return m;
       }
 
       /* ── 작은 부품 만들기 ── */
@@ -568,24 +784,7 @@
         return g;
       }
 
-      /* 세기 표시(색·움직임만으로 전달하지 않도록 칸 수로도 알려 준다). 부품 위에 띄운다. */
-      function levelGauge(group, title, y) {
-        var made = {
-          1: M.label(title + " ▮▯▯", { height: 0.38, bold: true }),
-          2: M.label(title + " ▮▮▮", { height: 0.38, bold: true }),
-        };
-        [1, 2].forEach(function (k) {
-          made[k].position.set(0, y, 0);
-          made[k].visible = false;
-          group.add(made[k]);
-        });
-        return function (lv) {
-          made[1].visible = lv === 1;
-          made[2].visible = lv === 2;
-        };
-      }
-
-      /* ── 부품(전구·전동기·버저) ── */
+      /* ── 부품(전구·전동기·버저) ──  (2026-09-27: 부품 위 세기 표시 "밝기/빠르기/소리 크기 ▮▯▯"는 없앴다 — 사용자 결정) */
       function bulbPart() {
         var g = new T.Group();
         var socket = new T.Mesh(new T.CylinderGeometry(0.3, 0.32, 0.4, 20), M.material(0x9aa3ae, { roughness: 0.5 }));
@@ -604,12 +803,10 @@
         halo.position.y = BOARD.h + 0.78;
         halo.renderOrder = 5;
         g.add(halo);
-        var gauge = levelGauge(g, "밝기", BOARD.h + 1.7);
         return {
           group: g,
           set: function (level) {
             // level: 0(꺼짐) · 1(전지 한 개) · 2(전지 두 개 직렬)
-            gauge(level);
             var e = level === 0 ? 0 : level === 1 ? 0.5 : 1.6;
             glassMat.emissiveIntensity = e;
             glassMat.opacity = level === 0 ? 0.35 : 0.6 + 0.25 * (level - 1);
@@ -652,15 +849,23 @@
         blur.rotation.x = Math.PI / 2;
         blur.position.y = BOARD.h + 1.08;
         g.add(blur);
-        var gauge = levelGauge(g, "빠르기", BOARD.h + 1.6);
+        // 움직임 줄이기에서 날개가 멈출 때만 보이는 회전 흐림 원판(두 회로의 빠르기 차이를 멈춘 그림으로도 — 2D의 흐림 원과 같은 뜻)
+        var discMat = M.material(0x7fb0e8, { transparent: true, opacity: 0, roughness: 0.8, depthWrite: false, side: T.DoubleSide });
+        var disc = new T.Mesh(new T.CircleGeometry(0.44, 32), discMat);
+        disc.rotation.x = -Math.PI / 2;
+        disc.position.y = BOARD.h + 1.07;
+        disc.visible = false;
+        g.add(disc);
         var level = 0;
         return {
           group: g,
           set: function (lv) {
             level = lv;
-            gauge(lv);
             blurMat.opacity = lv === 0 ? 0 : lv === 1 ? 0.18 : 0.5;
-            if (lv && reduceMotion()) prop.rotation.y = lv === 1 ? 0.2 : 0.7;
+            var still = !!lv && reduceMotion();
+            if (still) prop.rotation.y = lv === 1 ? 0.2 : 0.7;
+            disc.visible = still;
+            discMat.opacity = lv === 2 ? 0.55 : 0.2;
           },
           tickable: true,
           tick: function (dt) {
@@ -685,51 +890,52 @@
         var lead2 = new T.Mesh(new T.BoxGeometry(0.5, 0.05, 0.05), matWireBlack);
         lead2.position.set(-0.55, BOARD.h + 0.2, -0.1);
         g.add(lead2);
-        var rings = [];
-        var ringMat = M.material(0x6ea0ff, { transparent: true, opacity: 0, roughness: 0.9, emissive: 0x3f7fe0, emissiveIntensity: 0.5, depthWrite: false });
-        for (var i = 0; i < 3; i++) {
-          var r = new T.Mesh(new T.TorusGeometry(1, 0.035, 8, 40), ringMat.clone());
-          r.rotation.x = Math.PI / 2;
-          r.position.y = BOARD.h + 0.34;
-          r.visible = false;
-          g.add(r);
-          rings.push({ mesh: r, phase: i / 3 });
-        }
-        // 소리 크기 표시(소리를 끄거나 소리가 나지 않는 기기에서도 크기 차이를 알 수 있게)
-        var gauge = levelGauge(g, "소리 크기", BOARD.h + 1.2);
+        // 소리 파동(원형 고리, 모형): 두 회로 모두 고리 3개·같은 크기·같은 간격·같은 빠르기(WAVE), 소리가 큰 쪽만 고리 선이 더 굵다.
+        // 굵기별로 고리 한 벌씩(가는 선 = 전지 한 개, 굵은 선 = 전지 두 개 직렬) 만들어 두고 지금 세기의 한 벌만 보인다.
+        var ringSets = {};
+        [1, 2].forEach(function (lv) {
+          var geo = new T.TorusGeometry(1, WAVE.tube[lv], 8, 48);
+          ringSets[lv] = [0, 1, 2].map(function (i) {
+            var m = new T.Mesh(geo, M.material(0x6ea0ff, { transparent: true, opacity: 0, roughness: 0.9, emissive: 0x3f7fe0, emissiveIntensity: 0.5, depthWrite: false }));
+            m.rotation.x = Math.PI / 2;
+            m.position.y = BOARD.h + 0.34;
+            m.visible = false;
+            g.add(m);
+            return { mesh: m, phase: i / 3 };
+          });
+        });
         var level = 0;
         var t = 0;
         function placeRings(k0) {
-          var maxR = level === 1 ? 0.95 : 1.85;
-          var peak = level === 1 ? 0.35 : 0.7;
-          rings.forEach(function (r) {
+          (ringSets[level] || []).forEach(function (r) {
             var k = (k0 + r.phase) % 1;
-            var rad = 0.45 + (maxR - 0.45) * k;
+            var rad = WAVE.minR + (WAVE.maxR - WAVE.minR) * k;
             r.mesh.scale.set(rad, rad, 1);
-            r.mesh.material.opacity = peak * (1 - k);
+            r.mesh.material.opacity = WAVE.peak * (1 - k);
           });
         }
         return {
           group: g,
           set: function (lv) {
             level = lv;
-            gauge(lv);
-            rings.forEach(function (r, i) {
-              // 전지 한 개일 때는 고리를 2개만(작은 소리), 두 개 직렬일 때는 3개(큰 소리)
-              r.mesh.visible = lv > 0 && (lv === 2 || i < 2);
-              if (!lv) r.mesh.material.opacity = 0;
+            [1, 2].forEach(function (k) {
+              ringSets[k].forEach(function (r) {
+                r.mesh.visible = lv === k;
+                if (lv !== k) r.mesh.material.opacity = 0;
+              });
             });
-            // 움직임 줄이기 설정에서도 고리가 보이게 한 장면을 고정해서 그린다
-            if (lv && reduceMotion()) placeRings(0.25);
+            // 바로 한 장면을 그려 둔다(움직임 줄이기에서는 이 장면에 멈춰 있어도 굵기로 구분된다)
+            if (lv) placeRings(reduceMotion() ? 0.25 : t);
           },
           tickable: true,
           tick: function (dt) {
             if (!level) return;
-            t += dt * (level === 1 ? SPEED.wave.single : SPEED.wave.series2);
+            t += dt * WAVE.speed;
             placeRings(t);
           },
         };
       }
+      var MAKE = { bulb: bulbPart, motor: motorPart, buzzer: buzzerPart };
 
       /* ── 회로 한 벌 만들기 ── */
       function buildCircuit(cfg) {
@@ -760,7 +966,7 @@
         var battLeft = cfg.batteries === 1 ? -0.79 : -1.81; // (－)극 끝
         var battRight = cfg.batteries === 1 ? 0.83 : 1.85; // (＋)극 끝
 
-        // 스위치(왼쪽 뒤)
+        // 스위치(왼쪽 뒤) — 누르면 전구·전동기는 실행(두 회로의 스위치를 함께 닫기), 버저는 이 회로의 스위치만 닫기/열기(tapSwitch)
         var swX = -1.45;
         var swZ = -1.05;
         var swBase = new T.Mesh(new T.BoxGeometry(1.0, 0.12, 0.5), M.material(0xf2efe6, { roughness: 0.8 }));
@@ -781,20 +987,20 @@
         var swLabel = M.label("스위치", { height: 0.28 });
         swLabel.position.set(swX, BOARD.h + 0.75, swZ - 0.45);
         g.add(swLabel);
+        hitBox(g, 1.3, 0.9, 0.9, swX, BOARD.h + 0.35, swZ, { run: true, circuit: cfg.id });
 
-        // 부품 자리(오른쪽 뒤)
+        // 부품 자리(오른쪽 뒤) — 부품 3가지를 모두 만들어 두고 고른 것만 보인다. 보이는 부품을 누르면 그 부품을 고른다.
         var partX = 1.35;
         var partZ = -1.0;
         var parts = {};
         var holder = new T.Group();
         holder.position.set(partX, 0, partZ);
         g.add(holder);
-        parts.bulb = bulbPart();
-        parts.motor = motorPart();
-        parts.buzzer = buzzerPart();
-        Object.keys(parts).forEach(function (k) {
-          parts[k].group.visible = false;
-          holder.add(parts[k].group);
+        C.parts.forEach(function (p) {
+          parts[p.id] = MAKE[p.id]();
+          parts[p.id].group.visible = false;
+          holder.add(parts[p.id].group);
+          hitBox(parts[p.id].group, 1.1, 1.5, 1.1, 0, BOARD.h + 0.7, 0, { part: p.id });
         });
 
         // 전선 고리: 전지(＋) → 부품 → 스위치 → 전지(－)
@@ -811,42 +1017,42 @@
         nameLabel.position.set(0, 0.55, 2.2);
         g.add(nameLabel);
 
-        // 고른 회로 표시(테두리)
-        var ringG = new T.Group();
-        var edge = M.material(0x2f6fd6, { emissive: 0x2f6fd6, emissiveIntensity: 0.35, roughness: 0.6 });
-        [
-          [0, BOARD.d / 2 + 0.16, BOARD.w + 0.5, 0.12],
-          [0, -BOARD.d / 2 - 0.16, BOARD.w + 0.5, 0.12],
-        ].forEach(function (a) {
-          var m = new T.Mesh(new T.BoxGeometry(a[2], 0.08, a[3]), edge);
-          m.position.set(a[0], 0.04, a[1]);
-          ringG.add(m);
-        });
-        [
-          [-BOARD.w / 2 - 0.19, 0],
-          [BOARD.w / 2 + 0.19, 0],
-        ].forEach(function (a) {
-          var m = new T.Mesh(new T.BoxGeometry(0.12, 0.08, BOARD.d + 0.5), edge);
-          m.position.set(a[0], 0.04, a[1]);
-          ringG.add(m);
-        });
-        ringG.visible = false;
-        g.add(ringG);
-
-        // 회로판을 눌러 회로를 고를 수 있게
-        var pick = new T.Group();
-        var pickBox = new T.Mesh(new T.BoxGeometry(BOARD.w, 0.05, BOARD.d), new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
-        pickBox.position.y = BOARD.h + 0.02;
-        pick.add(pickBox);
-        g.add(pick);
-        v.pickable(pick, { circuit: cfg.id });
-
-        return { id: cfg.id, x: g.position.x, group: g, lever: lever, parts: parts, ring: ringG, on: false };
+        return { id: cfg.id, x: g.position.x, group: g, lever: lever, parts: parts, on: false };
       }
 
       var circuits = {};
       C.circuits.forEach(function (c, i) {
         circuits[c.id] = buildCircuit({ id: c.id, index: i, batteries: c.batteries, name: c.name });
+      });
+      function eachCircuit(fn) {
+        Object.keys(circuits).forEach(function (id) {
+          fn(circuits[id]);
+        });
+      }
+
+      /* ── 부품 상자(두 회로판 앞 가운데, 두 회로 이름표 사이): 지금 연결하지 않은 부품이 놓여 있다(연결한 부품 자리는 빈칸).
+         누르면 그 부품을 고른다(부품 버튼과 같다). 이름표는 안 바뀌는 부품 이름만 ── */
+      var tray = new T.Group();
+      tray.position.set(0, 0, TRAY.z);
+      v.root.add(tray);
+      var trayBase = new T.Mesh(new T.BoxGeometry(TRAY.gap * 3 + 0.2, TRAY.top, 1.0), M.material(0xc9d2dc, { roughness: 0.8 }));
+      trayBase.position.y = TRAY.top / 2;
+      tray.add(trayBase);
+      var traySlots = {};
+      C.parts.forEach(function (p, i) {
+        var slot = new T.Group();
+        slot.position.set((i - 1) * TRAY.gap, 0, 0);
+        tray.add(slot);
+        var model = MAKE[p.id]();
+        model.set(0);
+        model.group.scale.setScalar(TRAY.scale);
+        model.group.position.y = TRAY.top - BOARD.h * TRAY.scale; // 부품 바닥이 상자 윗면에 닿게
+        slot.add(model.group);
+        hitBox(model.group, 1.2, 1.6, 1.2, 0, BOARD.h + 0.7, 0, { part: p.id });
+        var lab = M.label(p.name, { height: 0.3, bold: true });
+        lab.position.set(0, TRAY.top + 0.02, 0.62);
+        slot.add(lab);
+        traySlots[p.id] = model;
       });
 
       /* ── 상태 ── */
@@ -854,14 +1060,18 @@
         return circuitId === "series2" ? 2 : 1;
       }
       function setLever(c, closed) {
-        c.lever.rotation.z = closed ? 0 : 0.6;
+        c.lever.rotation.z = closed ? 0 : LEVER_OPEN;
+      }
+      // 이 회로가 켜져 있나: 버저는 그 회로의 스위치만(buzz.closed), 전구·전동기는 두 회로를 함께 닫았을 때(lit)
+      function isOnNow(c, part) {
+        return part === "buzzer" ? buzz.closed === c.id : !!(part && lit[part]);
       }
       function applyState(c) {
         var part = currentPart;
         Object.keys(c.parts).forEach(function (k) {
           c.parts[k].group.visible = k === part;
         });
-        var isOn = !!(part && done[keyOf(part, c.id)]);
+        var isOn = isOnNow(c, part);
         c.on = isOn;
         setLever(c, isOn);
         if (part) c.parts[part].set(isOn ? levelOf(c.id) : 0);
@@ -869,12 +1079,18 @@
           if (k !== part) c.parts[k].set(0);
         });
       }
+      function applyAll() {
+        eachCircuit(applyState);
+        Object.keys(traySlots).forEach(function (id) {
+          traySlots[id].group.visible = id !== currentPart; // 연결한 부품은 상자에서 빠져 있다
+        });
+      }
       function setPart(partId) {
         if (!partId || partId === currentPart) return;
-        currentPart = partId;
-        Object.keys(circuits).forEach(function (id) {
-          applyState(circuits[id]);
-        });
+        currentPart = partId; // 버저 스위치·소리는 부품이 바뀔 때 앱이 연다(syncRunUI → openBuzz)
+        live.part = partId;
+        applyAll();
+        describe();
         startLoop();
       }
 
@@ -883,8 +1099,7 @@
       var lastT = 0;
       function needsTick() {
         var any = false;
-        Object.keys(circuits).forEach(function (id) {
-          var c = circuits[id];
+        eachCircuit(function (c) {
           if (c.on && currentPart && c.parts[currentPart].tickable) any = true;
         });
         return any;
@@ -899,87 +1114,130 @@
         if (disposed) return;
         var dt = Math.min(0.05, (now - lastT) / 1000);
         lastT = now;
-        Object.keys(circuits).forEach(function (id) {
-          var c = circuits[id];
+        eachCircuit(function (c) {
           if (c.on && currentPart && c.parts[currentPart].tick) c.parts[currentPart].tick(dt);
         });
         if (needsTick()) loopId = requestAnimationFrame(tick);
       }
 
       var runToken = 0;
+      function wait(ms) {
+        return v.tween(ms, noop);
+      }
       setPart(C.parts[0].id); // 부품을 고르기 전에도 회로가 비어 보이지 않게 첫 부품(전구)을 끼워 둔다
       v.render();
 
-      return {
+      var api = {
         whenVisible: v.whenVisible,
         highlight: function (s) {
+          activeView = api; // 공통 틀이 실제로 쓰는 화면만 highlight를 받는다(늦게 끝나 버려진 3D 생성은 받지 않음)
           if (s.part) setPart(s.part);
-          Object.keys(circuits).forEach(function (id) {
-            circuits[id].ring.visible = s.circuit === id;
-          });
+          applyAll(); // 버저 스위치 상태(3D↔2D를 바꿔도 이어짐)
+          describe();
+          startLoop();
+          syncTone();
           v.render();
         },
         run: async function (sel) {
           var my = ++runToken;
           setPart(sel.part);
-          var c = circuits[sel.circuit];
-          var part = c.parts[sel.part];
-          // 처음 상태로: 스위치 열고 부품 끄기
-          done[keyOf(sel.part, sel.circuit)] = false;
-          c.on = false;
-          setLever(c, false);
-          part.set(0);
-          // 카메라는 움직이지 않는다: 두 회로가 언제나 함께 보여야 비교할 수 있다(고른 회로는 파란 테두리로 표시).
-          say("① 스위치를 닫아요");
-          await v.tween(250, function () {});
+          var part = sel.part;
+          if (part === "buzzer") {
+            // 버저(2026-09-27 사용자): 누른 회로의 스위치만 여닫는다. 닫으면 다른 회로는 저절로 열리고, 닫힌 동안 소리가 계속 난다.
+            var cid = buzz.pending;
+            buzz.pending = null;
+            if (!cid) {
+              applyAll();
+              return;
+            }
+            var closing = buzz.closed !== cid;
+            var from = {};
+            eachCircuit(function (c) {
+              from[c.id] = c.lever.rotation.z;
+              c.on = false; // 움직이는 동안 두 버저 모두 조용히(고리도 끔) — 닫는 쪽은 손잡이가 닿은 뒤에 켠다
+              c.parts.buzzer.set(0);
+            });
+            stopBuzzer();
+            buzz.closed = null;
+            await v.tween(230, function (t) {
+              eachCircuit(function (c) {
+                var to = closing && c.id === cid ? 0 : LEVER_OPEN;
+                c.lever.rotation.z = from[c.id] + (to - from[c.id]) * t;
+              });
+            });
+            if (my !== runToken) return;
+            buzz.closed = closing ? cid : null;
+            if (closing) buzz.heard[cid] = true;
+            applyAll();
+            startLoop();
+            describe();
+            updateSwitchButtons();
+            syncTone();
+            v.render();
+            return;
+          }
+          // 처음 상태로: 두 회로의 스위치를 열고 부품 끄기
+          lit[part] = false;
+          applyAll();
+          describe();
+          // 카메라는 움직이지 않는다: 두 회로가 언제나 함께 보여야 비교할 수 있다.
+          say("① 두 회로의 스위치를 함께 닫아요");
+          await wait(250);
           if (my !== runToken) return;
           await v.tween(360, function (t) {
-            c.lever.rotation.z = 0.6 * (1 - t);
+            eachCircuit(function (c) {
+              c.lever.rotation.z = LEVER_OPEN * (1 - t);
+            });
           });
           if (my !== runToken) return;
-          say("② 잘 지켜보세요");
-          var lv = levelOf(sel.circuit);
-          c.on = true;
-          done[keyOf(sel.part, sel.circuit)] = true;
-          part.set(lv);
+          lit[part] = true;
+          applyAll();
           startLoop();
-          if (sel.part === "buzzer") playBuzzer(sel.circuit, 1250);
-          await v.tween(1350, function () {});
+          describe();
+          say("② 두 회로를 비교해 보세요");
+          await wait(1350);
           if (my !== runToken) return;
-          part.set(lv);
           say("");
           v.render();
         },
         showInstant: function (sel) {
-          done[keyOf(sel.part, sel.circuit)] = true;
-          if (!currentPart) setPart(sel.part);
-          if (sel.part === currentPart) applyState(circuits[sel.circuit]);
+          if (sel.part !== "buzzer") lit[sel.part] = true; // 버저는 스위치 상태(buzz.closed)를 저장하지 않는다 — 다시 열면 열림
+          if (sel.part === currentPart) applyAll();
           startLoop();
+          describe();
           v.render();
         },
         clear: function () {
           runToken++;
-          stopBuzzer();
           say("");
-          done = {};
-          Object.keys(circuits).forEach(function (id) {
-            applyState(circuits[id]);
-          });
+          lit = {};
+          openBuzz(true); // 버저 스위치도 모두 열고 '들어 본 회로'를 비운다
+          applyAll();
+          describe();
           v.flyHome(400);
           refreshSoon();
+          v.render();
+        },
+        // 버저 스위치 상태를 다시 그린다(앱이 스위치를 열 때 — openBuzz)
+        refreshBuzz: function () {
+          applyAll();
+          describe();
           v.render();
         },
         resetView: v.resetView,
         dispose: function () {
           runToken++;
           disposed = true;
-          stopBuzzer();
+          stopBuzzer(); // 스위치 상태는 그대로 두고 소리만 — 3D↔2D를 바꾸면 새 화면이 이어서 낸다(highlight → syncTone)
+          if (activeView === api) activeView = null;
           if (loopId) cancelAnimationFrame(loopId);
           loopId = 0;
           if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
           v.dispose();
         },
       };
+      describe();
+      return api;
     });
   }
 
@@ -1005,9 +1263,10 @@
     var token = 0;
     var panels = {};
     var currentPart = null;
-    var done = {};
     var row = el("div", { class: "d2-row" });
     var caption = el("p", { class: "d2-caption", "aria-live": "polite" });
+    var desc = el("p", { class: "ss-sr-only" }); // 그림 설명(화면 읽기 프로그램용)
+    var IDLE = "부품을 고른 뒤 두 회로의 스위치를 함께 닫아 보세요.";
 
     C.circuits.forEach(function (cfg) {
       // 전지 1개 또는 2개(직렬)
@@ -1031,14 +1290,19 @@
         svg("path", { d: (cfg.batteries === 1 ? "M145,165 L185,165" : "M180,165 L185,165") + " L185,60 L140,60", class: "d2-wire d2-red" }),
         svg("path", { d: "M60,60 L15,60 L15,165 " + (cfg.batteries === 1 ? "L55,165" : "L20,165"), class: "d2-wire d2-black" }),
       ]);
-      // 스위치(왼쪽 위)
+      // 스위치(왼쪽 위) — 누르면 3D 손잡이와 같다(버저면 이 회로만 여닫기, 전구·전동기면 실행). 누르는 곳은 손잡이·글자를 덮는 투명한 칸
       var lever = svg("line", { x1: 60, y1: 60, x2: 92, y2: 44, class: "d2-lever" });
-      var sw = svg("g", null, [
+      var swHit = svg("rect", { x: 46, y: 28, width: 60, height: 66, rx: 8, class: "d2-sw-hit" });
+      var sw = svg("g", { class: "d2-sw" }, [
+        swHit,
         svg("circle", { cx: 60, cy: 60, r: 4, class: "d2-post" }),
         svg("circle", { cx: 92, cy: 60, r: 4, class: "d2-post" }),
         lever,
         svgText(76, 86, "스위치", "d2-note"),
       ]);
+      sw.addEventListener("click", function () {
+        tapSwitch(cfg.id);
+      });
       // 부품 자리(오른쪽 위)
       var bulbGlow = svg("circle", { cx: 122, cy: 60, r: 26, class: "d2-glow" });
       var bulb = svg("g", null, [
@@ -1051,7 +1315,9 @@
         svg("rect", { x: -3, y: -18, width: 6, height: 36, rx: 3, class: "d2-blade" }),
         svg("circle", { cx: 0, cy: 0, r: 4, class: "d2-hub" }),
       ]);
-      var propWrap = svg("g", { transform: "translate(122,60)" }, [prop]);
+      // 날개가 도는 흐릿한 원(3D의 회전 흐림과 같은 뜻) — 움직임 줄이기에서 날개가 멈출 때만 보인다(두 회로의 빠르기 차이를 멈춘 그림으로도, style.css)
+      var blur = svg("circle", { cx: 0, cy: 0, r: 19, class: "d2-blur" });
+      var propWrap = svg("g", { transform: "translate(122,60)" }, [blur, prop]);
       var motor = svg("g", null, [svg("rect", { x: 106, y: 66, width: 32, height: 22, rx: 4, class: "d2-motor" }), propWrap]);
       var waves = svg("g", { class: "d2-waves" }, [
         svg("circle", { cx: 122, cy: 60, r: 20, class: "d2-wave" }),
@@ -1064,49 +1330,25 @@
         partG[k].setAttribute("class", "d2-part");
         partG[k].style.display = "none";
       });
-      // 세기 게이지(색 없이 칸 수와 글자로도 알 수 있게)
-      var bars = [];
-      for (var i = 0; i < 3; i++) {
-        bars.push(svg("rect", { x: 62 + i * 27, y: 210, width: 22, height: 14, rx: 4, class: "d2-bar" }));
-      }
-      var gaugeText = svgText(100, 240, "스위치를 닫아 보세요", "d2-note");
-      var gauge = svg("g", null, bars.concat([gaugeText]));
-
-      var pic = svg("svg", { viewBox: "0 0 200 252", class: "d2-svg", "aria-hidden": "true" }, [wires, batt, sw, bulb, motor, buzzer, gauge]);
-      var btn = el(
-        "button",
-        {
-          type: "button",
-          class: "d2-pick",
-          "aria-pressed": "false",
-          "aria-label": cfg.name + " (고르기)",
-          onclick: function () {
-            ctx.onPick({ circuit: cfg.id });
-          },
-        },
-        [el("span", { class: "d2-name", text: cfg.name }), pic]
-      );
-      row.appendChild(btn);
-      panels[cfg.id] = { id: cfg.id, btn: btn, lever: lever, partG: partG, prop: prop, waves: waves, glow: bulbGlow, bars: bars, gaugeText: gaugeText, on: false };
+      // (2026-09-27) 그림 아래 세기 표시(칸 막대·"밝기: 약하게" 글자)는 없앴다 — 사용자 결정. 그림 높이도 그만큼 줄였다(252 → 206).
+      var pic = svg("svg", { viewBox: "0 0 200 206", class: "d2-svg", "aria-hidden": "true" }, [wires, batt, sw, bulb, motor, buzzer]);
+      var box = el("div", { class: "d2-panel" }, [el("span", { class: "d2-name", text: cfg.name }), pic]);
+      row.appendChild(box);
+      panels[cfg.id] = { id: cfg.id, box: box, lever: lever, partG: partG, prop: prop, blur: blur, waves: waves, glow: bulbGlow, on: false };
     });
 
-    root.appendChild(el("div", { class: "d2-wrap" }, [row, caption]));
-    caption.textContent = "부품과 회로를 고른 뒤 스위치를 닫아 보세요.";
+    root.appendChild(el("div", { class: "d2-wrap" }, [row, caption, desc]));
+    caption.textContent = IDLE;
 
     function levelOf(id) {
       return id === "series2" ? 2 : 1;
-    }
-    function gaugeWord(partId, lv) {
-      if (partId === "bulb") return lv === 2 ? "밝기: 세게" : "밝기: 약하게";
-      if (partId === "motor") return lv === 2 ? "회전: 빠르게" : "회전: 느리게";
-      return lv === 2 ? "소리 크기: 크게" : "소리 크기: 작게";
     }
     function apply(p) {
       var part = currentPart;
       Object.keys(p.partG).forEach(function (k) {
         p.partG[k].style.display = k === part ? "" : "none";
       });
-      var on = !!(part && done[keyOf(part, p.id)]);
+      var on = part === "buzzer" ? buzz.closed === p.id : !!(part && lit[part]); // 버저는 그 회로의 스위치만(buzz.closed)
       p.on = on;
       p.lever.setAttribute("x2", on ? "92" : "88");
       p.lever.setAttribute("y2", on ? "60" : "40");
@@ -1114,106 +1356,145 @@
       var lv = on ? levelOf(p.id) : 0;
       p.glow.setAttribute("class", "d2-glow" + (lv ? " lv" + lv : ""));
       p.prop.setAttribute("class", "d2-prop" + (lv ? " spin" + lv : ""));
+      p.blur.setAttribute("class", "d2-blur" + (lv ? " lv" + lv : ""));
       p.waves.setAttribute("class", "d2-waves" + (lv ? " lv" + lv : ""));
-      p.bars.forEach(function (b, i) {
-        b.classList.toggle("is-on", lv === 1 ? i === 0 : lv === 2 ? true : false);
-      });
-      p.gaugeText.textContent = lv && part ? gaugeWord(part, lv) : "스위치를 닫아 보세요";
     }
     function applyAll() {
       Object.keys(panels).forEach(function (id) {
         apply(panels[id]);
       });
+      desc.textContent = sceneText("2D", currentPart);
+    }
+    // 아래 글: 버저는 지금 닫힌 회로(소리 나는 회로)를, 전구·전동기는 스위치를 닫았는지에 따라
+    function captionNow() {
+      if (currentPart === "buzzer") return buzz.closed ? "🔊 " + CIR[buzz.closed].choice + " 회로의 스위치를 닫았어요." : cmp("buzzer").look;
+      return currentPart && lit[currentPart] ? cmp(currentPart).look : IDLE;
     }
     function setPart(partId) {
       if (!partId || partId === currentPart) return;
-      currentPart = partId;
+      currentPart = partId; // 버저 스위치·소리는 부품이 바뀔 때 앱이 연다(syncRunUI → openBuzz)
       applyAll();
+      caption.textContent = captionNow();
     }
     setPart(C.parts[0].id); // 부품을 고르기 전에도 회로가 비어 보이지 않게 첫 부품(전구)을 끼워 둔다
 
-    return {
+    var api = {
       highlight: function (s) {
+        activeView = api;
         if (s.part) setPart(s.part);
-        Object.keys(panels).forEach(function (id) {
-          panels[id].btn.classList.toggle("is-sel", s.circuit === id);
-          panels[id].btn.setAttribute("aria-pressed", String(s.circuit === id));
-        });
+        applyAll(); // 버저 스위치 상태(3D↔2D를 바꿔도 이어짐)
+        caption.textContent = captionNow();
+        syncTone();
       },
       run: async function (sel) {
         var my = ++token;
         setPart(sel.part);
-        var p = panels[sel.circuit];
-        done[keyOf(sel.part, sel.circuit)] = false;
-        apply(p);
-        caption.textContent = "① 스위치를 닫아요…";
+        if (sel.part === "buzzer") {
+          // 버저: 누른 회로의 스위치만 여닫는다(닫으면 다른 회로는 저절로 열림, 닫힌 동안 소리가 계속 남)
+          var cid = buzz.pending;
+          buzz.pending = null;
+          if (cid) {
+            var closing = buzz.closed !== cid;
+            stopBuzzer();
+            buzz.closed = null;
+            applyAll();
+            await sleep(200);
+            if (my !== token) return;
+            buzz.closed = closing ? cid : null;
+            if (closing) buzz.heard[cid] = true;
+          }
+          applyAll();
+          caption.textContent = captionNow();
+          updateSwitchButtons();
+          syncTone();
+          return;
+        }
+        lit[sel.part] = false;
+        applyAll();
+        caption.textContent = "① 두 회로의 스위치를 함께 닫아요…";
         await sleep(420);
         if (my !== token) return;
-        done[keyOf(sel.part, sel.circuit)] = true;
-        apply(p);
-        caption.textContent = "② 잘 지켜보세요…";
-        if (sel.part === "buzzer") playBuzzer(sel.circuit, 1250);
+        lit[sel.part] = true;
+        applyAll();
+        caption.textContent = "② 두 회로를 비교해 보세요…";
         await sleep(1100);
         if (my !== token) return;
-        caption.textContent = CIR[sel.circuit].name + "에서 " + PART[sel.part].name + "의 모습을 살펴봐요.";
+        caption.textContent = cmp(sel.part).look;
       },
       showInstant: function (sel) {
-        done[keyOf(sel.part, sel.circuit)] = true;
+        if (sel.part !== "buzzer") lit[sel.part] = true; // 버저는 스위치 상태(buzz.closed)를 저장하지 않는다
         if (!currentPart) currentPart = sel.part;
         applyAll();
+        if (sel.part === currentPart) caption.textContent = captionNow();
       },
       clear: function () {
         token++;
-        stopBuzzer();
-        done = {};
+        lit = {};
+        openBuzz(true);
         applyAll();
-        caption.textContent = "부품과 회로를 고른 뒤 스위치를 닫아 보세요.";
+        caption.textContent = IDLE;
         refreshSoon();
+      },
+      // 버저 스위치 상태를 다시 그린다(앱이 스위치를 열 때 — openBuzz)
+      refreshBuzz: function () {
+        applyAll();
+        caption.textContent = captionNow();
       },
       resetView: function () {},
       dispose: function () {
         token++;
-        stopBuzzer();
+        stopBuzzer(); // 스위치 상태는 그대로 — 3D로 바꾸면 새 화면이 이어서 낸다
+        if (activeView === api) activeView = null;
       },
     };
+    return api;
   }
 
-  /* ───────── 3. 기록·분석하기: 관찰 결과 표 ───────── */
+  /* ───────── 3. 기록·분석하기: 관찰 결과 표(부품마다 비교한 것 · 내가 고른 회로) ───────── */
   var nav = null;
   function drawResultTable() {
     S.TableChart.renderMatrix($("result-table"), {
-      caption: "전기 회로에 따른 부품의 모습 (내 기록)",
-      rowHeader: "부품 \\ 전기 회로",
+      caption: "두 전기 회로를 비교한 결과 (내 기록)",
+      rowHeader: "부품",
       rows: C.parts.map(function (p) {
         return { id: p.id, label: p.icon + " " + p.name };
       }),
-      cols: C.circuits.map(function (c) {
-        return { id: c.id, label: c.name };
-      }),
+      cols: [
+        { id: "compare", label: "비교한 것" },
+        { id: "answer", label: "내가 고른 회로" },
+      ],
       emptyText: "아직 기록 없음",
       cell: function (r, c) {
-        var rec = records.get(keyOf(r.id, c.id));
+        if (c.id === "compare") return { text: cmp(r.id).short };
+        var rec = records.get(r.id);
         if (!rec) return null;
-        var wrong = rec.result !== expected(r.id, c.id);
+        var wrong = rec.answer !== C.compare.answer;
         return {
-          text: rec.result,
-          icon: C.resultIcon[rec.result] || null,
+          text: rec.answer,
+          icon: choiceIcon(rec.answer),
           flag: wrong ? "다시 관찰해 볼까요?" : null,
           onFlag: function () {
             nav.go("experiment");
-            exp.select({ part: r.id, circuit: c.id });
+            exp.select({ part: r.id });
           },
         };
       },
     });
   }
 
-  /* ───────── 5. 마치기(결과 저장) ───────── */
+  /* ───────── 4. 마치기(결과 저장) ───────── */
+  // 부품 순서(전구·전동기·버저)대로 — 다시 기록해도 순서가 바뀌지 않게
+  function recordList() {
+    return C.parts
+      .map(function (p) {
+        return records.get(p.id);
+      })
+      .filter(Boolean);
+  }
   function recordRows() {
     return C.parts.map(function (p) {
-      var a = records.get(keyOf(p.id, "single"));
-      var b = records.get(keyOf(p.id, "series2"));
-      return { part: p.name, single: a ? a.result : "", series2: b ? b.result : "" };
+      var r = records.get(p.id);
+      return { part: p.name, compare: cmp(p.id).short, answer: r ? r.answer : "" };
     });
   }
   function buildDetail() {
@@ -1235,13 +1516,14 @@
     return {
       predict: predict.values(),
       hintsOpened: predict.hintsOpened(),
-      records: records.list().map(function (r) {
-        return { part: PART[r.part].name, circuit: CIR[r.circuit].name, result: r.result, recordedAt: r.recordedAt };
+      // 2026-09-27(v2): 부품마다 두 회로를 비교한 기록 3칸 — 예전 판(v1)은 { part, circuit, result } 6칸
+      records: recordList().map(function (r) {
+        return { part: PART[r.part].name, question: cmp(r.part).question, answer: r.answer, recordedAt: r.recordedAt };
       }),
       analysis: analysis,
       conclusion: conclude.values().conclusion,
       curiosity: curiosity.value(),
-      // 질문-답 표준 목록(관리자 "학생 응답" 화면용, docs/admin/responses-spec.md §3.3)
+      // 질문-답 표준 목록(관리자 "학생 응답" 화면용, docs/admin/responses-spec.md §3.3). '더 탐구하고 싶은 점'은 정리하기 안(stage conclude)
       qa: [].concat(
         predict.qa("predict"),
         [
@@ -1249,13 +1531,13 @@
             stage: "experiment",
             id: "records",
             label: "내 관찰 기록",
-            question: "부품별 전기 회로(전지 한 개 / 전지 두 개 직렬)에서의 관찰 결과",
+            question: "부품마다 두 전기 회로(전지 1개 연결 · 전지 2개 직렬연결)를 비교한 결과", // 버저는 하나씩 닫아 비교하므로 '함께 닫아'를 뺐다(review-D2 R2 — v2 배포 전)
             kind: "table",
             answer: {
               columns: [
                 { key: "part", label: "부품" },
-                { key: "single", label: "전지 한 개" },
-                { key: "series2", label: "전지 두 개 직렬" },
+                { key: "compare", label: "비교한 것" },
+                { key: "answer", label: "고른 답" },
               ],
               rows: recordRows(),
             },
@@ -1263,17 +1545,19 @@
         ],
         quiz.qa("analyze"),
         conclude.qa("conclude"),
-        curiosity.qa("curiosity")
+        curiosity.qa("conclude")
       ),
     };
   }
 
   lesson.finish({
+    stage: "conclude", // 마치기 칸이 정리하기 안에 있다(공통 틀 기본값 "curiosity"가 아니다)
     button: $("btn-finish"),
     msgEl: $("finish-msg"),
     loginHintEl: $("login-hint"),
     doneEl: $("done-card"),
     canFinish: function () {
+      // '더 탐구하고 싶은 점'이 비었는지·무의미한지는 공통 틀(lesson.js)이 마칠 때 본다(필수, 느슨한 판정)
       return conclude.isDone() || "정리하기에서 결론을 적고 '제출하고 모범 답안 보기'를 먼저 눌러 주세요.";
     },
     detail: buildDetail,
@@ -1283,7 +1567,7 @@
         return q[k].correct;
       }).length;
       var p = exp.progress();
-      return ["관찰하고 기록한 칸: " + p.done + "/" + p.total + "칸", "분석 질문: " + n + "/" + C.quiz.length + " 맞힘"];
+      return ["두 회로를 비교하고 기록한 부품: " + p.done + "/" + p.total + "가지", "분석 질문: " + n + "/" + C.quiz.length + " 맞힘"];
     },
   });
   lesson.restart($("btn-restart"));
@@ -1303,11 +1587,8 @@
         return exp.allDone() || "관찰할 " + p.total + "칸을 모두 기록해야 넘어갈 수 있어요. (지금 " + p.done + "/" + p.total + "칸)";
       },
       conclude: function () {
-        if (!exp.allDone()) return "먼저 실험하기에서 6칸을 모두 기록해 주세요.";
+        if (!exp.allDone()) return "먼저 실험하기에서 " + exp.progress().total + "칸을 모두 기록해 주세요.";
         return quiz.isDone() || "분석 질문 2개에서 모두 보기를 고르고 '확인하기'를 눌러 주세요.";
-      },
-      curiosity: function () {
-        return conclude.isDone() || "정리하기에서 결론을 적고 '제출하고 모범 답안 보기'를 눌러 주세요.";
       },
     },
     done: {
@@ -1317,21 +1598,26 @@
         return quiz.isDone();
       },
       conclude: function () {
-        return conclude.isDone();
-      },
-      curiosity: function () {
-        return !!lesson.meta.finishedAt;
+        return conclude.isDone() && !!lesson.meta.finishedAt;
       },
     },
     onEnter: {
+      predict: leaveBuzz,
       experiment: exp.activate,
-      analyze: drawResultTable,
+      analyze: function () {
+        leaveBuzz(); // 실험하기를 떠나면 버저 스위치를 열어 소리를 멈춘다
+        drawResultTable();
+      },
+      conclude: leaveBuzz,
     },
   });
 
-  // 실험 화면을 떠나거나 페이지를 닫을 때 소리를 멈춘다
+  // 실험하기를 떠나거나 화면이 숨거나 페이지를 닫으면 버저 스위치를 열어 소리를 멈춘다('들어 본 회로'는 그대로 — 돌아와서 확인할 수 있게)
+  function leaveBuzz() {
+    if (buzz.closed || sound.node) openBuzz(false);
+  }
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) stopBuzzer();
+    if (document.hidden) leaveBuzz();
   });
-  window.addEventListener("pagehide", stopBuzzer);
+  window.addEventListener("pagehide", leaveBuzz);
 })();

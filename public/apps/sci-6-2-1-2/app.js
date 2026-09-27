@@ -1574,11 +1574,6 @@
       setMinute(to);
     });
 
-    function nextTodo() {
-      return TIMES.filter(function (t) {
-        return !recOf(t.id);
-      })[0] || null;
-    }
     recBtn.addEventListener("click", function () {
       var st = valuesAt(cur);
       if (tweening || !st.tick) return;
@@ -1622,15 +1617,13 @@
         ? "📘 교과서·실험관찰 예시 값(2023년 9월 23일 서울 관측 자료)이에요."
         : "🏷 모형: 눈금 사이 값은 살펴보기만 해요(기록하지 않아요).";
       southNote.hidden = !(tk && tk.south && !tweening);
-      // 눈금 버튼
-      var todo = nextTodo();
+      // 눈금 버튼(아직 안 잰 눈금을 따로 강조하지 않는다 — '다음' 표시 없음, 2026-09-27 사용자 결정)
       TIMES.forEach(function (t) {
         var b = tickBtns[t.id];
         var done = !!recOf(t.id);
         var at = !!(tk && tk.id === t.id);
         b.classList.toggle("is-rec", done);
         b.classList.toggle("is-at", at);
-        b.classList.toggle("is-next", !done && !!todo && todo.id === t.id && !at);
         if (at) b.setAttribute("aria-current", "true");
         else b.removeAttribute("aria-current");
         b.setAttribute("aria-label", t.label + "으로 빨리 감기" + (done ? ", 기록함" : ", 아직 기록 안 함"));
@@ -1644,11 +1637,11 @@
         var done2 = !!recOf(tk.id);
         recBtn.disabled = false;
         recBtn.textContent = done2 ? "🔁 " + tk.label + " 다시 기록하기" : "📝 " + tk.label + " 측정값 기록하기";
-        recMsg.textContent = done2 ? "✅ " + tk.label + "은 기록했어요." + (todo ? " 다음: " + todo.label + " 눈금을 눌러요." : "") : "값을 확인하고 기록하기를 눌러요.";
+        recMsg.textContent = done2 ? "✅ " + tk.label + "은 기록했어요." : "값을 확인하고 기록하기를 눌러요.";
       } else {
         recBtn.disabled = true;
         recBtn.textContent = "📝 기록은 매시 30분 눈금에서";
-        recMsg.textContent = "눈금 사이 시각은 살펴보기만 해요. 눈금 버튼(9:30~15:30)이나 하늘의 시각 점을 누르면 기록할 수 있어요." + (todo ? " 다음: " + todo.label : "");
+        recMsg.textContent = "눈금 사이 시각은 살펴보기만 해요. 눈금 버튼(9:30~15:30)이나 하늘의 시각 점을 누르면 기록할 수 있어요.";
       }
       if (!tweening && tk) live.textContent = tk.label + ": 태양 고도 " + f1(st.solar) + "도, 그림자 길이 " + f1(st.shadow) + " 센티미터, 기온 " + f1(st.temp) + "도";
     }
