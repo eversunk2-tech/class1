@@ -5,7 +5,7 @@
 
 ## 읽을 것
 `CLAUDE.md`, 각 앱의 `slim-instructions.md`, `slim-report.md`, `spec.md`(끝의 개정 절 우선), `data/lesson-config.js`, `app.js`. 이전 버전과 비교는 `git diff HEAD -- public/apps/sci-6-1-2-{3,4,5}`.
-지도서: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf`(인쇄 쪽 ≈ PDF 쪽 + 179~180), `python3`의 `fitz`.
+지도서: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf`(인쇄 쪽 ≈ PDF 쪽 + 179~180), `python3`의 `fitz`.
 
 ## 검증 항목
 1. **새 기준 준수**: 예상 탐구 질문 1개(힌트가 답을 말하지 않음), 분석 보기 고르기 1~2개(자기 기록 기반), 정리 탐구 질문 1개 + 모범 답안 비교, 발전 질문 없음, 궁금한 점 선택 한 줄.

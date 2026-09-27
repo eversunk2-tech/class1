@@ -5,7 +5,7 @@
 
 ## 읽을 것
 `CLAUDE.md`(웹앱 규칙, 과학 차시 앱 규칙), `public/apps/sci-6-1-2-1/spec.md`(확정 결정 절 우선), `build-report.md`, 앱 폴더 전체, 공통 틀 `scripts/templates/science-sim/`. 형식 본보기: `public/apps/sci-6-1-1-3/review.md`.
-지도서 원문: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf` — spec에 적힌 이 차시 쪽 범위와 단원 개관(지도상 유의점·용어 범위). 인쇄 쪽 ↔ PDF 쪽 오프셋은 직접 확인. `python3`의 `fitz`.
+지도서 원문: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf` — spec에 적힌 이 차시 쪽 범위와 단원 개관(지도상 유의점·용어 범위). 인쇄 쪽 ↔ PDF 쪽 오프셋은 직접 확인. `python3`의 `fitz`.
 
 ## 검증 항목
 1. **과학적 정확성 (최우선)**: 화면의 모든 사실·수치·단위·계산·현상·용어·힌트·분석 정답·모범 답안·발전 질문 답을 지도서 원문과 대조하고, 물리적으로 맞는지(거리·시간·속력 관계, 반올림) 직접 계산해 확인. 지도서 밖 주장은 일반 과학 지식으로 판정. 오개념 유발 표현, 다음 차시 용어 스포일러.

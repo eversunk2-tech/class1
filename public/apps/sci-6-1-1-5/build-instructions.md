@@ -14,7 +14,7 @@
 * `scripts/templates/class1-record.js` — 앱 폴더로 복사해 결과 저장 연결. `config.js`는 시범 앱 것과 같은 형식(anon key만).
 
 ## 핵심
-* 과학적 사실은 spec의 정확성 체크리스트 값만 사용. 지도서 확인이 필요하면: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf` (인쇄 쪽 = PDF 쪽 + 103), `python3`의 `fitz`.
+* 과학적 사실은 spec의 정확성 체크리스트 값만 사용. 지도서 확인이 필요하면: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf` (인쇄 쪽 = PDF 쪽 + 103), `python3`의 `fitz`.
 * 이 단원에서 pH·중성·중화 용어 금지(지도서 106쪽).
 * 블로그로 돌아가기 링크: 시범 앱과 같은 방식(`../../science/?term=6-1&unit=1&lesson=<lesson id>`; lesson id는 `src/data/science-curriculum.ts` 참고).
 * 모든 참조 상대경로, 외부 라이브러리는 three.js·supabase-js CDN(시범 앱과 같은 버전+SRI)만.

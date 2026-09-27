@@ -14,7 +14,7 @@
 * `scripts/templates/class1-record.js` — 앱 폴더로 복사해 결과 저장 연결. `config.js`는 1단원 앱과 같은 형식(anon key만).
 
 ## 핵심
-* 과학적 사실·수치는 spec의 정확성 체크리스트와 확정 결정 값만 사용. 지도서 확인이 필요하면 `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf` (`python3`의 `fitz`, 인쇄 쪽 ↔ PDF 쪽 오프셋은 직접 확인).
+* 과학적 사실·수치는 spec의 정확성 체크리스트와 확정 결정 값만 사용. 지도서 확인이 필요하면 `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf` (`python3`의 `fitz`, 인쇄 쪽 ↔ PDF 쪽 오프셋은 직접 확인).
 * 다음 차시 용어·내용 스포일러 금지(spec 참고, 예: 탐구 3·4에서 "속력" 금지).
 * 블로그로 돌아가기 링크: `../../science/?term=6-1&unit=2&lesson=4`.
 * 모든 참조 상대경로, 외부 라이브러리는 1단원 앱과 같은 three.js·supabase-js CDN(같은 버전+SRI)만.

@@ -17,7 +17,7 @@
 * 공통 틀 `scripts/templates/science-sim/README.md`(수치 측정형 config 예시, 꺾은선/막대 그래프, 반복 측정 평균 포함)와 `scripts/templates/science-guide/README.md` — **공통 틀로 구현 가능한 설계**를 한다. 꼭 필요한 새 기능은 "공통 틀 확장 필요" 절로 따로 적는다(구현 X).
 
 ## 지도서 읽기
-* `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf`
+* `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 물체의 운동.pdf`
 * 먼저 단원 지도 계획 표(인쇄 184쪽 부근)에서 이 차시의 **지도서 쪽 범위**를 찾고, 인쇄 쪽 ↔ PDF 쪽 대응(오프셋)을 직접 확인한다. 단원 개관(지도상 유의점, 용어 사용 범위)도 읽는다.
 * `python3`의 `fitz`(PyMuPDF)로 텍스트 추출 가능. 임시 파일은 스크래치 디렉터리에만 두고 끝나면 삭제.
 

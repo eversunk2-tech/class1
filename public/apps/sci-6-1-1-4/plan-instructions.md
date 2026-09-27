@@ -12,7 +12,7 @@
 * 공통 틀 `scripts/templates/science-sim/README.md`와 config 예시 — **공통 틀로 구현 가능한 설계**를 한다. 공통 틀에 없는 기능이 꼭 필요하면 spec에 "공통 틀 확장 필요" 절로 따로 적는다(구현 X).
 
 ## 지도서 읽기
-* `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf`
+* `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf`
 * 인쇄 쪽 108 = PDF 5쪽(오프셋 103)이므로 지도서 138~147쪽 ≈ PDF 해당 쪽-103. 앞뒤를 확인. 단원 개관(PDF 1~6쪽, 특히 지도상 유의점 106쪽)도 참고.
 * `python3`의 `fitz`(PyMuPDF)로 텍스트 추출 가능. 임시 파일은 스크래치 디렉터리에만 두고 **끝나면 삭제**.
 

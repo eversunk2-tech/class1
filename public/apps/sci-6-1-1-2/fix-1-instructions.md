@@ -12,7 +12,7 @@
 
 ## 읽을 것
 `CLAUDE.md`(웹앱 규칙, 과학 차시 앱 규칙), `spec.md`(확정 결정 우선), `build-report.md`, `review.md`, 앱 폴더, `scripts/templates/science-sim/**`.
-지도서: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf` (인쇄 108쪽 = PDF 5쪽; 113쪽 ≈ PDF 10쪽). `python3`의 `fitz` 사용 가능. 임시 파일은 스크래치에 두고 **끝나면 반드시 삭제**, 띄운 서버는 **끝나면 반드시 종료**.
+지도서: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf` (인쇄 108쪽 = PDF 5쪽; 113쪽 ≈ PDF 10쪽). `python3`의 `fitz` 사용 가능. 임시 파일은 스크래치에 두고 **끝나면 반드시 삭제**, 띄운 서버는 **끝나면 반드시 종료**.
 
 ## 수정 범위
 * 수정 가능: `public/apps/sci-6-1-1-2/**`(단, `spec.md`, `*-instructions.md`, `review.md`, `build-report.md` 제외), `scripts/templates/science-sim/**`.

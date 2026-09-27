@@ -44,3 +44,6 @@ next-env.d.ts
 # 계정 import용 CSV (비밀번호 포함)
 scripts/*.csv
 *.csv
+
+# Supabase CLI 로컬 연결 정보(프로젝트 연결·버전 캐시) — 커밋하지 않는다(2026-09-27)
+/supabase/.temp/

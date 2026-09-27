@@ -10,7 +10,7 @@
 **구현하지 않는다.**
 
 ## 지도서 읽기
-* 파일: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf`
+* 파일: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/과학 지도서 산과염기.pdf`
 * 텍스트 레이어가 있다. `python3`의 `fitz`(PyMuPDF, 이미 설치됨)로 텍스트를 뽑거나 Read 도구의 `pages`로 본다. 인쇄 쪽 108 = PDF 5쪽이므로 지도서 118~129쪽 ≈ PDF 15~26쪽(앞뒤로 확인). 필요하면 단원 개관(PDF 1~6쪽)도 참고.
 * 임시 파일은 스크래치 디렉터리에만 두고 끝나면 지운다.
 

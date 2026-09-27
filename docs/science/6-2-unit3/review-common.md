@@ -4,7 +4,7 @@ Build와 **독립적으로** 검증한다. **코드는 수정하지 않는다.**
 
 ## 읽을 것
 `CLAUDE.md`(과학 차시 앱 규칙, 측정 규칙 개정 포함), 앱 `spec.md`(끝 "개정 1" 우선 → "Claude 검토 메모"), `build-instructions.md`, `docs/science/6-2-unit3/build-common.md`, `build-report.md`, 앱 코드 전부.
-지도서: `~/Library/CloudStorage/GoogleDrive-sunkyboy@pen.go.kr/내 드라이브/오션초2026/수업/교과서 usb자료/[과학]623_지도서 3.전기의 이용.pdf` (인쇄 쪽 = PDF 쪽 + 253, `pdftotext -layout -f N -l N`), 실험관찰 `실험관찰-6-2.pdf`.
+지도서: `~/Library/CloudStorage/GoogleDrive-*/내 드라이브/오션초2026/수업/교과서 usb자료/[과학]623_지도서 3.전기의 이용.pdf` (인쇄 쪽 = PDF 쪽 + 253, `pdftotext -layout -f N -l N`), 실험관찰 `실험관찰-6-2.pdf`.
 
 ## 검증 항목
 1. **과학적 정확성(별도 절)**: 화면의 모든 수치·용어·현상을 지도서 쪽과 대조. 3D/2D 장면이 현상과 맞는지(회로 연결·불 켜짐 조건, 직렬연결 방향, 전자석 극·세기, 나침반 바늘 방향), 안전 안내, 버저 소리 크기·소리 끄기(탐구 2), 병렬연결 팝업의 과학적 정확성과 기록에 영향 없음. "모형"/"모형(추정)" 표시 누락, 다음 차시 스포일러, 중학교 용어(전압·전류의 세기·저항) 사용, 오개념 유발 표현, 학생 화면의 "지도서" 문구.
