@@ -260,6 +260,14 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
   box-shadow: var(--ss-shadow-brand);
 }
 .ss-btn-primary:disabled { box-shadow: none; }
+/* 앱이 끈 실행 버튼(runLabel이 { text, disabled: true } — 끝난 실행이라 학생이 안내 글로 읽는다, 2026-09-28 6-2-2-3 후속 — experiment.js가
+   클래스 ss-run-done을 붙인다): 흐린 반투명 대신 옅은 면 바탕 + 본문 색 글자 + 얇은 테두리, 누를 수 없어 보이게(기본 커서, 그림자·그라데이션 없음).
+   글자 대비 밝음 #1e1d2d/#efeff9 14.5:1, 어두움 #eaeaf2/#262530 12.6:1(AA 4.5:1 이상). 크게 보기 막대로 옮겨도 같은 버튼이라 같은 모양.
+   실행 중·"…을 골라요"·안전 때문에 안 하는 실험의 꺼짐은 위 .ss-btn:disabled 모양 그대로. */
+.ss-btn.ss-run-done:disabled {
+  opacity: 1; background: var(--ss-surface-2); border: 1px solid var(--ss-border); color: var(--ss-text);
+  box-shadow: none; cursor: default;
+}
 .ss-btn-ghost { background: transparent; box-shadow: none; }
 .ss-btn-big { min-height: 56px; font-size: 1.05rem; padding: 0 22px; }
 @media (hover: hover) {
@@ -555,6 +563,8 @@ html:has([data-stage]:not([hidden]) .ss-exp-layout.is-full) { overflow: hidden; 
 }
 .ss-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 1100px) { .ss-choice-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* factors[].columns: 1 — 보기를 한 줄에 하나씩 위아래로(2026-09-28, 6-2-2-3 실험 버튼 두 개) */
+.ss-choice-grid.cols-1 { grid-template-columns: 1fr; }
 .ss-choice {
   display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 10px; text-align: left;
   border: 2px solid var(--ss-border); border-radius: 12px; background: var(--ss-surface); cursor: pointer;

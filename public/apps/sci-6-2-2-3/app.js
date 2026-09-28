@@ -13,6 +13,11 @@
  *
  * 장면 상태(sim, 저장 키 "sim"): { covered, t(시간 바 0~1), seen(시간 바 끝까지 봄), heat(가열 0/1), show("e1"|"e2") }
  * 3D/2D 화면은 이 상태를 그리기만 한다(render). 그래서 3D↔2D를 바꾸거나 새로고침해도 같은 모습으로 돌아온다.
+ *
+ * 조작 흐름(spec.md 개정 3 — 2026-09-28 사용자 요청 "조작 단순화"): 조건 고르기 = 실험 버튼 두 개("산소의 영향 실험하기" /
+ * "온도의 영향 실험하기"). 공통 틀의 보기 4개(none·added·head·wood — 기록·저장 그대로)는 실험마다 하나만 보인다(factor.visible).
+ * 한 번의 실행(덮기+시간 바 / 가열)으로 두 칸을 함께 관찰하므로, 실행이 끝나면 그 실험에서 아직 기록하지 않은 첫 칸(㉠ → ㉡, 머리 → 나무)의
+ * 질문이 나오고, 기록하면 같은 실행의 다음 칸 질문을 exp.observe로 이어서 연다(앱 전용 예외 — 사용자 결정). 끝난 뒤 실행 버튼은 꺼진다.
  */
 (function () {
   "use strict";
@@ -115,6 +120,7 @@
   var T_OUT = 0.42; // ㉠ 촛불이 꺼지는 시간 바 위치(모형, 실제 시간 아님)
   var TB_DIM = 0.78; // ㉡ 불꽃이 작아지기 시작하는 위치(모형) — ㉡도 더 오래 타다가 결국 꺼진다(fix-1)
   var TB_OUT = 0.96; // ㉡ 촛불이 꺼지는 위치(모형)
+  var HEAT_MS = 4600; // 실험해요 2 가열 연출 시간(빨리 감기, 모형) — 개정 3: 3400 → 4600(머리 부분 불꽃을 조금 더 오래 보게)
   var sim = (function () {
     var s = store.get("sim", null) || {};
     var t = Number(s.t);
@@ -166,10 +172,12 @@
       smokeB: covered && sb > 0 && sb < 1 ? sb : 0,
       heat: h,
       lamp: h > 0 ? clamp01(h / 0.06) : 0,
-      // 머리 부분: 불이 붙어 잠깐 타다가 다 타서 꺼진다(모형, fix-1)
-      headFire: clamp01((h - 0.45) / 0.08) * (1 - clamp01((h - 0.78) / 0.14)),
-      headBurnt: clamp01((h - 0.45) / 0.45),
-      headDone: h >= 0.92,
+      // 머리 부분: 불이 붙어 잠깐 타다가 다 타서 꺼진다(모형, fix-1). 개정 3(2026-09-28 사용자 "머리 부분에 불이 붙어 있는 시간을 약간만 더"):
+      // 가열 HEAT_MS(3400 → 4600 ms) 동안 h 0.40에 붙어 0.46에 다 커지고 0.84~0.96에 꺼진다 — 불꽃이 보이는 시간 약 1.6초 → 약 2.6초
+      // (전: 0.45에 붙어 0.53에 다 커지고 0.78~0.92에 꺼짐). 검게 변하는 것은 붙을 때부터 꺼지기 조금 전까지.
+      headFire: clamp01((h - 0.4) / 0.06) * (1 - clamp01((h - 0.84) / 0.12)),
+      headBurnt: clamp01((h - 0.4) / 0.54),
+      headDone: h >= 0.96,
       woodChar: clamp01((h - 0.5) / 0.5), // 머리 부분에 불이 붙은 뒤에 나무 부분 색이 검게 변해 간다(이 실험 시간 안에서는 아직 불이 붙지 않음)
     };
   }
@@ -257,6 +265,16 @@
       requestAnimationFrame(tick);
     });
   }
+  // 움직이지 않고 기다리기(움직임 줄이기의 정지 장면 — 탭이 숨겨지면 바로 끝낸다)
+  function hold(ms) {
+    return new Promise(function (resolve) {
+      if (document.hidden || ms <= 0) {
+        resolve();
+        return;
+      }
+      setTimeout(resolve, ms);
+    });
+  }
   function easeInOut(t) {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
@@ -296,27 +314,14 @@
       frame: { width: 11.6, depth: 7.4, center: [0, 2.0, 0] },
       viewDir: [0, 0.42, 0.91],
       minDistance: 3,
-      onPick: function (p) {
-        // 숨겨진 실험의 물체는 누르지 않은 것으로 본다. 이미 고른 조건을 다시 누르면 그대로 둔다(다시 고르면 공통 틀이 관찰 카드를 닫는다 — review-D1 L2)
-        if (p && p.cond && expOf(p.cond) === sim.show && p.cond !== curSel) ctx.onPick(p);
-      },
+      // 장면의 촛불·성냥을 눌러 칸을 고르는 동작은 없앴다(개정 3 — 같은 실험 안에서 ㉠↔㉡, 머리↔나무를 바꾸면 질문 순서가 흐트러진다).
+      // onPick을 넘기지 않으면 틀은 누르기를 고르기로 쓰지 않는다(두 번 탭 = 처음 방향은 그대로).
       onLost: ctx.onLost,
     }).then(function (v) {
       if (!v) return null;
       var T = v.THREE;
       var M = v.make;
       var disposed = false;
-
-      // 누르기(탭) 대상 등록: 숨긴 실험의 물체는 누르기 레이에 걸리지 않게 한다(단계 D). three.js 레이는 숨긴 물체도 맞히므로
-      // 실험해요 2에서 나무 조각을 누르면 그 앞(같은 자리)의 숨은 ㉡ 아크릴 통이 먼저 맞아 아무것도 골라지지 않았다.
-      function pickable(obj, value) {
-        var orig = obj.raycast;
-        obj.raycast = function (rc, hits) {
-          for (var n = obj; n; n = n.parent) if (!n.visible) return;
-          return orig.call(this, rc, hits);
-        };
-        v.pickable(obj, value);
-      }
 
       var table = M.table(14, 8, 0xd9c7a3);
       v.root.add(table);
@@ -385,7 +390,6 @@
         var wick = new T.Mesh(new T.CylinderGeometry(0.018, 0.018, 0.14, 8), M.material(0x222222));
         wick.position.set(CANDLE_DX, 0.91 + 0.07, 0);
         g.add(dish, candle, wick);
-        pickable(candle, { cond: d.id });
         var fl = makeFlame();
         fl.position.set(CANDLE_DX, 0.98, 0);
         g.add(fl);
@@ -411,7 +415,6 @@
           var liquid = new T.Mesh(new T.CylinderGeometry(0.4, 0.39, 0.5, 28), M.material(0xe2bf62, { transparent: true, opacity: 0.72 }));
           liquid.position.set(bx, 0.27, 0);
           g.add(glass, liquid);
-          pickable(glass, { cond: d.id });
           var bubMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
           var bubGeo = new T.SphereGeometry(0.035, 8, 6);
           for (var i = 0; i < 14; i++) {
@@ -445,7 +448,6 @@
         );
         var edges = new T.LineSegments(boxEdges, new T.LineBasicMaterial({ color: 0x5d9ccc }));
         box.add(shell, edges);
-        pickable(shell, { cond: d.id });
         g.add(box);
         // ㉠·㉡ 이름표: 덮은 통의 앞면 위쪽 자리에 고정(통을 들어 올려도 움직이지 않는다). 통 위에 띄우면 들어 올린 통과 함께 올라가
         // 장면 위 가장자리에서 잘리거나 왼쪽 위 토글·오른쪽 위 상태 표시에 가렸다(review-dock R1, 단계 D). 불꽃·흰 김보다 위라 가리지 않고,
@@ -534,12 +536,10 @@
       head.scale.set(1.25, 0.8, 1);
       head.position.set(-PART_D, PLATE_Y + 0.14, 0);
       e2.add(head);
-      pickable(head, { cond: "head" });
       var woodMat = M.material(0xe0b97c, { roughness: 0.85 });
       var wood = new T.Mesh(new T.BoxGeometry(0.17, 0.15, 1.05), woodMat);
       wood.position.set(PART_D, PLATE_Y + 0.075, 0);
       e2.add(wood);
-      pickable(wood, { cond: "wood" });
       var WOOD0 = new T.Color(0xe0b97c);
       var WOOD1 = new T.Color(0x2a221c);
       var HEAD0 = new T.Color(0xa3262c);
@@ -763,10 +763,7 @@
       { id: "none", cx: 185 },
       { id: "added", cx: 515 },
     ].forEach(function (d) {
-      var g = svg("g", { class: "d2-pick", "data-cond": d.id });
-      g.addEventListener("click", function () {
-        if (d.id !== curSel) ctx.onPick({ cond: d.id }); // 이미 고른 조건은 그대로(관찰 카드가 닫히지 않게)
-      });
+      var g = svg("g", { "data-cond": d.id }); // 눌러 고르기 없음(개정 3 — 질문 순서가 흐트러지지 않게)
       var candleX = d.cx - 50;
       var sel = svg("ellipse", { cx: candleX, cy: TY + 4, rx: 44, ry: 9, class: "d2-selring" });
       g.appendChild(sel);
@@ -853,10 +850,7 @@
       ["head", CX - PD],
       ["wood", CX + PD],
     ].forEach(function (d) {
-      var g = svg("g", { class: "d2-pick", "data-cond": d[0] });
-      g.addEventListener("click", function () {
-        if (d[0] !== curSel) ctx.onPick({ cond: d[0] }); // 이미 고른 조건은 그대로(관찰 카드가 닫히지 않게)
-      });
+      var g = svg("g", { "data-cond": d[0] }); // 눌러 고르기 없음(개정 3)
       var sel = svg("ellipse", { cx: d[1], cy: PY + 2, rx: 42, ry: 8, class: "d2-selring" });
       g.appendChild(sel);
       var body = d[0] === "head" ? svg("ellipse", { cx: d[1], cy: PY - 8, rx: 12, ry: 8, class: "d2-head" }) : svg("rect", { x: d[1] - 26, y: PY - 9, width: 52, height: 9, rx: 2, class: "d2-wood" });
@@ -1013,14 +1007,74 @@
     if (curView) curView.home(450);
     return true;
   }
+  /* ── 어느 질문을 여는가(개정 3) ──
+     실험(e1 = 산소, e2 = 온도)마다 한 번의 실행으로 두 칸을 함께 관찰한다. 질문은 그 실험에서 아직 기록하지 않은 첫 칸부터(㉠ → ㉡, 머리 → 나무).
+     앱이 공통 틀의 선택을 바꿀 때(exp.select·exp.observe)는 steer()로 부른다 — 그동안 onHighlight는 선택만 따라가고 다시 정하지 않는다(재진입 막기). */
+  var CELLS = { e1: ["none", "added"], e2: ["head", "wood"] };
+  function nextUnrecorded(e) {
+    var ids = CELLS[e];
+    for (var i = 0; i < ids.length; i++) if (!recOf(ids[i])) return ids[i];
+    return null;
+  }
+  // 그 실험에서 아직 기록하지 않은 첫 칸, 다 기록했으면 첫 칸(㉠·머리)
+  function targetOf(e) {
+    return nextUnrecorded(e) || CELLS[e][0];
+  }
+  // 그 실험의 장면이 끝났나(결과가 장면에 보이나): 산소 = 덮고 시간 바를 끝까지 봄, 온도 = 가열 끝
+  function sceneDone(e) {
+    return e === "e2" ? sim.heat === 1 : sim.covered && sim.seen;
+  }
+  var appSel = null; // 앱이 아는 공통 틀의 지금 선택 — 이것과 다른 선택이 들어오면 학생이 실험 버튼을 눌러 바꾼 것
+  var steering = false;
+  function applySel(c) {
+    appSel = c;
+    curSel = c;
+    store.set("curSel", c);
+    setShow(expOf(c));
+    drawMine(); // '📋 내 기록' 표의 고른 칸 테두리도 바로 따라가게(review L5 — 실험 버튼으로 산소↔온도를 바꿀 때)
+  }
+  function steer(cond, how) {
+    if (steering || !exp) return false;
+    var focused = document.activeElement;
+    var ok = false;
+    steering = true;
+    try {
+      ok = how === "observe" ? exp.observe({ cond: cond }) : exp.select({ cond: cond });
+    } finally {
+      steering = false;
+    }
+    if (ok) {
+      applySel(cond); // 3D 화면을 만드는 중이라 틀이 onHighlight를 아직 부르지 못했을 때도 앱 상태가 맞게
+      requestDraw();
+    }
+    keepFocus(focused);
+    return ok;
+  }
+  // 누른 실험 버튼이 같은 글자의 다른 보기로 바뀌어 숨으면(예: ㉠ 칸 → ㉡ 칸) 키보드 초점을 새로 보이는 버튼으로 옮긴다
+  function keepFocus(prev) {
+    if (!prev || !prev.hidden || !prev.closest) return;
+    var grid = prev.closest(".ss-choice-grid");
+    var b = grid ? grid.querySelector('.ss-choice[aria-pressed="true"]:not([hidden])') : null;
+    if (!b) return;
+    try {
+      b.focus({ preventScroll: true });
+    } catch (e) {
+      b.focus();
+    }
+  }
+  // 학생이 실험 버튼을 눌렀을 때: 장면이 이미 끝났으면 그 질문을 바로 열고, 아니면 첫 질문 칸을 골라 둔다(실행이 끝나면 틀이 그 칸의 관찰 카드를 연다)
+  function chooseQuestion(e) {
+    var t = targetOf(e);
+    if (sceneDone(e)) steer(t, "observe");
+    else if (t !== appSel) steer(t, "select");
+  }
   function onHighlight(sel) {
     var c = sel && sel.cond;
-    if (c && COND[c]) {
-      curSel = c;
-      store.set("curSel", c);
-      setShow(expOf(c));
-    }
+    var ok = !!(c && COND[c]);
+    var pressed = ok && c !== appSel && !steering;
+    if (ok) applySel(c);
     requestDraw();
+    if (pressed) chooseQuestion(expOf(c));
   }
   var seenWaiters = [];
   function markSeen() {
@@ -1030,7 +1084,11 @@
     seenWaiters.splice(0).forEach(function (r) {
       r();
     });
-    if (exp && !exp.isBusy()) exp.refresh();
+    if (exp && !exp.isBusy()) {
+      exp.refresh();
+      // 실행하지 않고 시간 바를 끝까지 끈 경우(덮는 중 새로고침한 뒤 등): 실행이 끝날 때처럼 첫 질문을 연다(실행 버튼은 이제 꺼져 있다)
+      if (sim.show === "e1") steer(targetOf("e1"), "observe");
+    }
   }
   async function runCell(sel) {
     var c = sel.cond;
@@ -1059,42 +1117,70 @@
         });
         ui.waitBar(false);
       }
-      if (curView) await curView.focus(c, 650);
-    } else {
-      if (sim.heat < 1) {
+      // 시간 바가 끝에 닿은 뒤 카메라를 한 촛불로 다가가게 하지 않는다 — 두 촛불이 함께 보이게 둔다(개정 3, 전: focus(c, 650))
+    } else if (sim.heat < 1) {
+      ui.ff(true);
+      ui.say("알코올램프로 철판 가운데를 가열해요(빨리 감기).");
+      var focused = false;
+      if (reduceMotion()) {
+        // 움직임 줄이기(review L3): 트윈 대신 움직임 없는 세 장면을 바로 바꿔 보여 준다 — 머리·나무 구분을 놓치지 않게.
+        //   ① 가열 시작(h 0.25, 0.8초) → ② 머리에 불꽃이 다 커진 장면(h 0.62, 2.5초) → ③ 끝(h 1). 카메라도 넘어가지 않고 바로(두 조각이 함께 보이는 자리)
+        focused = true;
+        if (curView) curView.focus(c, 1);
+        anim.heat = 0.25;
+        drawNow();
+        await hold(800);
+        anim.heat = 0.62;
+        drawNow();
+        await hold(2500);
+      } else {
         if (curView) curView.home(400);
-        ui.ff(true);
-        ui.say("알코올램프로 철판 가운데를 가열해요(빨리 감기).");
-        var focused = false;
-        await animate(3400, function (t) {
+        await animate(HEAT_MS, function (t) {
           anim.heat = t;
+          // 고른 쪽으로 살짝만 다가간다(두 조각과 이름표가 함께 보이게 — 단계 D 그대로)
           if (!focused && t > 0.3 && curView) {
             focused = true;
             curView.focus(c, 900);
           }
           requestDraw();
         });
-        anim.heat = null;
-        sim.heat = 1;
-        saveSim();
-        ui.ff(false);
-        drawNow();
-        if (!focused && curView) await curView.focus(c, 600);
-      } else if (curView) await curView.focus(c, 650);
+      }
+      anim.heat = null;
+      sim.heat = 1;
+      saveSim();
+      ui.ff(false);
+      drawNow();
+      if (!focused && curView) await curView.focus(c, 600);
     }
+    // 가열이 끝난 뒤의 "가까이 보기" 실행은 없앴다(개정 3 — 실행 버튼이 "가열이 끝났어요"로 꺼진다)
     var st = statusOf(c, snap());
     ui.say(COND[c].name + ": " + st.text);
   }
   function restoreCell(sel) {
-    if (expOf(sel.cond) === "e1") {
+    var e = expOf(sel.cond);
+    var changed = false;
+    if (e === "e1") {
       if (!sim.covered) {
         sim.covered = true;
         sim.seen = true;
         sim.t = 1;
+        changed = true;
       }
-    } else sim.heat = 1;
+    } else if (sim.heat !== 1) {
+      sim.heat = 1;
+      changed = true;
+    }
     saveSim();
     requestDraw();
+    // 실행 버튼 글자·꺼짐을 장면에 맞게 다시 그린다(review L2 — 저장된 scene과 sim이 어긋나 장면만 되살아난 경우 버튼이 "▶ … 가열하기"로
+    // 켜진 채 눌러도 아무 일이 없었다). 그렇게 되살린 실험이 지금 실험이면 새로고침 뒤 이어서 하기처럼 남은 질문을 연다.
+    if (exp && !exp.isBusy()) {
+      exp.refresh();
+      if (changed && curSel && expOf(curSel) === e) {
+        var next = nextUnrecorded(e);
+        if (next) steer(next, "observe");
+      }
+    }
   }
   function clearScene() {
     sim.covered = false;
@@ -1106,6 +1192,11 @@
     saveSim();
     if (curView) curView.home(450);
     requestDraw();
+    // 다시 하면 그 실험의 첫 질문 칸부터(아직 기록하지 않은 첫 칸, 다 기록했으면 ㉠·머리) — 실행이 끝나면 틀이 고른 칸의 관찰 카드를 연다(개정 3)
+    if (curSel && COND[curSel]) {
+      var t = targetOf(expOf(curSel));
+      if (t !== appSel) steer(t, "select");
+    }
     if (exp) exp.refresh();
   }
 
@@ -1148,14 +1239,26 @@
       // 크게 보기(가로)에서는 시간 바가 오른쪽 조작 칸에 있어 "아래"라고 하지 않는다(단계 D)
       return expOf(sel.cond) === "e1" ? "⏳ 시간 바를 오른쪽 끝까지 끌어요" : "⏩ 가열하는 중… 잘 지켜보세요";
     },
+    // 조건 고르기 = 실험 버튼 두 개(개정 3 — 사용자: "두 개를 동시에 비교하는 건데 하나씩 조건을 고르라고 하니 실험 방향이 헷갈릴 수 있어").
+    // 보기 4개(none·added·head·wood)는 기록·진행률·잠금·분석이 그대로 동작하게 그대로 두고, 실험마다 하나만 보인다:
+    // added는 지금 고른 칸이 added일 때만, 아니면 none(wood·head도 같은 규칙) — 버튼은 늘 둘이고 눌린 표시는 지금 실험에 붙는다.
     factors: [
       {
         id: "cond",
         title: "관찰할 조건 고르기",
         short: "관찰할 조건",
+        columns: 1, // 산소 위, 온도 아래
+        phaseTag: false, // 버튼 밑의 "실험해요 1 — 산소의 영향" 글은 빼고, 잠김 안내만 둔다
         options: C.conditions.map(function (c) {
-          return { id: c.id, label: c.name };
+          return { id: c.id, label: PHASE[c.phase].button };
         }),
+        visible: function (oid, sel) {
+          if (oid === "added") return sel.cond === "added";
+          if (oid === "none") return sel.cond !== "added";
+          if (oid === "wood") return sel.cond === "wood";
+          if (oid === "head") return sel.cond !== "wood";
+          return true;
+        },
       },
     ],
     phases: C.phases.map(function (ph) {
@@ -1172,15 +1275,15 @@
     cellKey: function (sel) {
       return sel.cond;
     },
+    // 실험이 끝나면 실행 버튼은 그 글자로 꺼진다(개정 3 — 공통 틀 runLabel { text, disabled }). 다시 하려면 "🕯 실험 장치 처음 상태로".
     runLabel: function (sel) {
-      var c = COND[sel.cond];
       if (expOf(sel.cond) === "e1") {
         if (!sim.covered) return "▶ 두 촛불에 아크릴 통 덮기";
         if (!sim.seen) return "▶ 시간 바로 두 촛불 살펴보기";
-        return "▶ " + c.mark + " 촛불 가까이 보기";
+        return { text: "⏳ 시간 바를 오른쪽 끝까지 끌어요", disabled: true }; // 사용자: "글자와 비활성화 상태 그대로"
       }
       if (sim.heat < 1) return "▶ 알코올램프로 철판 가운데 가열하기";
-      return "▶ " + c.name.replace("성냥의 ", "") + " 가까이 보기";
+      return { text: "가열이 끝났어요", disabled: true }; // 사용자 문구
     },
     view: {
       build3D: function (c, ctx) {
@@ -1189,9 +1292,9 @@
       build2D: function (c, ctx) {
         return wrapView(build2D(c, ctx));
       },
-      // 물체를 눌러 고를 수 있음을 알린다(단계 D). 휴대폰(폭 375px)에서도 두 줄에 들도록 "두 손가락: 확대/축소"는 뺐다(세 줄이면 촛불을 가림)
-      tip3D: "👆 드래그: 돌려 보기 · 두 번 탭: 처음 방향 · 촛불·성냥을 눌러 고르기",
-      tip2D: "2D 화면(모형, 옆에서 본 모습)이에요. 촛불이나 성냥 조각을 눌러 고를 수 있어요.",
+      // 3D 드래그 안내는 공통 틀 기본 문구("👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향" — 다른 앱과 같음)를 쓴다.
+      // 장면을 눌러 고르기를 없애며(개정 3) 누르기 안내를 뺐으므로 덮어쓰지 않는다. 2D 안내만 앱 문구
+      tip2D: "2D 화면(모형, 옆에서 본 모습)이에요.",
     },
     observe: observeCard,
     makeRecord: function (sel, observed) {
@@ -1201,6 +1304,23 @@
       return COND[r.cond].name + " → " + r.result;
     },
     extras: [myTable, safety],
+    // 기록한 뒤(같은 실험의 장면이 끝나 있을 때만) 다음 질문을 이어서 연다 — 앱 전용 예외(사용자 결정 2026-09-28, 한 번의 실행으로 두 칸을 함께
+    // 관찰): 새로 실행하거나 다른 실험으로 넘어가지 않는다.
+    //  · 처음 할 때(이 실험에 아직 기록하지 않은 칸이 있을 때): 아직 기록하지 않은 칸을 연다(㉠ → ㉡, 머리 → 나무). 다 채웠으면 아무것도 안 한다.
+    //  · 다시 할 때(이 실험을 다 기록한 뒤 다시 기록): 순서상 다음 칸을 연다(그 칸이 이미 기록된 칸이어도 — "이 칸은 이미 기록했어요…" 안내 그대로).
+    //    마지막 칸(㉡·나무)을 기록한 뒤에는 아무것도 안 한다. (Claude 결정 2026-09-28 — 후속, fix-2-report.md "후속(물음 답)")
+    onRecorded: function (info) {
+      var c = info && info.record && info.record.cond;
+      if (!c || !COND[c]) return;
+      var e = expOf(c);
+      if (!sceneDone(e)) return;
+      var ids = CELLS[e];
+      var i = ids.indexOf(c);
+      var redo = !!info.replaced && !nextUnrecorded(e);
+      var next = redo ? (i >= 0 && i < ids.length - 1 ? ids[i + 1] : null) : nextUnrecorded(e);
+      // 화면 읽기 프로그램에도 다음 질문이 열렸음을 알린다(조건 이름만 — 결과는 말하지 않는다)
+      if (next && next !== c && steer(next, "observe")) ui.say("이어서 " + COND[next].name + " 질문이에요.");
+    },
     onChange: function () {
       lesson.refresh();
       drawMine();
@@ -1527,8 +1647,22 @@
             type: "button",
             class: "mine-cell" + (r ? " is-rec" : "") + (locked ? " is-locked" : "") + (curSel === c.id ? " is-sel" : ""),
             "aria-label": c.name + (r ? ", 기록함: " + r : locked ? ", 잠김" : ", 아직 기록 안 함"),
+            // 그 실험의 장면이 끝나 있으면 그 칸의 질문을 연다(다시 기록하려는 학생), 아니면 그 실험의 첫 질문 칸만 골라 둔다(개정 3)
             onclick: function () {
-              if (exp.select({ cond: c.id })) drawMine();
+              // 표를 다시 그려도 키보드 초점이 같은 칸에 남게(다시 그리면 버튼이 새로 만들어진다 — steer 안에서도 다시 그리므로 먼저 잰다)
+              var idx = document.activeElement === this ? [].indexOf.call(myTable.querySelectorAll(".mine-cell"), this) : -1;
+              var e = expOf(c.id);
+              var ok = (sceneDone(e) && steer(c.id, "observe")) || steer(targetOf(e), "select");
+              if (!ok) return;
+              drawMine();
+              var nb = idx >= 0 ? myTable.querySelectorAll(".mine-cell")[idx] : null;
+              if (nb) {
+                try {
+                  nb.focus({ preventScroll: true });
+                } catch (err) {
+                  nb.focus();
+                }
+              }
             },
           },
           [el("span", { class: "mine-name", text: c.name }), el("span", { class: "mine-val", text: r ? "✓ " + r : locked ? "🔒" : "—" })]
@@ -1539,14 +1673,22 @@
     });
   }
 
-  /* ── 지금 고른 조건을 새로고침 뒤에도 되살린다(앱 전용, 공통 틀은 선택을 저장하지 않음) ── */
+  /* ── 지금 고른 조건을 새로고침 뒤에도 되살린다(앱 전용, 공통 틀은 선택을 저장하지 않음) ──
+     개정 3: 그 실험의 장면이 끝나 있고 아직 기록하지 않은 칸이 있으면 그 질문을 다시 연다(실행 버튼은 꺼져 있으므로 — 이어서 하기).
+     장면이 아직 끝나지 않았으면 첫 질문 칸을 골라 둔다(실행이 끝나면 그 칸의 관찰 카드가 열린다). */
   var selRestored = false;
   function activateExperiment() {
     exp.activate();
     if (!selRestored) {
       selRestored = true;
       var saved = store.get("curSel", null);
-      if (saved && COND[saved]) exp.select({ cond: saved });
+      if (saved && COND[saved]) {
+        var e = expOf(saved);
+        var next = nextUnrecorded(e);
+        if (sceneDone(e)) {
+          if (!(next && steer(next, "observe"))) steer(saved, "select");
+        } else steer(targetOf(e), "select");
+      }
     }
     drawMine();
     requestDraw();

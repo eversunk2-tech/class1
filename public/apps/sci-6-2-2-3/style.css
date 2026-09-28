@@ -121,7 +121,7 @@
 .d2-svg { display: block; width: 100%; height: auto; }
 .d2-bg { fill: #eef3f8; }
 .d2-table { fill: #d9c7a3; }
-.d2-pick { cursor: pointer; }
+/* 개정 3: 2D 그림의 촛불·성냥을 눌러 고르기는 없앴다(.d2-pick 커서 규칙 삭제) */
 .d2-selring { fill: none; stroke: #f2a93b; stroke-width: 5; }
 .d2-dish { fill: #b8c0c8; }
 .d2-candle { fill: #f6f1e6; stroke: #b9b2a3; stroke-width: 1.5; }

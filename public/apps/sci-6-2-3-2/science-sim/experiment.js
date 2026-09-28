@@ -17,6 +17,7 @@
  *       { id: "obj", title: "물체 고르기", options: [...],
  *         visible: function (optionId, sel) { return true | false; },   // 선택: 다른 조건에 따라 보기를 숨긴다(예: 고른 장면의 물체만).
  *         phaseTag: false },                                  //  숨겨진 보기가 골라져 있으면 선택이 풀린다. phaseTag: false면 보기 아래 단계 이름을 쓰지 않는다(잠김 안내는 그대로)
+ *       // columns: 한 줄에 놓을 보기 수 — 2(기본), 3(폭 1100px 이상에서만 3칸), 1(한 줄에 하나씩 위아래로 — 2026-09-28, 6-2-2-3)
  *     ],
  *     phases: [                                              // 실험 단계. 앞 단계를 다 기록해야 다음 단계가 열린다.
  *       { id: "A", name: "실험 A", title: "…", lead: "안내 문장",
@@ -26,6 +27,10 @@
  *     doneLead: "모든 실험을 기록했어요 …",
  *     cellKey: function (sel) { return sel.sol + "|" + sel.ind; },
  *     runLabel: function (sel) { return "▶ … 넣기"; },
+ *                                                           // 또는 { text: "…", disabled: true } — 그 글자로 실행 버튼을 끈다(2026-09-28, 6-2-2-3:
+ *                                                           //   결과가 이미 장면에 보여 새로 실행할 것이 없을 때). 끈 동안은 관찰 카드의 '다시 실행'(retryLabel)도 실행하지 않고 숨긴다.
+ *                                                           //   이렇게 끈 버튼에는 클래스 ss-run-done이 붙어 흐린 반투명 대신 읽기 쉬운 모양이 된다(style-common.css).
+ *                                                           //   문자열을 돌려주면 예전과 같다(실행 중이 아니면 켜짐).
  *     busyLabel: "실험하는 중… 잘 지켜보세요 👀",               // 선택: 실행 중 버튼 글자(문자열 또는 function (sel))
  *     view: {
  *       build3D: function (container, ctx) { return Promise<view|null>; },   // null이면 2D로 대신한다
@@ -72,6 +77,7 @@
  *     onRecorded: function (info) {},                       // { record, replaced, phaseCompleted: "A"|null, allDone }
  *                                                           // 기록 뒤 틀은 다음 칸을 고르지 않는다(2026-09-27 — 조건·장면 그대로, "다음" 안내 표시도 없음).
  *                                                           // 앱도 여기서 다음 조건을 고르거나 실행하지 않는다(CLAUDE.md "기록 뒤 다음 조건을 자동으로 고르거나 재생하지 않는다").
+ *                                                           // 예외: 한 번의 실행으로 여러 칸을 함께 관찰하는 앱은 `exp.observe`로 **같은 실행**의 다음 칸 질문을 이어서 열 수 있다(6-2-2-3, 사용자 결정 2026-09-28). 새로 실행하거나 다른 조건으로 넘어가는 것은 아니다.
  *     onChange: function () {},                             // 진행 상황이 바뀔 때(단계 이동 막대 갱신 등)
  *     can3D: true,                                          // false면 처음부터 2D(주소에 ?no3d=1이면 자동 false)
  *     scenePanel: node,                                     // 선택(2026-09-25): 지금 값을 보여 주는 노드(예: 시각·측정값 패널). 전체 화면 모드일 때
@@ -82,6 +88,12 @@
  *   exp.activate()            → 실험하기 단계에 들어올 때 호출(처음 한 번 실험 화면을 만든다)
  *   exp.select(sel)           → 조건 고르기(분석 단계의 '다시 실험' 버튼 등). 고른 값이 하나도 바뀌지 않으면 아무것도 하지 않는다
  *                               (관찰 카드·적던 답·장면 그대로, true — 2026-09-28 단계 E. 조작 칸 버튼·장면 누르기·기록한 칸 표도 같다)
+ *   exp.observe(sel)          → 실행하지 않고 그 칸의 관찰 카드를 연다(2026-09-28, 6-2-2-3) — 앱이 "그 칸의 결과가 이미 장면에 보인다"고
+ *                               판단할 때(한 번의 실행으로 두 칸을 함께 관찰하는 실험 등). 고른 값이 다르면 select처럼 바꾸고, 같은 칸의 관찰 카드가
+ *                               이미 열려 있으면 그대로 둔다(적던 답·확인 결과 유지). scene에도 남겨 새로고침 뒤 복원은 실행한 것과 같다.
+ *                               기록 직후 예약된 조작 칸 올림(0.45초)은 취소하고, 관찰 카드가 보이게 최소로 스크롤한다(크게 보기는 조작 칸 안에서만).
+ *                               onRecorded 안에서 불렀고 초점이 기록 버튼이나 BODY였으면 새 카드의 첫 보기로 초점을 옮긴다(preventScroll, 다른 초점은 그대로).
+ *                               실행 중·잠긴 단계·관찰하지 않는 칸(skipCells)·조건이 다 안 골라짐(숨긴 보기 포함)이면 아무것도 안 하고 false, 열면 true.
  *   exp.refresh()             → 버튼 글자·진행률·표를 지금 상태로 다시 그린다('실험 화면 비우기' 뒤에는 틀이 스스로 부른다)
  *   exp.phaseDone(id) / exp.allDone() / exp.progress() → { done, total }
  *   exp.skipInfo(sel)         → 관찰하지 않는 조합이면 skipCells의 그 항목, 아니면 null
@@ -607,6 +619,8 @@
     var sel = {};
     var trial = null; // { sel, observed }
     var busy = false;
+    var liftTimer = null; // 기록 뒤 크게 보기 조작 칸을 조건 카드 쪽으로 올리는 예약(0.45초) — exp.observe가 취소한다
+    var inRecorded = false; // onRecorded를 부르는 동안(기록 직후) — exp.observe가 초점을 새 카드로 옮길지 정할 때 쓴다
     var scene = store.get("scene", {}) || {}; // cellKey → sel (실험 화면에 남아 있는 결과)
     var view = null;
     var viewKind = null;
@@ -736,7 +750,8 @@
     R.factorBtns = {};
     R.factorNotes = {};
     o.factors.forEach(function (f, fi) {
-      var grid = el("div", { class: "ss-choice-grid" + (f.columns === 3 ? " cols-3" : ""), role: "group", "aria-label": f.title });
+      // columns: 3 = 넓은 화면에서 한 줄에 셋, 1 = 한 줄에 하나씩 위아래로(2026-09-28, 6-2-2-3), 그 밖 = 둘(기본)
+      var grid = el("div", { class: "ss-choice-grid" + (f.columns === 3 ? " cols-3" : f.columns === 1 ? " cols-1" : ""), role: "group", "aria-label": f.title });
       R.factorBtns[f.id] = {};
       f.options.forEach(function (op) {
         var kids = [];
@@ -884,10 +899,79 @@
       afterSelect();
       return true;
     }
+    function cancelLift() {
+      if (liftTimer) clearTimeout(liftTimer);
+      liftTimer = null;
+    }
+    /* exp.observe(sel) — 실행하지 않고 그 칸의 관찰 카드를 연다(2026-09-28 T2, 6-2-2-3: 한 번의 실행으로 두 칸을 함께 관찰하는 실험).
+       앱이 "그 칸의 결과가 이미 장면에 보인다"고 판단했을 때만 부른다. 틀은 장면을 모르므로 결과가 보이는지는 확인하지 않는다.
+       실행 중·잠긴 단계·관찰하지 않는 칸(skipCells)·조건이 다 안 골라짐(숨긴 보기 포함)이면 아무것도 하지 않고 false. */
+    function observeCell(s) {
+      if (busy || !s) return false;
+      // 기록 직후(onRecorded 안) 이어서 여는데 초점이 기록 버튼(꺼지며 풀림)이나 BODY에 있으면 새 카드의 첫 보기로 옮긴다(아래)
+      var ae = document.activeElement;
+      var moveFocus = inRecorded && (!ae || ae === document.body || ae === R.record);
+      var target = {};
+      factorIds.forEach(function (k) {
+        target[k] = s[k] != null ? s[k] : sel[k];
+      });
+      var full = o.factors.every(function (f) {
+        var v = target[f.id];
+        return v != null && (typeof f.visible !== "function" || f.visible(v, Object.assign({}, target)) !== false);
+      });
+      if (!full) return false;
+      if (skipOf(target)) return false;
+      var p = cellPhase(target);
+      if (p && !phaseUnlocked(p)) return false;
+      var changed = factorIds.some(function (k) {
+        return sel[k] !== target[k];
+      });
+      // 같은 칸의 관찰 카드가 이미 열려 있으면 그대로(적던 답·확인 결과·기록하기 상태 유지)
+      if (!changed && trial && !R.observe.hidden && sameSel(trial.sel, target, factorIds)) return true;
+      if (changed) {
+        // select처럼 바꾼다(관찰 카드 닫기·버튼·장면 표시)
+        factorIds.forEach(function (k) {
+          sel[k] = target[k];
+        });
+        pruneHidden();
+        afterSelect();
+      }
+      cancelLift(); // 기록 직후 예약된 '조건 카드 쪽으로 올리기'가 새로 연 관찰 카드를 밀어내지 않게
+      // 실행한 것과 같이 남긴다 — 새로고침 뒤 복원(view.showInstant)이 예전 규칙대로
+      scene[o.cellKey(target)] = Object.assign({}, target);
+      store.set("scene", scene);
+      trial = { sel: Object.assign({}, target), observed: null };
+      showObserve(); // 관찰 카드가 보이게 최소로 스크롤(크게 보기는 조작 칸 안에서만, 기본 화면은 페이지)
+      // 키보드로 이어서 답하게(2026-09-28 review L4): 스크롤은 showObserve가 맡으므로 초점만 옮긴다. 다른 곳에 있던 초점은 건드리지 않는다
+      if (moveFocus) {
+        var first = R.obsChoices.querySelector("button:not([disabled]), input:not([disabled])");
+        if (first) {
+          try {
+            first.focus({ preventScroll: true });
+          } catch (e) {
+            first.focus();
+          }
+        }
+      }
+      return true;
+    }
     function complete() {
       return factorIds.every(function (k) {
         return sel[k] != null;
       });
+    }
+    // 실행 버튼 글자·꺼짐(o.runLabel): 문자열이면 예전과 같고(실행 중이 아니면 켜짐), { text, disabled: true }면 그 글자로 끈다(2026-09-28 T1)
+    function runLabelOf(s) {
+      var v = o.runLabel(Object.assign({}, s));
+      if (v && typeof v === "object") return { text: v.text != null ? String(v.text) : "", disabled: v.disabled === true };
+      return { text: v, disabled: false };
+    }
+    // 이 조건에서 앱이 실행 버튼을 꺼 두었나(run()·'다시 실행' 버튼이 쓴다 — 버튼이 꺼져 있을 때 다른 길로 실행되지 않게)
+    function runOff(s) {
+      var full = factorIds.every(function (k) {
+        return s[k] != null;
+      });
+      return full && !skipOf(s) && runLabelOf(s).disabled;
     }
     function afterSelect() {
       // 크게 보기: 관찰 카드를 숨기면 조작 칸 내용이 짧아져(칸 아래쪽을 보고 있었으면) 칸의 스크롤이 줄며 방금 누른 조건 버튼이
@@ -941,12 +1025,17 @@
         }, "");
         R.run.textContent = SciSim.josa(phrase, "을", "를") + " 골라요";
         R.run.disabled = true;
+        R.run.classList.remove("ss-run-done");
       } else if (skipOf(sel)) {
         R.run.textContent = skipOf(sel).runLabel || "🚫 안전을 위해 하지 않는 실험이에요";
         R.run.disabled = true;
+        R.run.classList.remove("ss-run-done");
       } else {
-        R.run.textContent = o.runLabel(Object.assign({}, sel));
-        R.run.disabled = busy;
+        var rl = runLabelOf(sel);
+        R.run.textContent = rl.text;
+        R.run.disabled = busy || rl.disabled;
+        // 앱이 끈 실행 버튼(끝난 실행 — 학생이 안내 글로 읽는다)만 읽기 쉬운 모양(style-common.css .ss-run-done). 실행 중은 예전 꺼짐 모양
+        R.run.classList.toggle("ss-run-done", rl.disabled && !busy);
       }
       drawSkip();
       var cp = currentPhase();
@@ -1051,6 +1140,7 @@
       }
       var s = Object.assign({}, sel);
       if (skipOf(s)) return; // 관찰하지 않는 조합은 실행하지 않는다
+      if (runOff(s)) return; // 앱이 실행 버튼을 꺼 둔 조건(runLabel이 { disabled: true }) — '다시 실행' 등 다른 길로도 실행하지 않는다
       var p = cellPhase(s);
       if (p && !phaseUnlocked(p)) return;
       if (o.canRun) {
@@ -1096,6 +1186,7 @@
       R.btnToggle.disabled = on || mounting || (viewKind === "2d" && !can3D);
       if (on) {
         R.run.disabled = true;
+        R.run.classList.remove("ss-run-done"); // 실행 중 꺼짐은 예전 모양(흐린 주 버튼)
         var bl = typeof o.busyLabel === "function" ? o.busyLabel(Object.assign({}, sel)) : o.busyLabel;
         R.run.textContent = bl || "실험하는 중… 잘 지켜보세요 👀";
       } else draw();
@@ -1255,7 +1346,8 @@
       R.checkNode.textContent = "";
       R.checkNode.hidden = !res.node;
       if (res.node) R.checkNode.appendChild(res.node);
-      R.retryBtn.hidden = res.ok || !(trial && trial.ob && trial.ob.retryLabel);
+      // '다시 실행'은 실행 버튼이 꺼져 있으면 숨긴다(runLabel { disabled: true } — 눌러도 실행되지 않으므로)
+      R.retryBtn.hidden = res.ok || !(trial && trial.ob && trial.ob.retryLabel) || runOff(trial.sel);
       revealNext();
     }
     /* 보기를 고르거나 '확인하기'를 누른 뒤 다음에 누를 곳이 가려져 있을 때만 최소로 스크롤한다(이미 보이면 그대로 둔다).
@@ -1407,8 +1499,11 @@
       // (review-D1 M1 — 예전에는 다음 칸이 저절로 골라져 막대의 ▶만 누르면 됐다. 어느 칸을 하라고 가리키지는 않는다). 기본 화면은 예전처럼
       // 움직이지 않는다. '확인하기' 뒤의 피드백 스크롤(약 0.3초)이 끝난 다음에 올린다(review-D2 R1 — 그 스크롤이 이 올림을 덮었다).
       // 보이는 카드만 센다(review-D3 M1 — 방금 닫힌 관찰 카드·막대로 옮긴 실행 카드는 크기가 0이라, 넣으면 범위가 비어 올림이 한 번도 일어나지 않았다).
+      cancelLift();
       if (R.enl.isOn() && !allDone()) {
-        setTimeout(function () {
+        // exp.observe가 같은 실행의 다음 칸 관찰 카드를 곧바로 열면 이 올림은 취소된다(liftTimer — 2026-09-28 T2)
+        liftTimer = setTimeout(function () {
+          liftTimer = null;
           if (!R.enl.isOn()) return;
           var cards = [].slice.call(o.root.querySelectorAll(".ss-exp-panel .ss-step-card")).filter(function (c) {
             return c.getBoundingClientRect().height > 0;
@@ -1419,7 +1514,14 @@
           revealInDock(dockOf(cards[0]), first.top, last.bottom);
         }, 450);
       }
-      if (o.onRecorded) o.onRecorded({ record: r.record, replaced: r.replaced, phaseCompleted: completed ? completed.id : null, allDone: allDone() });
+      if (o.onRecorded) {
+        inRecorded = true; // 앱이 여기서 exp.observe로 다음 칸을 이어서 열면 초점도 따라간다(observeCell)
+        try {
+          o.onRecorded({ record: r.record, replaced: r.replaced, phaseCompleted: completed ? completed.id : null, allDone: allDone() });
+        } finally {
+          inRecorded = false;
+        }
+      }
       if (o.onChange) o.onChange();
     });
 
@@ -1551,6 +1653,7 @@
         draw();
       },
       select: select,
+      observe: observeCell,
       refresh: draw,
       phaseDone: phaseDone,
       allDone: allDone,
