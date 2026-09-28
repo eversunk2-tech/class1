@@ -57,7 +57,8 @@
       var ci = indexOf(cur);
       stages.forEach(function (s, i) {
         var reachable = i <= ci || check(s.id).ok;
-        var done = opts.isDone ? !!opts.isDone(s.id) : false;
+        // 잠긴 단계에는 완료(✓)를 보이지 않는다(앞 단계를 비워 다시 잠겼을 때 표시가 어긋나지 않게)
+        var done = reachable && (opts.isDone ? !!opts.isDone(s.id) : false);
         var btn = SciSim.el(
           "button",
           {

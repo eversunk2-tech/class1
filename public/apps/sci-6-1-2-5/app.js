@@ -802,64 +802,9 @@
         frontMark.userData.want = true;
       }
 
-      // 이름표가 3D 칸 가장자리에 걸리거나 장면 위 표시에 가리는가(화면 좌표로 재어 본다, 기준점 sp.center 반영)
-      var wp = new T.Vector3();
-      var cp = new T.Vector3();
-      var host = (container.closest && container.closest(".ss-exp-view")) || container;
-      var overlayRects = [];
-      var overlayAt = -1e9;
-      function overlays() {
-        var now = performance.now();
-        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
-        overlayAt = now;
-        overlayRects = [];
-        var cr = container.getBoundingClientRect();
-        function add(r) {
-          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
-        }
-        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .sw-hud, .ss-view-tip").forEach(function (el) {
-          if (el.closest("[hidden]") || !el.getClientRects().length) return;
-          if (el.classList.contains("ss-view-tip")) {
-            // 바탕 없는 안내 글은 글자 줄만
-            var rg = document.createRange();
-            rg.selectNodeContents(el);
-            [].forEach.call(rg.getClientRects(), add);
-          } else add(el.getBoundingClientRect());
-        });
-        return overlayRects;
-      }
-      function blocked(sp) {
-        sp.getWorldPosition(wp);
-        cp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
-        var dist = -cp.z;
-        if (dist <= v.camera.near) return true;
-        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
-        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
-        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
-        wp.project(v.camera);
-        var x0 = wp.x - wN * sp.center.x,
-          x1 = wp.x + wN * (1 - sp.center.x),
-          y0 = wp.y - hN * sp.center.y,
-          y1 = wp.y + hN * (1 - sp.center.y);
-        if (x0 < -0.995 || x1 > 0.995 || y0 < -0.995 || y1 > 0.995) return true; // 가장자리(잘림)
-        var cw = container.clientWidth || 1;
-        var ch = container.clientHeight || 1;
-        var l = ((x0 + 1) / 2) * cw,
-          r = ((x1 + 1) / 2) * cw,
-          t = ((1 - y1) / 2) * ch,
-          b = ((1 - y0) / 2) * ch;
-        var list = overlays();
-        for (var i = 0; i < list.length; i++) {
-          var o = list[i];
-          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
-        }
-        return false;
-      }
-      v.scene.onBeforeRender = function () {
-        tags.forEach(function (sp) {
-          sp.visible = sp.userData.want !== false && !blocked(sp);
-        });
-      };
+      // 이름표가 3D 칸 가장자리에 걸리거나 장면 위 표시에 가리면 숨긴다(화면 좌표로 재어 본다, 기준점 sp.center 반영) — 공통 틀 도우미
+      // v.autoHideLabels가 한다(2026-09-28 단계 E2에서 이 앱에 있던 같은 코드를 옮김 — 동작 그대로: 가장자리 한도 0.995, 초시계 표시 .sw-hud도 피함).
+      v.autoHideLabels(tags, { avoid: ".sw-hud", edge: 0.995 });
 
       var lastRun = null;
       v.render();

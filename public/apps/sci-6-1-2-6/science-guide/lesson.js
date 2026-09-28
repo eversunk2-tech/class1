@@ -449,19 +449,40 @@
                 f.button.textContent = "🎉 학습 마치기 (다시 저장)";
               });
           }
+          /* 비로그인일 때 체험 모드(사이트 잠금 꺼짐)인지는 persist.js가 사이트 설정을 받은 뒤에 정한다(persist.js 맨 위 주석 ⑦ —
+           * 그전에는 phase "checking"). 정해질 때까지 기다렸다가 fn을 부른다. 설정을 못 받아도 persist.js가 6초 안에 정하므로
+           * 오래 걸리지 않는다(최대 15초 뒤에는 그대로 부른다). */
+          function whenLoginKnown(fn) {
+            var waited = 0;
+            (function wait() {
+              var S = SciSim.Sync;
+              if (S && S.phase && S.phase() === "checking" && waited < 15000) {
+                waited += 100;
+                setTimeout(wait, 100);
+                return;
+              }
+              fn();
+            })();
+          }
           api.onStage(function (id) {
             if (id !== (f.stage || "curiosity")) return;
             if (meta.finishedAt) setNote(meta.savedAt ? "done" : "warn");
             if (meta.finishedAt && f.doneEl.hidden) drawDone(meta.savedAt ? "✅ 결과를 저장했어요." : "");
             if (!loginChecked && recordReady && f.loginHintEl) {
               loginChecked = true;
-              var trial = SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial();
+              var askedAt = meta.finishedAt; // 기다리는 사이 '학습 마치기'가 안내를 먼저 썼으면 덮지 않는다
               window.Class1Record.getUser().then(function (u) {
                 if (u) return;
-                window.Class1Record.renderLoginHint(
-                  f.loginHintEl,
-                  trial ? "지금은 체험 모드예요. 로그인하면 결과가 저장돼요." : "로그인이 풀렸어요. 다시 로그인하면 이어서 하고 결과도 저장돼요."
-                );
+                // 체험 여부는 정해진 뒤에 읽는다(2026-09-28 단계 E2 — 전에는 이 단계에 들어올 때 한 번 읽어, 체험 모드에서 이 단계를
+                // 새로 고침하면 아직 정해지기 전이라 "로그인이 풀렸어요"가 나왔다. build-E3 R1)
+                whenLoginKnown(function () {
+                  if (meta.finishedAt !== askedAt) return;
+                  var trial = SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial();
+                  window.Class1Record.renderLoginHint(
+                    f.loginHintEl,
+                    trial ? "지금은 체험 모드예요. 로그인하면 결과가 저장돼요." : "로그인이 풀렸어요. 다시 로그인하면 이어서 하고 결과도 저장돼요."
+                  );
+                });
               });
             }
           });

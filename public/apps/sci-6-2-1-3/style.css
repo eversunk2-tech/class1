@@ -171,6 +171,8 @@
 .done-card { border: 2px solid var(--ss-good); }
 .restart-line { text-align: center; }
 #login-hint a { font-weight: 700; }
+/* '더 탐구하고 싶은 점': 필수 한 줄(공통 Curiosity 입력칸을 한 줄로 — sci-6-2-1-4 등과 같게, spec 개정 7) */
+.ss-textarea.one-line { min-height: 48px; resize: none; overflow: hidden; white-space: nowrap; }
 
 @media (max-width: 640px) {
   body { font-size: 16px; }

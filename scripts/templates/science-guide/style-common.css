@@ -156,7 +156,8 @@ a { color: var(--ss-primary); }
 .ss-title { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.35; flex: 1 1 240px; }
 .ss-title small { display: block; color: var(--ss-muted); font-family: var(--ss-font); font-weight: 500; font-size: 0.82rem; }
 
-/* 머리말 접기 토글(2026-09-25, 모든 앱) — 제목 줄 맨 끝. 애니메이션 없이 즉시 바뀐다(reduce-motion 여부와 무관). */
+/* 머리말 접기 토글(2026-09-25, 모든 앱) — 제목 줄(.ss-topline)의 제목 뒤. 저장 상태 배지(persist.js .ss-sync)는 나중에 붙어서
+   이 버튼 뒤(줄 맨 끝)에 온다. 애니메이션 없이 즉시 바뀐다(reduce-motion 여부와 무관). */
 .ss-header-toggle {
   flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 999px;
   border: 1px solid var(--ss-border); background: var(--ss-surface); color: var(--ss-text);
@@ -455,7 +456,9 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 
 .ss-toast {
   position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50;
-  max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 18px;
+  /* width: max-content — left:50%만 두면 남은 반쪽 폭에서 줄이 바뀌었다(science-sim 2026-09-27과 같은 고침, 2026-09-28 단계 E2). 이제 최대 폭까지 편다.
+     자리(화면 아래)는 조사 앱 그대로 — 알림을 머리말 위로 올린 것은 3D 장면을 가리지 않으려는 실험 앱 전용이다 */
+  width: max-content; max-width: min(92vw, 520px); padding: 12px 20px; border-radius: 18px;
   background: #1e1d2d; color: #fff; font-weight: 600; box-shadow: 0 10px 28px -8px rgba(30, 20, 80, 0.45); text-align: center;
   pointer-events: none; /* 알림이 떠 있는 동안 아래 버튼을 가려 누르지 못하는 일이 없게 한다 */
 }

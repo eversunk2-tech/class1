@@ -80,7 +80,9 @@
  *                                                           //   측정·기록하는 경우). factors가 []이면 자동으로 false처럼 동작한다. 이때 막대에는 scenePanel만, 없으면 막대를 숨긴다.
  *   });
  *   exp.activate()            → 실험하기 단계에 들어올 때 호출(처음 한 번 실험 화면을 만든다)
- *   exp.select(sel)           → 조건 고르기(분석 단계의 '다시 실험' 버튼 등)
+ *   exp.select(sel)           → 조건 고르기(분석 단계의 '다시 실험' 버튼 등). 고른 값이 하나도 바뀌지 않으면 아무것도 하지 않는다
+ *                               (관찰 카드·적던 답·장면 그대로, true — 2026-09-28 단계 E. 조작 칸 버튼·장면 누르기·기록한 칸 표도 같다)
+ *   exp.refresh()             → 버튼 글자·진행률·표를 지금 상태로 다시 그린다('실험 화면 비우기' 뒤에는 틀이 스스로 부른다)
  *   exp.phaseDone(id) / exp.allDone() / exp.progress() → { done, total }
  *   exp.skipInfo(sel)         → 관찰하지 않는 조합이면 skipCells의 그 항목, 아니면 null
  *   exp.runButton / exp.recordButton → 공통 실행·기록 버튼 엘리먼트(클래스 ss-run-btn / ss-record-btn). 앱이 기록 버튼을 찾을 때는
@@ -848,6 +850,9 @@
         if (sel[f.id] != null && !optionVisible(f, sel[f.id])) delete sel[f.id];
       });
     }
+    // 이미 고른 조건을 다시 누르면(조작 칸 버튼·장면 누르기·기록한 칸 표·앱의 exp.select) 아무것도 하지 않는다(2026-09-28 단계 E —
+    // 전에는 관찰 카드가 닫히고 적던 답·확인 결과·기록하기가 처음으로 돌아갔다). 다시 해 보려면 실행 버튼(▶ 다시 …)을 누른다.
+    // 요인이 여럿이면 누른 요인의 값이 지금 값과 같을 때만 무시한다. 실행 중(busy)·잠긴 보기는 예전과 같다.
     function pick(fid, oid) {
       if (busy) return;
       var lock = optionLock(fid, oid);
@@ -855,6 +860,7 @@
         toast(lockMessage(lock), 3400);
         return;
       }
+      if (sel[fid] === oid) return; // 같은 보기 다시 누름 — 그대로
       sel[fid] = oid;
       pruneHidden();
       afterSelect();
@@ -866,6 +872,11 @@
         toast(lockMessage(p), 3400);
         return false;
       }
+      // 고른 값이 하나도 바뀌지 않으면 그대로 둔다(고른 것은 이미 그 조건이므로 true)
+      var changed = factorIds.some(function (k) {
+        return s[k] != null && sel[k] !== s[k];
+      });
+      if (!changed) return true;
       factorIds.forEach(function (k) {
         if (s[k] != null) sel[k] = s[k];
       });
@@ -1424,6 +1435,9 @@
       trial = null;
       R.observe.hidden = true;
       R.record.disabled = true;
+      // 실행 버튼 글자·상태를 비운 장면에 맞게 다시 그린다(2026-09-28 단계 E — 예: 실험 1 '스위치 열기' → '스위치 닫기'.
+      // 전에는 앱이 view.clear() 안에서 exp.refresh()를 불러야 했다 — 앱이 또 불러도 결과는 같다)
+      draw();
       toast(o.clearMessage || "실험 화면을 비웠어요. 기록은 그대로 남아 있어요.");
     });
     R.btnToggle.addEventListener("click", function () {

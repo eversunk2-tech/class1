@@ -16,21 +16,21 @@
 | 파일 | science-sim과 | 하는 일 |
 |---|---|---|
 | `persist.js` | **같음** | localStorage 임시 저장, `SciSim.el`·`rich`·`josa`·`debounce`. 맨 위에서 글꼴 CSS를 첫 화면을 막지 않게 `<link>`로 붙인다(2026-09-24, science-sim과 같은 코드) |
-| `stage-nav.js` | 조금 다름 | 단계 진행바. **잠긴 단계에는 ✓(완료)를 보이지 않는다**(앞 단계를 비워 다시 잠겼을 때 표시 어긋남 방지) |
+| `stage-nav.js` | **같음**(2026-09-28부터) | 단계 진행바. **잠긴 단계에는 ✓(완료)를 보이지 않는다**(앞 단계를 비워 다시 잠겼을 때 표시 어긋남 방지 — 이 틀에 먼저 넣은 고침을 2026-09-28 단계 E2에서 science-sim에도 옮겨 같은 파일이 됐다) |
 | `predict.js` | **같음** | 도입 질문(직접 타이핑) + 한 단계씩 열리는 힌트. 조사 앱에서는 "조사 시작하기"에 쓴다 |
 | `conclude.js` | 조금 다름 | 적고 제출해야 모범 답안이 나오는 결론·발전 질문. **제출한 글(`sent`)만** 비교 칸과 `values()`에 쓴다. 제출 뒤 고치면 "다시 제출해야 반영돼요" 안내 |
 | `curiosity.js` | **같음** | 더 탐구하고 싶은 점 |
 | `answer-check.js` | **같음** | 답 되짚기·차단(머리 주석의 파일 이름만 다름). 설계: `docs/science/answer-check/spec.md` |
-| `style-common.css` | 디자인 같음 | 공통 스타일(색 변수·카드·버튼·다크모드·단계바·퀴즈·비교). **색·글꼴·버튼·카드·단계 막대 디자인은 science-sim과 같다**(2026-09-24, science-sim README "디자인" 절). 레이아웃은 조사 도우미 판 그대로다 — science-sim의 2026-09-23 공통 틀 수정 1(낮은 화면 머리말 축소, 아래 막대 높이만큼의 여백·`scroll-margin`)과 실험 전용 규칙(카운트다운·관찰 확인 줄)은 넣지 않았다 |
-| `lesson.js` | 조금 다름 | `texts` 옵션 추가(마침 카드 제목·안내, 처음부터 다시 확인 문구, 너무 긴 글 문구). **기본 문구가 "조사"** |
+| `style-common.css` | 디자인 같음 | 공통 스타일(색 변수·카드·버튼·다크모드·단계바·퀴즈·비교). **색·글꼴·버튼·카드·단계 막대 디자인은 science-sim과 같다**(2026-09-24, science-sim README "디자인" 절). 레이아웃은 조사 도우미 판 그대로다 — science-sim의 2026-09-23 공통 틀 수정 1(낮은 화면 머리말 축소, 아래 막대 높이만큼의 여백·`scroll-margin`)과 실험 전용 규칙(카운트다운·관찰 확인 줄·크게 보기·이동 화살표)은 넣지 않았다. 알림(토스트)은 화면 아래 그대로(science-sim은 3D 장면을 가리지 않게 머리말 위)이고, 폭만 science-sim처럼 `width: max-content`(2026-09-28 — 화면 반쪽 폭에서 줄이 바뀌던 것) |
+| `lesson.js` | 조금 다름 | `texts` 옵션 추가(마침 카드 제목·안내, 처음부터 다시 확인 문구, 너무 긴 글 문구). **기본 문구가 "조사"**. science-sim판에만 있는 것: 아래 이동 막대 높이 `--ss-footer-h` 재기(실험판 레이아웃 전용). 나머지(머리말 접기, 마치기 조건, 체험 모드 안내 — 2026-09-28 고침 포함)는 같다 |
 | `quiz.js` | 조금 다름 | 마지막 인자 `{ numLabel, key }` 추가(문항 앞 말 기본 "문제", 저장 키 기본 "analysis") |
 
 > **2026-09-23 마치기 조건**: `lesson.js`가 '학습 마치기' 직전에 정리하기 답과 '더 탐구하고 싶은 점'(필수)을 한 번 더 본다.
 > 자세한 내용은 `scripts/templates/science-sim/README.md`의 "마치기 조건"과 `docs/science/answer-check/finish-gate-report.md`를 본다(동작은 실험 앱과 같다).
 
-"같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity}.js scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다).
+"같음" 파일은 science-sim 정본을 고치면 여기에도 그대로 복사한다(`cp scripts/templates/science-sim/{persist,predict,curiosity,answer-check,stage-nav}.js scripts/templates/science-guide/`. 머리 주석의 파일 이름만 `science-guide/`로 바꿨다 — 복사한 뒤 머리 주석 한 줄을 되돌리고 `diff`로 그 줄만 다른지 확인).
 `style-common.css`는 통째로 복사하지 않는다(위 표의 레이아웃 차이가 사라진다). science-sim에서 **디자인(색·글꼴·버튼·카드)** 규칙을 바꾸면 같은 규칙만 이 파일에 옮기고 `diff`로 차이가 위 표에 적은 것뿐인지 확인한다.
-`stage-nav.js`·`conclude.js`는 2026-09 수정 1차에서 위 동작을 더해 달라졌으니 **덮어쓰지 말고** 차이를 옮긴다.
+`conclude.js`는 2026-09 수정 1차에서 위 동작(제출한 글만)을 더해 달라졌으니 **덮어쓰지 말고** 차이를 옮긴다(`stage-nav.js`는 2026-09-28부터 같음).
 "조금 다름" 파일은 덧붙인 옵션이 모두 선택(기본값 있음)이라 나중에 science-sim 쪽으로 합쳐도 실험 앱이 깨지지 않는다.
 
 ### 조사 도우미 전용
@@ -50,6 +50,7 @@
 - **2026-09 수정 2차**(sci-6-1-2-6 review, 기존 앱과 하위 호환): ① `worksheet` 비교 표 이름 맞추기 — 예전에는 지도서 예시 줄마다 "한쪽이 다른 쪽을 품는" 첫 기록을 골라 "장치"가 두 장치에 ⚠를, "계단"이 "자동계단"에 ✔를 붙였다. 이제 **내 기록 한 줄마다 가장 잘 맞는 예시 한 줄**을 고른다(정확히 같음 > 별칭과 같음 > 더 길게 겹침). 가장 잘 맞는 예시가 둘 이상으로 비기면 어디에도 맞추지 않고 "어느 예시인지 알기 어려운 것"으로 따로 알린다 → 틀린 ⚠가 `mismatches()`(저장 detail)에 들어가지 않는다. 새 옵션 `compare.match: "exact"`(정확 일치만), `compare.aliases`·`rows[i].aliases`(별칭), `compare.genericNames`(뜻이 넓어 부분 일치로 쓰지 않을 말), `compare.minPartialLength`. 이름 비교는 띄어쓰기에 더해 문장 부호·괄호도 무시한다. 옵션을 넘기지 않으면 예전처럼 부분 일치(`contains`)로 맞춘다. ② "⚠ ○○이 달라요"의 조사를 받침에 따라 이/가로 고른다("설치 위치가 달라요"). ③ 행 중복 검사 `unique: "칸 id" | ["칸", …] | true`(+`uniqueMessage`) — 같은 내용을 적은 줄이 있으면 넘어가지 못하고 "같은 상황을 적은 줄이 있어요: 계단. …"으로 안내한다. ④ `persist.js`: 미뤄 둔 입력 저장(250ms)을 `pagehide`·`beforeunload`·`visibilitychange(hidden)` 때 바로 실행한다(science-sim과 같은 파일). ⑤ 비교 표의 기본 글자에서 '지도서'를 뺐다(학생 화면에 교사용 자료 이름을 쓰지 않음): 기본 버튼 "📘 예시 답안과 비교해 보기", 안내 "예시 답안에 없는 것을 …" 등. 이름은 `compare.refName`으로 바꾼다. (1단원 앱처럼 `buttonLabel`·`title`·`source`에 '지도서'를 직접 넘긴 앱은 그 글자가 그대로 나오므로 앱 config에서 고쳐야 한다.)
 - **2026-09-25 실험 앱 개편 단계 A**(science-sim과 같은 코드, 기존 앱과 하위 호환): ① **머리말 접기** — `lesson.js`가 제목 줄(`.ss-topline`)의 제목 뒤에 "▲ 접기 / ▼ 펼치기"(`aria-expanded`, 44px)를 붙인다(저장 상태 배지 `.ss-sync`는 persist.js가 나중에 붙여 이 버튼 뒤, 줄 맨 끝에 온다). 접으면 계정 줄(`.ss-who`·`.ss-trial`)과 단계 메뉴(`#stage-nav`)가 감춰지고 제목 줄만 남는다(아래 이전/다음 버튼으로 계속 이동). 선택은 `persist.js`의 `SciSim.uiPref`(localStorage `ssUiPref:headerCollapsed` — `sci6` 접두사가 아닌 기기 UI 설정이라 로그아웃 때 안 지운다)에 기억, 애니메이션 없음. ② **단계 메뉴 칸 수** — `stage-nav.js`가 `--ss-steps`(단계 수)를 넣어 단계 수만큼 칸을 나눈다(4단계 앱에 빈 칸이 남지 않게, 5단계 앱은 그대로). 전체 화면 보기·끌기 도우미는 3D 실험 화면이 있는 science-sim에만 있다.
 - **2026-09-26 `persist.js` 다시 맞춤**(review-dock R3, 사용자 허락): science-sim판에만 들어가 있던 **가짜 충돌 거르기**(떠날 때 보낸 내용의 지문 `sentFp`, 서버 기록이 이 기기 기록 안에 그대로 들어 있으면 충돌 창 없이 이 기기 기록을 올림 — `docs/science/template-fix-1-report.md`)와 **숫자로 끝나는 말의 조사**("실험 1을")를 옮겨 science-sim과 같은 파일로 되돌렸다(머리 주석 한 줄만 다름). 저장 키·저장 구조는 그대로. 앞으로 science-sim `persist.js`를 고치면 위 "같음" 규칙대로 여기에도 복사한다.
+- **2026-09-28 단계 E2 — 정본 맞추기**(science-sim과 한 줄씩 비교, 보고 `docs/science/sim-redesign/build-E2-report.md`, 기존 앱과 하위 호환·저장 키와 저장 모양 그대로): ① `stage-nav.js` — 이 틀에만 있던 '잠긴 단계에는 ✓ 안 보이기'를 science-sim에도 옮겨 두 파일이 같아졌다(머리 주석만 다름). ② `lesson.js` — 체험 모드에서 마치기가 있는 단계(정리 질문·궁금한 점)를 **새로 고침**하면 마치기 칸 아래 안내가 "로그인이 풀렸어요…"로 나오던 것(앞 단계에서 넘어오면 "지금은 체험 모드예요…"로 맞았다 — build-E3 R1) → 체험 여부(사이트 설정)가 정해진 뒤에 문구를 고른다(science-sim과 같은 고침). ③ `style-common.css` — 알림(토스트)이 `left: 50%` 때문에 화면 반쪽 폭에서 줄이 바뀌던 것(태블릿 세로 두 줄·휴대폰 여러 줄) → `width: max-content`로 최대 폭(`min(92vw, 520px)`)까지 편다(science-sim 2026-09-27과 같은 고침, 자리는 화면 아래 그대로). 머리말 접기 주석을 실제 배치(저장 상태 배지 앞)에 맞춤. 일부러 다른 것(조사판 `texts`·`quiz.js` 옵션·`conclude.js`의 제출한 글만·레이아웃)은 그대로 둔다.
 
 각 파일 맨 위 주석에 자세한 사용법(옵션 전체, 돌려주는 함수, 저장 키)이 있다.
 학생 입력은 모두 `textContent`로만 넣는다(`innerHTML` 없음). `**굵게**`는 config 문구에서만 `SciSim.rich`로 처리한다.

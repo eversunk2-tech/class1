@@ -867,68 +867,16 @@
 
       // 이름표가 3D 칸 가장자리에 걸리거나(잘림) 장면 위 표시(토글·"모형" 배지·상태 표시·빨리 감기 배지·드래그 안내 글)에 가리면
       // 그 순간에는 숨긴다 — 잘리거나 겹친 글자를 보이지 않게(휴대폰·크게 보기처럼 칸이 좁을 때). 이동 화살표는 옅어서 넣지 않는다(개정 8 보충).
-      var wp = new T.Vector3();
-      var cp = new T.Vector3();
-      var host = container.closest ? container.closest(".ss-exp-view") || container : container;
-      var overlayRects = [];
-      var overlayAt = -1e9;
-      function overlays() {
-        var now = performance.now();
-        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
-        overlayAt = now;
-        overlayRects = [];
-        var cr = container.getBoundingClientRect();
-        function add(r) {
-          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
-        }
-        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .hud, .hud-ff, .ss-view-tip").forEach(function (el) {
-          if (el.closest("[hidden]") || !el.getClientRects().length) return;
-          if (el.classList.contains("ss-view-tip")) {
-            // 바탕 없는 안내 글은 글자 줄만
-            var rg = document.createRange();
-            rg.selectNodeContents(el);
-            [].forEach.call(rg.getClientRects(), add);
-          } else add(el.getBoundingClientRect());
-        });
-        return overlayRects;
-      }
-      function blocked(sp) {
-        sp.getWorldPosition(wp);
-        cp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
-        var dist = -cp.z;
-        if (dist <= v.camera.near) return true;
-        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
-        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
-        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
-        wp.project(v.camera);
-        if (wp.x - wN / 2 < -0.99 || wp.x + wN / 2 > 0.99 || wp.y - hN / 2 < -0.99 || wp.y + hN / 2 > 0.99) return true; // 가장자리
-        var cw = container.clientWidth || 1;
-        var ch = container.clientHeight || 1;
-        var l = ((wp.x - wN / 2 + 1) / 2) * cw,
-          r = ((wp.x + wN / 2 + 1) / 2) * cw,
-          t = ((1 - wp.y - hN / 2) / 2) * ch,
-          b = ((1 - wp.y + hN / 2) / 2) * ch;
-        var list = overlays();
-        for (var i = 0; i < list.length; i++) {
-          var o = list[i];
-          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
-        }
-        return false;
-      }
+      // 공통 틀 도우미 v.autoHideLabels가 한다(2026-09-28 단계 E2에서 이 앱에 있던 같은 코드를 옮김 — 동작 그대로). 불꽃을 흔드는
+      // onBeforeRender가 따로 있으므로 manual로 만들고 그 안에서 부른다(아래 이름표 목록을 만들 때).
+      var labelGuard = null;
 
       // 불꽃이 살짝 흔들리는 모습(렌더할 때마다)
       var st = freshState("A", false);
       var flick = 1;
       var tags = null; // 이름표 목록(아래에서 만든다)
       v.scene.onBeforeRender = function () {
-        if (tags) {
-          // 종이·병으로 다가간 시점(실행 뒤 관찰, 손가락으로 확대)에서는 통 옆 이름표를 숨긴다(장면 가장자리·이동 화살표 자리)
-          var near = v.camera.position.distanceTo(v.controls.target) < fitDist() * 0.85;
-          tags.forEach(function (t) {
-            var want = t.sp.userData.want !== false && !(t.sp === cupLabel && (near || st.cupY > 0.05)); // 통을 들어 옮기는 동안에도 숨김
-            t.sp.visible = want && !blocked(t.sp);
-          });
-        }
+        if (labelGuard) labelGuard.update();
         if (st.flame <= 0) return;
         var tm = performance.now();
         flick = 1 + 0.06 * Math.sin(tm / 85) + 0.035 * Math.sin(tm / 31);
@@ -966,6 +914,23 @@
       tags = [candleLabel, cupLabel, paperLabel, tapeLabel, jarLabel, lidLabel].map(function (sp) {
         return { sp: sp, sx: sp.scale.x, sy: sp.scale.y };
       });
+      labelGuard = v.autoHideLabels(
+        tags.map(function (t) {
+          return t.sp;
+        }),
+        {
+          avoid: ".hud, .hud-ff",
+          edge: 0.99,
+          manual: true,
+          want: function (sp) {
+            if (sp.userData.want === false) return false;
+            // 종이·병으로 다가간 시점(실행 뒤 관찰, 손가락으로 확대)에서는 통 옆 이름표를 숨긴다(장면 가장자리·이동 화살표 자리).
+            // 통을 들어 옮기는 동안에도 숨김
+            if (sp === cupLabel) return !(v.camera.position.distanceTo(v.controls.target) < fitDist() * 0.85 || st.cupY > 0.05);
+            return true;
+          },
+        }
+      );
       var labelK = 0;
       function fitLabels() {
         var k = (container.clientWidth || 1024) < 480 ? 1.5 : 1;

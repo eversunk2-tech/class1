@@ -626,68 +626,10 @@
       /* 이름표 가림 막기(개편 단계 D, 2026-09-27): 이름표가 3D 칸 가장자리에 걸려 잘리거나 장면 위 표시("모형" 배지·전체 화면 보기 토글·
        * 달리기 표시·드래그 안내 글)에 가리면 그 순간에는 숨긴다 — 잘리거나 겹친 글자가 보이지 않게(휴대폰·크게 보기처럼 칸이 좁거나 낮을 때,
        * 달리는 동안 카메라가 자동차를 따라갈 때). 가릴 것이 없어지면 다시 보인다. 이동 화살표는 옅어서 넣지 않는다(spec 개정 8 보충).
-       * 보여야 하는지(userData.want)와 부모(📸 표시 묶음)의 보임은 그대로 따른다. 글자·자리·크기는 바꾸지 않는다. */
-      var wp = new T.Vector3();
-      var vp = new T.Vector3();
-      var overlayRects = [];
-      var overlayAt = -1e9;
-      function overlays() {
-        var now = performance.now();
-        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
-        overlayAt = now;
-        overlayRects = [];
-        var cr = container.getBoundingClientRect();
-        function add(r) {
-          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
-        }
-        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .run-timer, .ss-view-tip").forEach(function (n) {
-          if (n.closest("[hidden]") || !n.getClientRects().length) return;
-          if (n.classList.contains("ss-view-tip")) {
-            // 바탕 없는 안내 글은 글자 줄만
-            var rg = document.createRange();
-            rg.selectNodeContents(n);
-            [].forEach.call(rg.getClientRects(), add);
-          } else add(n.getBoundingClientRect());
-        });
-        return overlayRects;
-      }
-      function parentShown(o) {
-        for (var p = o.parent; p; p = p.parent) if (p.visible === false) return false;
-        return true;
-      }
-      function blocked(sp, cw, ch) {
-        sp.getWorldPosition(wp);
-        vp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
-        var dist = -vp.z;
-        if (dist <= v.camera.near) return true;
-        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
-        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
-        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
-        wp.project(v.camera);
-        if (wp.x - wN / 2 < -1 || wp.x + wN / 2 > 1 || wp.y - hN / 2 < -1 || wp.y + hN / 2 > 1) return true; // 가장자리에 걸림
-        var l = ((wp.x - wN / 2 + 1) / 2) * cw,
-          r = ((wp.x + wN / 2 + 1) / 2) * cw,
-          t = ((1 - wp.y - hN / 2) / 2) * ch,
-          b = ((1 - wp.y + hN / 2) / 2) * ch;
-        var list = overlays();
-        for (var i = 0; i < list.length; i++) {
-          var o = list[i];
-          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
-        }
-        return false;
-      }
-      v.scene.onBeforeRender = function () {
-        var cw = container.clientWidth || 1;
-        var ch = container.clientHeight || 1;
-        tags.forEach(function (sp) {
-          if (sp.userData.want === false) {
-            sp.visible = false;
-            return;
-          }
-          if (!parentShown(sp)) return;
-          sp.visible = !blocked(sp, cw, ch);
-        });
-      };
+       * 보여야 하는지(userData.want)와 부모(📸 표시 묶음)의 보임은 그대로 따른다. 글자·자리·크기는 바꾸지 않는다.
+       * 공통 틀 도우미 v.autoHideLabels가 한다(2026-09-28 단계 E2에서 이 앱에 있던 같은 코드를 옮김 — 동작 그대로:
+       * 가장자리 한도 1, 달리기 표시 .run-timer도 피함, 부모가 숨은 이름표는 건드리지 않음). */
+      v.autoHideLabels(tags, { host: host, avoid: ".run-timer", edge: 1, keepUnderHidden: true });
 
       function place(dist) {
         CAR_IDS.forEach(function (id) {

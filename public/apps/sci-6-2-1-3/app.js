@@ -2,7 +2,7 @@
  * app.js — sci-6-2-1-3 "계절별 태양의 남중 고도와 낮의 길이의 관계는?" 차시 전용 로직
  * 공통 틀(science-sim/)이 단계 이동·저장·로그인·예상/분석/정리 모듈을 맡고, 이 파일은
  *   ① 실험하기 화면(앱 전용): 달 바(3월 → 2월, 계절별 묶음) · 값 패널 · 3D/2D 하늘 모형 · 궤적 보기(이번 달만·계절 대표 3개)
- *   ② 분석 표·꺾은선그래프 2개(남중 고도, 낮의 길이), 보기 고르기 2개, 결론 1개, 궁금한 점 한 줄(선택)   을 만든다.
+ *   ② 분석 표·꺾은선그래프 2개(남중 고도, 낮의 길이), 보기 고르기 2개, 결론 1개, '더 탐구하고 싶은 점' 한 줄(필수 — 공통 Curiosity)   을 만든다.
  *
  * spec "개정 1": 12달 모두 측정. 달을 누르면 그 달 21일 태양이 해 뜰 때부터 해 질 때까지 하루 길을 따라 움직인다(약 1.2초 빨리 감기, 모형).
  *   spec 개정 5: 움직이는 동안에는 태양만 움직이고, 움직임이 끝나면 태양이 남중 자리에 나타나 그때 한 번만 빛줄기·호·옆에서 본 모습·
@@ -159,34 +159,34 @@
     { id: "winter", label: "겨울", month: 12, color: "#00838f", dark: "#45d3e0" },
   ];
 
-  /* ───────── 1. 예상하기 / 4. 정리 ───────── */
+  /* ───────── 1. 예상하기 / 4. 정리(결론 + '더 탐구하고 싶은 점' 한 줄) ───────── */
   var predict = S.Predict.render($("predict-root"), C.predict, store, lesson.refresh);
-  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, lesson.refresh);
+  var conclude = S.Conclude.render($("conclude-root"), C.conclude, store, function () {
+    lesson.refresh();
+    showFinish();
+  });
   var quiz = S.Quiz.render($("quiz-root"), C.quiz, store, lesson.refresh);
 
-  /* 궁금한 점: 선택 입력 한 줄(비워도 마칠 수 있음). 저장 키 "curiosity" */
-  var curiosityText = store.get("curiosity", "") || "";
+  /* '더 탐구하고 싶은 점'(궁금한 점): 필수 한 줄(2026-09-28 사용자 결정 — spec 개정 7). 전에는 앱이 직접 만든 선택 입력이었다.
+   * 다른 새 기준 앱(sci-6-2-1-4 등)처럼 공통 SciSim.Curiosity로 만들고 여러 줄 입력칸을 한 줄로 쓴다(최대 200자, Enter로 줄을
+   * 바꾸지 않음). 저장 키 "curiosity"(문자열)는 전과 같아 적어 둔 글이 그대로 이어진다. 비었거나 무의미·주제 무관이면
+   * '학습 마치기'를 막는 것은 공통 틀(lesson.js — #ss-curiosity)이 한다. */
+  var curiosity = S.Curiosity.render($("curiosity-root"), C.curiosity, store, lesson.refresh);
   (function () {
-    var saveCur = S.debounce(function () {
-      store.set("curiosity", curiosityText);
-    }, 250);
-    var inp = el("input", {
-      id: "ss-curiosity",
-      type: "text",
-      class: "ss-num-input ss-text-input",
-      maxlength: "200",
-      autocomplete: "off",
-      placeholder: C.curiosity.placeholder,
+    var ta = $("ss-curiosity");
+    if (!ta) return;
+    ta.rows = 1;
+    ta.maxLength = C.curiosity.maxLength || 200;
+    ta.classList.add("one-line");
+    ta.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
     });
-    inp.value = curiosityText;
-    inp.addEventListener("input", function () {
-      curiosityText = inp.value;
-      saveCur();
-    });
-    $("curiosity-root").appendChild(
-      el("div", { class: "ss-card" }, [el("label", { for: "ss-curiosity", class: "ss-q-label" }, [el("span", { class: "ss-q-num", text: "선택" }), C.curiosity.prompt]), inp])
-    );
   })();
+  // 결론을 제출해야 '더 탐구하고 싶은 점'과 '학습 마치기'가 보인다
+  function showFinish() {
+    $("finish-wrap").hidden = !conclude.isDone();
+  }
+  showFinish();
 
   /* ───────── 남중할 때 옆에서 본 모습 칸(모형) — spec 개정 4 보충(2026-09-26 사용자 결정) ─────────
    * 탐구 2(sci-6-2-1-2)의 '옆에서 본 모습' 칸을 본떴다. 3D 처음 시점은 남중 그림(막대기·그림자·빛줄기·호)이 담긴 자오선 면(정남북
@@ -1655,7 +1655,7 @@
       records: rows,
       analysis: analysis,
       conclusion: conclude.values().conclusion,
-      curiosity: curiosityText.trim(),
+      curiosity: curiosity.value(),
       // 질문-답 표준 목록(관리자 "학생 응답" 화면용, docs/admin/responses-spec.md §3.3)
       qa: [].concat(
         predict.qa("predict"),
@@ -1681,7 +1681,8 @@
         ],
         quiz.qa("analyze"),
         conclude.qa("conclude"),
-        [{ stage: "conclude", id: "curiosity", label: "궁금한 점(선택)", question: C.curiosity.prompt, kind: "text", answer: curiosityText.trim() }]
+        // 궁금한 점: 공통 모양(label "궁금한 점", question = config 문구) — 전 판은 label "궁금한 점(선택)"과 옛 문구(spec 개정 7)
+        curiosity.qa("conclude")
       ),
     };
   }

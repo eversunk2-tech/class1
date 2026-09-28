@@ -611,6 +611,15 @@ html:has([data-stage]:not([hidden]) .ss-exp-layout.is-full) { overflow: hidden; 
 .ss-mini-cell.is-part { background: var(--ss-warn-bg); }
 .ss-mini-cell.is-locked { opacity: 0.55; border-style: dashed; }
 .ss-mini-cell.is-sel { outline: 3px solid var(--ss-accent); outline-offset: 1px; }
+/* 크게 보기 조작 칸의 '기록한 칸 한눈에 보기' 표(2026-09-28 단계 E, review-dock L1): 조작 칸이 좁아(1024×768 가로 화면 표 자리 284px)
+   끝 열이 가려져 옆으로 밀어야 보이던 것 → 표를 카드 안쪽 여백까지 조금 넓히고(−8px), 행 머리글은 띄어쓰기에서 줄을 바꾸고,
+   칸 사이 가로 틈을 없앤다(칸 테두리로 구분). 누르는 칸은 가로·세로 44px 이상. 기본 화면(끔)의 표는 그대로. */
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini-wrap { margin-left: -8px; margin-right: -8px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini th { padding: 4px 2px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini tbody th { white-space: normal; word-break: keep-all; padding: 2px 4px 2px 2px; line-height: 1.25; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini td { padding: 2px 0; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini-cell { min-height: 44px; }
+.ss-exp-layout.is-full > .ss-exp-panel .ss-mini-cell:is(.is-sel, :focus-visible) { position: relative; z-index: 1; outline-offset: -3px; } /* 테두리 선이 옆 칸에 가리지 않게 + 칸 안쪽에 그림(review-E L1 — 칸 틈이 없어 끝 열의 선택 선이 표 밖으로 나가 잘렸다) */
 
 /* ── 분류하기(sorter.js) ── */
 .ss-sorter { border-width: 2px; }

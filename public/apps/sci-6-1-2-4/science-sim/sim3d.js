@@ -30,8 +30,10 @@
  *   v.tween(ms, function (t) {})  → Promise (t: 0→1, 부드럽게)
  *   v.moveTo(obj, [x,y,z], ms)    → Promise
  *   v.fadeColor(material, "#hex", ms) → Promise
- *   v.focus([x,y,z], ratio, ms) / v.flyHome(ms) → 관찰할 곳으로 다가가기 / 처음 시점으로 돌아가기(Promise)
- *   v.pickable(obj, pickValue)    → 탭 선택 대상 등록
+ *   v.focus([x,y,z], ratio, ms) / v.flyHome(ms) → 관찰할 곳으로 다가가기 / 처음 시점으로 돌아가기(Promise — 끝나면 정확히 처음 자리)
+ *     (시작할 때 끌어 돌린 뒤 남은 관성을 없앤다. 카메라·과녁을 움직이는 앱의 v.tween도 움직이기 시작할 때 같다 — 2026-09-28 단계 E)
+ *   v.pickable(obj, pickValue)    → 탭 선택 대상 등록(숨긴 조상 그룹 안의 물체는 누르기에 걸리지 않고 그 뒤의 보이는 물체가 골라진다.
+ *                                   스스로 visible=false인 물체는 조상이 보이면 잡힌다 — 넓은 보이지 않는 누르기 자리)
  *   v.draggable(obj, opts)        → 물체를 끌어 값 바꾸기(2026-09-25 추가, 순수 추가라 안 쓰면 영향 없음). opts:
  *       { plane: THREE.Plane | {normal:[x,y,z], point:[x,y,z]} | function()→그 중 하나,   // 선택: 끄는 동안 이 평면과의 교점을 point로 준다
  *         onStart(info), onDrag(info), onEnd(info) }                                    // info = { point(평면 없으면 null), ray(레이, 구면·곡선에 직접 투영할 때), event }
@@ -46,6 +48,8 @@
  *       경계 상자가 빈 곳까지 넓다 — pad:0에 보이지 않는 굵은 손잡이 메시(visible 그대로, 투명 재질 opacity 0)를 자식으로 붙여 쓰기를 권장).
  *   v.discard(obj)                → 장면에서 빼고 geometry·material·texture까지 해제(잠깐 쓰는 방울·스포이트 등).
  *                                   obj 안에 pickable로 등록한 자식이 있으면 그 등록도 함께 뺀다(장면 통째 바꾸기에 안전)
+ *   v.autoHideLabels(labels, opts) → 3D 이름표가 3D 칸 가장자리에 걸리거나 장면 위 표시(토글·배지·안내 글·앱 HUD)에 가리면
+ *                                   그 장면에서는 숨긴다(선택 기능 — 부르는 앱만, 2026-09-28 단계 E2. 옵션은 아래 함수 주석)
  *   v.cameraPose() / v.setCameraPose(pose) → 지금 시점 { position:[x,y,z], target:[x,y,z] } 얻기 / 되돌리기
  *   v.project([x,y,z], pose?)     → 화면 위 자리 { x, y (0~1, 왼쪽 위 기준), inView }. pose를 주면 그 시점 기준
  *   v.snapshot({ pose, width, marks, hide, type, quality }) → 지금 장면을 '사진'으로 찍는다(전/후 비교용).
@@ -59,7 +63,8 @@
  *   더블탭(더블클릭)하면 처음 보던 방향으로 돌아간다(이동 화살표로 옮긴 것까지).
  *
  * ▶ 이동 화살표(2026-09-26 spec 개정 8, 자동 — 앱은 할 일이 없다): 처음보다 확대했거나(거리 < 맞춤 거리 × 0.92) 과녁이 처음 중심에서
- *   옮겨져 있으면 container 가장자리 가운데에 반투명 ▲▼◀▶ 버튼(.ss-pan-btn)이 나타난다. 한 번 누르면 한 칸(보이는 높이의 12%),
+ *   옮겨져 있으면(학생이 화살표로 옮긴 자리는 맞춤 거리의 1%, 앱의 연출이 옮긴 자리는 5%보다 멀리 — 2026-09-28 단계 E)
+ *   container 가장자리 가운데에 반투명 ▲▼◀▶ 버튼(.ss-pan-btn)이 나타난다. 한 번 누르면 한 칸(보이는 높이의 12%),
  *   누르고 있으면 계속(초당 60%) — 화면 기준으로 카메라와 과녁을 함께 옮겨 돌거나 좌우가 뒤집히지 않는다. 한도는 처음 시점에서 본
  *   장면 틀(frame)과 바닥(groundY), resetView·flyHome은 옮긴 것까지 처음으로, 카메라 트윈(focus·flyHome·앱의 v.tween)·끌기 중에는
  *   옮기지 않는다.
@@ -149,6 +154,16 @@
     controls.minPolarAngle = 0.15;
     controls.target.copy(center);
     controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    /* 끌어 돌린 뒤 남은 관성(감쇠로 천천히 멈추며 계속 도는 회전)을 없앤다 — 남은 값을 적용하지 않고 버린다(2026-09-28 단계 E).
+       처음 방향으로(resetView·두 번 탭)·flyHome·focus·앱의 시점 연출(카메라를 움직이는 v.tween)이 시작될 때 부른다 — 전에는 끈 직후에
+       누르면 처음 방향에 돌아온 뒤에도 남은 관성으로 수십 도 더 돌았다. 손으로 돌리기·확대·이동 화살표의 부드러운 멈춤은 그대로.
+       three r169 OrbitControls의 내부 값(_sphericalDelta·_panOffset)을 쓴다 — three 판을 바꾸면 확인(없으면 아무것도 하지 않아 예전과 같다). */
+    function stopInertia() {
+      var sd = controls._sphericalDelta;
+      var po = controls._panOffset;
+      if (sd && typeof sd.set === "function") sd.set(0, 0, 0);
+      if (po && typeof po.set === "function") po.set(0, 0, 0);
+    }
 
     var fitDistance = 20;
     function computeFit() {
@@ -166,6 +181,7 @@
     function resetView() {
       if (disposed) return;
       stopPan(); // 이동 화살표로 옮긴 것까지 처음으로(누르고 있던 이동도 멈춘다)
+      stopInertia(); // 끌어 돌린 직후에 눌러도 남은 관성으로 더 돌지 않게
       computeFit();
       camera.position.copy(center).addScaledVector(viewDir, fitDistance);
       controls.target.copy(center);
@@ -209,6 +225,19 @@
       });
     }
     var camWas = null; // 이동 화살표를 누르는 동안: 트윈 전 카메라·과녁(앱이 카메라를 움직이는 트윈인지 알아보려고)
+    // 트윈 하나가 카메라·과녁을 움직이기 시작하는지 보는 칸(앱의 시점 연출이 시작되면 남은 관성을 없앤다 — 트윈마다 한 번)
+    var camSeen = [0, 0, 0, 0, 0, 0];
+    function camNow() {
+      camSeen[0] = camera.position.x;
+      camSeen[1] = camera.position.y;
+      camSeen[2] = camera.position.z;
+      camSeen[3] = controls.target.x;
+      camSeen[4] = controls.target.y;
+      camSeen[5] = controls.target.z;
+    }
+    function camChanged() {
+      return camSeen[0] !== camera.position.x || camSeen[1] !== camera.position.y || camSeen[2] !== camera.position.z || camSeen[3] !== controls.target.x || camSeen[4] !== controls.target.y || camSeen[5] !== controls.target.z;
+    }
     function loop(now) {
       if (!running || disposed) return;
       if (pan && tweens.length) camWas = [camera.position.clone(), controls.target.clone()];
@@ -216,7 +245,12 @@
         var tw = tweens[i];
         if (tw.start == null) tw.start = now;
         var t = Math.min(1, (now - tw.start) / tw.ms);
+        if (!tw.cam) camNow();
         tw.fn(ease(t), t);
+        if (!tw.cam && camChanged()) {
+          tw.cam = true; // 앱의 시점 연출(v.focus·flyHome·카메라를 움직이는 앱의 v.tween)이 시작됨 — 끌어 돌린 뒤 남은 관성이 연출 뒤에 이어지지 않게
+          stopInertia();
+        }
         if (t >= 1) {
           tweens.splice(i, 1);
           tw.resolve();
@@ -310,6 +344,7 @@
     // 카메라를 한 지점(예: 관찰할 홈) 쪽으로 부드럽게 다가가게 한다. ratio: 처음 거리 대비 비율
     function focus(point, ratio, ms) {
       stopPan(); // 앱의 카메라 연출이 시작되면 화살표 이동은 멈춘다(끝난 뒤 다시 누르면 된다)
+      stopInertia(); // 끌어 돌린 직후여도 다가간 뒤 남은 관성으로 돌지 않게(방향 = 부를 때의 방향)
       var fromT = controls.target.clone();
       var toT = new THREE.Vector3().fromArray(point);
       var fromP = camera.position.clone();
@@ -320,17 +355,29 @@
         camera.position.lerpVectors(fromP, toP, t);
       });
     }
-    // 처음 보던 방향·거리로 부드럽게 돌아가기
+    // 처음 보던 방향·거리로 부드럽게 돌아가기. 끝나면 **정확히** 처음 자리(과녁 = 처음 중심, 지금 맞춤 거리)에 두고 이동 화살표를 다시
+    // 판단한다(2026-09-28 단계 E — 처음 방향에 돌아왔는데 화살표가 남지 않게). 도중에 화면 크기가 바뀌면 바뀐 맞춤 거리로 간다.
     function flyHome(ms) {
       stopPan(); // 이동 화살표로 옮긴 것까지 처음으로
+      stopInertia(); // 끌어 돌린 직후여도 돌아온 뒤 남은 관성으로 돌지 않게
       computeFit();
       var fromT = controls.target.clone();
       var fromP = camera.position.clone();
-      var toP = center.clone().addScaledVector(viewDir, fitDistance);
-      if (fromT.distanceTo(center) < 0.01 && fromP.distanceTo(toP) < 0.01) return Promise.resolve();
-      return tween(ms || 600, function (t) {
+      var toP = new THREE.Vector3();
+      function homeP() {
+        return toP.copy(center).addScaledVector(viewDir, fitDistance);
+      }
+      if (fromT.distanceTo(center) < 0.01 && fromP.distanceTo(homeP()) < 0.01) return Promise.resolve();
+      return tween(ms || 600, function (t, lin) {
+        if (lin >= 1) {
+          controls.target.copy(center);
+          camera.position.copy(homeP());
+          return;
+        }
         controls.target.lerpVectors(fromT, center, t);
-        camera.position.lerpVectors(fromP, toP, t);
+        camera.position.lerpVectors(fromP, homeP(), t);
+      }).then(function () {
+        if (panUI && !disposed) panUI.refresh();
       });
     }
     function fadeColor(material, hex, ms) {
@@ -347,6 +394,11 @@
     var down = null;
     var lastTap = 0;
     var el = renderer.domElement;
+    // 조상(자기 자신은 빼고, 장면까지) 가운데 visible === false가 있는가
+    function underHidden(obj) {
+      for (var o = obj.parent; o; o = o.parent) if (o.visible === false) return true;
+      return false;
+    }
     function onDown(e) {
       down = { x: e.clientX, y: e.clientY, t: performance.now() };
     }
@@ -369,6 +421,10 @@
       raycaster.setFromCamera(ndc, camera);
       var hits = raycaster.intersectObjects(pickables, true);
       for (var i = 0; i < hits.length; i++) {
+        // three.js 레이는 숨긴 물체도 맞힌다 — 숨긴 조상 그룹(예: 지금 안 보이는 다른 실험 장치) 안의 물체는 건너뛰고 다음 맞음을 본다
+        // (2026-09-28 단계 E — 전에는 거기서 멈춰 그 뒤의 보이는 물체를 못 골랐다). 자기 자신만 visible=false인 넓은 누르기 자리
+        // (보이지 않는 누르기 영역)는 조상이 보이면 그대로 잡힌다.
+        if (underHidden(hits[i].object)) continue;
         var o = hits[i].object;
         while (o && !(o.userData && o.userData.pick != null)) o = o.parent;
         if (o) {
@@ -555,7 +611,12 @@
     // 가지 않게), 틀의 가장자리에서는 멈춘다(그쪽 화살표는 흐리게 + aria-disabled). 앱의 focus 등으로 이미 틀 밖에 있으면 더 바깥으로만
     // 못 간다. resetView(더블탭·"처음 방향으로")·flyHome은 옮긴 것까지 처음으로, 카메라 트윈·물체 끌기 중에는 옮기지 않는다.
     var PAN_ZOOM = 0.92;
-    var PAN_MOVED = 0.01; // 과녁이 맞춤 거리의 1%보다 멀리 옮겨져 있으면 "옮긴 상태"
+    var PAN_MOVED = 0.01; // 학생이 화살표로 옮긴 과녁이 맞춤 거리의 1%보다 멀리 있으면 "옮긴 상태"
+    // 앱의 연출(v.focus·앱의 시점 트윈)이 옮긴 과녁은 5%부터 "옮긴 상태"(2026-09-28 단계 E — 연출이 처음 중심에서 1~2% 떨어진 곳에서
+    // 끝나 처음 방향인데도 화살표가 남던 것). 학생의 화살표 한 칸은 확대하지 않은 화면에서 맞춤 거리의 8% 이상이라 늘 보인다.
+    var PAN_MOVED_APP = 0.05;
+    var panMark = new THREE.Vector3(); // 학생이 화살표로 마지막에 옮겨 둔 과녁(과녁이 여기 그대로면 학생이 옮긴 상태 — 확대·돌리기는 과녁을 안 바꾼다)
+    var panMarked = false;
     var PAN_STEP = 0.12;
     var PAN_SPEED = 0.6;
     var groundY = typeof opts.groundY === "number" ? opts.groundY : 0;
@@ -642,6 +703,10 @@
         camera.position.add(d);
         controls.target.add(d);
         pan.done += len;
+        if (d.lengthSq() > 0) {
+          panMark.copy(controls.target); // 학생이 옮긴 자리
+          panMarked = true;
+        }
         if (!pan.held && d.lengthSq() === 0) pan.done = pan.want; // 한도에 닿았으면 남은 칸은 버린다
       }
       if (!pan.held && pan.done >= pan.want - 1e-9) {
@@ -769,8 +834,12 @@
       });
       container.appendChild(wrap);
 
+      // 보일 때: 처음보다 확대했거나, 과녁이 옮겨져 있을 때(학생이 화살표로 옮긴 자리면 1%, 앱의 연출이 옮긴 자리면 5%보다 멀리).
+      // 처음 방향(확대 안 함)에 돌아와 과녁이 연출 탓으로 조금(5% 안쪽)만 어긋나 있으면 숨긴다.
       function wanted() {
-        return camera.position.distanceTo(controls.target) < fitDistance * PAN_ZOOM || controls.target.distanceTo(center) > fitDistance * PAN_MOVED;
+        if (camera.position.distanceTo(controls.target) < fitDistance * PAN_ZOOM) return true;
+        var byHand = panMarked && controls.target.distanceToSquared(panMark) < 1e-10;
+        return controls.target.distanceTo(center) > fitDistance * (byHand ? PAN_MOVED : PAN_MOVED_APP);
       }
       // 보이기·흐림 다시 판단(카메라가 바뀔 때마다). again이면 자리도 다시 잰다(화면 크기가 바뀔 때)
       function refresh(again) {
@@ -1231,6 +1300,121 @@
       },
     };
 
+    /* ── 이름표 가림 숨기기(선택 기능 — 부르는 앱만, 2026-09-28 단계 E2) ──
+     * 3D 이름표(스프라이트)가 3D 칸 가장자리에 걸리거나(잘림) 장면 위 DOM 표시(전체 화면 보기 토글·"모형" 배지·드래그 안내 글 + 앱이
+     * 더한 HUD 등)에 가리면 그 장면에서는 숨기고, 가릴 것이 없어지면 다시 보인다(휴대폰·크게 보기처럼 칸이 좁거나 낮을 때, 카메라가 움직일 때).
+     * 이름표의 글자·자리·크기는 바꾸지 않는다. 이동 화살표는 옅어서 피하지 않는다(spec 개정 8 보충).
+     * sci-6-2-2-4·6-1-2-3·6-1-2-5가 따로 가지던 같은 코드를 모았다(동작 그대로 — README "바뀐 동작·추가 기능(2026-09-28 단계 E2)" 절 3).
+     *   var guard = v.autoHideLabels(labels, {
+     *     avoid: ".hud, .hud-ff",   // 선택: 더 피할 앱 표시(CSS 선택자). 늘 피하는 것: .ss-scene-toggle, .ss-view-badge, .ss-view-tip
+     *     edge: 1,                  // 선택: 가장자리 한도(화면 좌표 −1~1). 이름표 끝이 이보다 밖이면 숨긴다(0.99면 조금 안쪽부터)
+     *     want: function (sp) {},   // 선택: 지금 보여야 하는가(기본 sp.userData.want !== false). false면 숨긴다
+     *     keepUnderHidden: false,   // 선택: true면 조상이 숨은 이름표는 visible을 건드리지 않는다
+     *     manual: false,            // 선택: true면 scene.onBeforeRender에 붙지 않는다(앱의 onBeforeRender에서 guard.update()를 부른다)
+     *   });
+     *   labels: 스프라이트 배열(앱이 나중에 더 넣어도 된다 — 그릴 때마다 다시 본다) 또는 배열을 돌려주는 함수.
+     *   guard.update() — 이름표마다 visible을 정한다. 그리기 직전(scene.onBeforeRender — 카메라 행렬이 맞은 뒤)에 부른다.
+     *   guard.blocked(sp) → true면 잘리거나 가림. guard.stop() → 더 정하지 않는다.
+     *   피할 표시는 3D 칸을 품은 장면 칸(.ss-exp-view) 안에서 찾고 0.25초마다 다시 잰다(숨긴 것·크기 없는 것은 빼고, 바탕 없는 드래그
+     *   안내 글은 글자 줄만). 2px 안까지 다가와도 가린 것으로 본다. 이름표의 기준점(sp.center)을 따른다.
+     *   앱이 이 도우미를 부른 뒤에 scene.onBeforeRender를 새로 대입하면 도우미가 떨어진다 — 그런 앱은 manual: true로 만들고 자기
+     *   onBeforeRender 안에서 guard.update()를 부른다(sci-6-2-2-4). */
+    function autoHideLabels(labels, ho) {
+      ho = ho || {};
+      var edge = ho.edge != null ? ho.edge : 1;
+      var sel = ".ss-scene-toggle, .ss-view-badge, .ss-view-tip" + (ho.avoid ? ", " + ho.avoid : "");
+      var want =
+        typeof ho.want === "function"
+          ? ho.want
+          : function (sp) {
+              return sp.userData.want !== false;
+            };
+      var host = ho.host || (container.closest && container.closest(".ss-exp-view")) || container;
+      var wp = new THREE.Vector3();
+      var cp = new THREE.Vector3();
+      var rects = [];
+      var rectsAt = -1e9;
+      var stopped = false;
+      function overlays() {
+        var now = performance.now();
+        if (now - rectsAt < 250) return rects; // 0.25초마다 다시 잰다
+        rectsAt = now;
+        rects = [];
+        var cr = container.getBoundingClientRect();
+        function add(r) {
+          if (r.width > 0 && r.height > 0) rects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
+        }
+        host.querySelectorAll(sel).forEach(function (n) {
+          if (n.closest("[hidden]") || !n.getClientRects().length) return;
+          if (n.classList.contains("ss-view-tip")) {
+            // 바탕 없는 안내 글은 글자 줄만
+            var rg = document.createRange();
+            rg.selectNodeContents(n);
+            [].forEach.call(rg.getClientRects(), add);
+          } else add(n.getBoundingClientRect());
+        });
+        return rects;
+      }
+      function blocked(sp) {
+        sp.getWorldPosition(wp);
+        cp.copy(wp).applyMatrix4(camera.matrixWorldInverse);
+        var dist = -cp.z;
+        if (dist <= camera.near) return true;
+        var worldH = 2 * dist * Math.tan((camera.fov * Math.PI) / 360);
+        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
+        var wN = (2 * sp.scale.x) / (worldH * (camera.aspect || 1));
+        wp.project(camera);
+        var cx = sp.center ? sp.center.x : 0.5;
+        var cy = sp.center ? sp.center.y : 0.5;
+        if (wp.x - wN * cx < -edge || wp.x + wN * (1 - cx) > edge || wp.y - hN * cy < -edge || wp.y + hN * (1 - cy) > edge) return true; // 가장자리(잘림)
+        var cw = container.clientWidth || 1;
+        var ch = container.clientHeight || 1;
+        var l = ((wp.x - wN * cx + 1) / 2) * cw,
+          r = ((wp.x + wN * (1 - cx) + 1) / 2) * cw,
+          t = ((1 - wp.y - hN * (1 - cy)) / 2) * ch,
+          b = ((1 - wp.y + hN * cy) / 2) * ch;
+        var list = overlays();
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
+        }
+        return false;
+      }
+      function ancestorsShown(o) {
+        for (var p = o.parent; p; p = p.parent) if (p.visible === false) return false;
+        return true;
+      }
+      function update() {
+        if (stopped || disposed) return;
+        var list = typeof labels === "function" ? labels() : labels;
+        if (!list) return;
+        for (var i = 0; i < list.length; i++) {
+          var sp = list[i];
+          if (!sp) continue;
+          if (!want(sp)) {
+            sp.visible = false;
+            continue;
+          }
+          if (ho.keepUnderHidden && !ancestorsShown(sp)) continue;
+          sp.visible = !blocked(sp);
+        }
+      }
+      if (!ho.manual) {
+        var prev = scene.onBeforeRender;
+        scene.onBeforeRender = function () {
+          update();
+          if (typeof prev === "function") return prev.apply(this, arguments);
+        };
+      }
+      return {
+        update: update,
+        blocked: blocked,
+        stop: function () {
+          stopped = true;
+        },
+      };
+    }
+
     var theme = { light: { bg: 0xeef3f8 }, dark: { bg: 0x1b2230 } };
     var themeFns = [];
     var darkMq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -1284,6 +1468,7 @@
         draggables.push({ obj: obj, opts: dopts || {} });
       },
       discard: discard,
+      autoHideLabels: autoHideLabels,
       cameraPose: cameraPose,
       setCameraPose: setCameraPose,
       project: project,
