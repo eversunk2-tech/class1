@@ -12,6 +12,7 @@ import {
   SearchIcon,
   ShieldCheckIcon,
   ShieldOffIcon,
+  Trash2Icon,
   UserMinusIcon,
   UserPlusIcon,
   XIcon,
@@ -21,6 +22,7 @@ import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { MyClassesCard, NO_CLASS_MESSAGE } from "@/components/admin/class-card";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
 import { MemberCreateDialog } from "@/components/admin/member-create-dialog";
+import { MemberPurgeDialog } from "@/components/admin/member-purge-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
 import { RoleChangeDialog } from "@/components/admin/role-change-dialog";
@@ -42,12 +44,16 @@ import {
   accountLabel,
   fetchMembers,
   isMissingSchemaError,
+  isOAuthOnlyMember,
   isWithdrawnMember,
   memberName,
   memberProviders,
   MISSING_SCHEMA_MESSAGE,
   passwordResetBlockReason,
+  purgeAccessFrom,
+  purgeBlockReason,
   withdrawBlockReason,
+  type PurgeAccess,
 } from "@/lib/admin";
 import { formatCount, formatDateTime } from "@/lib/format";
 import type { MemberRow, Role } from "@/lib/types";
@@ -151,6 +157,8 @@ export function MemberList() {
   const [resetOpen, setResetOpen] = useState(false);
   const [withdrawTarget, setWithdrawTarget] = useState<MemberRow | null>(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [purgeTarget, setPurgeTarget] = useState<MemberRow | null>(null);
+  const [purgeOpen, setPurgeOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<MemberRow | null>(null);
   const [roleOpen, setRoleOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -236,6 +244,20 @@ export function MemberList() {
     void ctx.refresh();
   }
 
+  function openPurge(row: MemberRow) {
+    setPurgeTarget(row);
+    setPurgeOpen(true);
+  }
+
+  /** 완전 삭제 뒤: 목록을 화면에 둔 채 조용히 새로 불러온다(성공이면 그 행을 먼저 뺀다 — 깜박이는 로딩 없이). */
+  function refreshAfterPurge(userId: string, removed: boolean) {
+    if (removed) setState((s) => (s.status === "ready" ? { ...s, rows: s.rows.filter((r) => r.id !== userId) } : s));
+    void load().then((next) => {
+      if (next.status === "ready") setState(next);
+    });
+    void ctx.refresh();
+  }
+
   function openRole(row: MemberRow) {
     setRoleTarget(row);
     setRoleOpen(true);
@@ -271,6 +293,10 @@ export function MemberList() {
   const noClass = classMode && !ctx.classes.length;
   const createBlocked = noClass && !perms.canCreateTeacher;
   const homeroomOnly = classMode && !perms.superAdmin;
+  // 구글·깃허브 전용 계정은 '탈퇴 처리' 대신 '완전 삭제'(총괄만 — docs/admin/oauth-delete/spec.md 개정 1).
+  // 학급 기능 SQL 전(예전 방식)에는 완전 삭제를 쓸 수 없어(총괄 없음) 예전 '탈퇴 처리'를 그대로 둔다.
+  const purgeAccess = purgeAccessFrom(ctx);
+  const purgeEnabled = !perms.legacy;
   const columns = classMode ? CLASS_COLUMNS : BASE_COLUMNS;
   const filterName =
     activeFilter === FILTER_NONE ? "학급 없음" : filterOptions.find((c) => c.id === activeFilter)?.name ?? null;
@@ -515,8 +541,11 @@ export function MemberList() {
                             row={row}
                             myId={myId}
                             canChangeRole={perms.canChangeRole && classMode}
+                            purgeMode={purgeEnabled && isOAuthOnlyMember(row)}
+                            purgeAccess={purgeAccess}
                             onReset={() => openReset(row)}
                             onWithdraw={() => openWithdraw(row)}
+                            onPurge={() => openPurge(row)}
                             onRole={() => openRole(row)}
                           />
                         </td>
@@ -580,8 +609,11 @@ export function MemberList() {
                           row={row}
                           myId={myId}
                           canChangeRole={perms.canChangeRole && classMode}
+                          purgeMode={purgeEnabled && isOAuthOnlyMember(row)}
+                          purgeAccess={purgeAccess}
                           onReset={() => openReset(row)}
                           onWithdraw={() => openWithdraw(row)}
+                          onPurge={() => openPurge(row)}
                           onRole={() => openRole(row)}
                         />
                       </div>
@@ -609,6 +641,13 @@ export function MemberList() {
         onOpenChange={setWithdrawOpen}
         onWithdrawn={markWithdrawn}
       />
+      <MemberPurgeDialog
+        target={purgeTarget}
+        open={purgeOpen}
+        onOpenChange={setPurgeOpen}
+        onPurged={(userId) => refreshAfterPurge(userId, true)}
+        onPartial={(userId) => refreshAfterPurge(userId, false)}
+      />
       <RoleChangeDialog target={roleTarget} open={roleOpen} onOpenChange={setRoleOpen} onChanged={markRole} />
     </div>
   );
@@ -622,28 +661,36 @@ function roleChangeBlockReason(row: MemberRow, myId: string | null): string | nu
 }
 
 /**
- * 파괴적인 동작(비밀번호 초기화·탈퇴 처리)을 케밥 메뉴로 묶어 실수 클릭을 막는다(spec §1.3 Q3).
+ * 파괴적인 동작(비밀번호 초기화·탈퇴 처리·완전 삭제)을 케밥 메뉴로 묶어 실수 클릭을 막는다(spec §1.3 Q3).
  * 할 수 없는 항목은 지우지 않고 비활성 + 이유를 보여 준다(왜 못 하는지 알 수 있게).
  * 총괄에게는 "담임교사로 지정 / 담임 해제"도 보인다(docs/classes/spec.md 개정 1-2 — admin_set_role).
+ * 구글·깃허브 전용 계정(purgeMode)은 마지막 항목이 '탈퇴 처리' 대신 '완전 삭제'다(docs/admin/oauth-delete/spec.md 개정 1 — 교체).
  */
 function MemberActions({
   row,
   myId,
   canChangeRole,
+  purgeMode,
+  purgeAccess,
   onReset,
   onWithdraw,
+  onPurge,
   onRole,
 }: {
   row: MemberRow;
   myId: string | null;
   canChangeRole: boolean;
+  purgeMode: boolean;
+  purgeAccess: PurgeAccess;
   onReset: () => void;
   onWithdraw: () => void;
+  onPurge: () => void;
   onRole: () => void;
 }) {
   const name = memberName(row);
   const resetBlock = passwordResetBlockReason(row, myId);
-  const withdrawBlock = withdrawBlockReason(row, myId);
+  const withdrawBlock = purgeMode ? null : withdrawBlockReason(row, myId);
+  const purgeBlock = purgeMode ? purgeBlockReason(row, myId, purgeAccess) : null;
   const isTeacher = row.profiles?.role === "admin";
   const roleBlock = canChangeRole ? roleChangeBlockReason(row, myId) : null;
   return (
@@ -684,17 +731,31 @@ function MemberActions({
             비밀번호 초기화
             {resetBlock ? <span className="ml-auto text-xs text-muted-foreground">{resetBlock.short}</span> : null}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            disabled={!!withdrawBlock}
-            onClick={onWithdraw}
-            title={withdrawBlock?.long}
-            aria-label={withdrawBlock ? `탈퇴 처리 불가: ${withdrawBlock.long}` : `${name} 탈퇴 처리`}
-          >
-            <UserMinusIcon />
-            탈퇴 처리
-            {withdrawBlock ? <span className="ml-auto text-xs text-muted-foreground">{withdrawBlock.short}</span> : null}
-          </DropdownMenuItem>
+          {purgeMode ? (
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={!!purgeBlock}
+              onClick={onPurge}
+              title={purgeBlock?.long}
+              aria-label={purgeBlock ? `완전 삭제 불가: ${purgeBlock.long}` : `${name} 완전 삭제`}
+            >
+              <Trash2Icon />
+              완전 삭제
+              {purgeBlock ? <span className="ml-auto text-xs text-muted-foreground">{purgeBlock.short}</span> : null}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={!!withdrawBlock}
+              onClick={onWithdraw}
+              title={withdrawBlock?.long}
+              aria-label={withdrawBlock ? `탈퇴 처리 불가: ${withdrawBlock.long}` : `${name} 탈퇴 처리`}
+            >
+              <UserMinusIcon />
+              탈퇴 처리
+              {withdrawBlock ? <span className="ml-auto text-xs text-muted-foreground">{withdrawBlock.short}</span> : null}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </span>

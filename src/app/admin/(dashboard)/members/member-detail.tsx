@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, KeyRoundIcon, LockKeyholeIcon, ShieldCheckIcon, ShieldOffIcon, UserMinusIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeftIcon,
+  KeyRoundIcon,
+  LockKeyholeIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+  Trash2Icon,
+  UserMinusIcon,
+} from "lucide-react";
 import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { MemberPurgeDialog } from "@/components/admin/member-purge-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
 import { RoleChangeDialog } from "@/components/admin/role-change-dialog";
@@ -17,9 +27,12 @@ import {
   canResetPassword,
   fetchLatestWithdrawal,
   fetchMember,
+  isOAuthOnlyMember,
   isWithdrawnMember,
   memberRealName,
   passwordResetBlockReason,
+  purgeAccessFrom,
+  purgeBlockReason,
   isMissingSchemaError,
   memberName,
   MISSING_SCHEMA_MESSAGE,
@@ -51,6 +64,7 @@ function BackLink() {
  * 학습 기록은 내 학급 학생만 본다(총괄도 같음 — docs/classes/spec.md 개정 1-1). 다른 학급 학생이면 탭 대신 안내를 보여 준다.
  */
 export function MemberDetail({ id }: { id: string }) {
+  const router = useRouter();
   const { user } = useSession();
   const ctx = useAdminContext();
   const perms = adminPermissions(ctx);
@@ -59,6 +73,7 @@ export function MemberDetail({ id }: { id: string }) {
   const [resetOpen, setResetOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [purgeOpen, setPurgeOpen] = useState(false);
   const [withdrawInfo, setWithdrawInfo] = useState<{ created_at: string; actor_name: string | null } | null>(null);
 
   const load = useCallback(async (): Promise<State> => {
@@ -141,6 +156,10 @@ export function MemberDetail({ id }: { id: string }) {
   const isAdmin = member.profiles?.role === "admin";
   const isSelf = user?.id === member.id;
   const resetBlock = passwordResetBlockReason(member, user?.id);
+  // 구글·깃허브 전용 계정은 '탈퇴 처리' 대신 '완전 삭제'(총괄만 — docs/admin/oauth-delete/spec.md 개정 1).
+  // 학급 기능 SQL 전(예전 방식)에는 완전 삭제를 쓸 수 없어 예전 '탈퇴 처리'를 그대로 둔다.
+  const purgeMode = !perms.legacy && isOAuthOnlyMember(member);
+  const purgeBlock = purgeMode ? purgeBlockReason(member, user?.id, purgeAccessFrom(ctx)) : null;
   const withdrawBlock = withdrawBlockReason(member, user?.id);
   const classMode = ctx.status === "ready";
   // 학급 표시(관리자 화면에서만): 학생은 소속 학급, 교사는 담임 학급(총괄만 알 수 있음)
@@ -223,6 +242,7 @@ export function MemberDetail({ id }: { id: string }) {
           <p className="rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground" role="note">
             이 학생의 계정은 삭제되어 더 이상 로그인할 수 없습니다. 아래 학습 기록과 게시글은 그대로 남아 있으며,
             학생·다른 사람에게는 이름이 “탈퇴한 학생”으로 보입니다. 되돌릴 수 없습니다.
+            {purgeMode ? " 구글·깃허브 계정이라 ‘완전 삭제’로 남은 기록까지 지울 수 있어요(총괄)." : ""}
           </p>
         ) : null}
 
@@ -258,7 +278,22 @@ export function MemberDetail({ id }: { id: string }) {
               {isAdmin ? "담임 해제" : "담임교사로 지정"}
             </Button>
           )}
-          {withdrawBlock ? (
+          {purgeMode ? (
+            purgeBlock ? (
+              <div className="flex flex-col gap-1">
+                <Button variant="outline" disabled title={purgeBlock.long} className="self-start">
+                  <Trash2Icon />
+                  완전 삭제 불가({purgeBlock.short})
+                </Button>
+                <p className="max-w-md text-xs text-muted-foreground">{purgeBlock.long}</p>
+              </div>
+            ) : (
+              <Button variant="destructive" onClick={() => setPurgeOpen(true)}>
+                <Trash2Icon />
+                완전 삭제
+              </Button>
+            )
+          ) : withdrawBlock ? (
             <div className="flex flex-col gap-1">
               <Button variant="outline" disabled title={withdrawBlock.long} className="self-start">
                 <UserMinusIcon />
@@ -288,7 +323,11 @@ export function MemberDetail({ id }: { id: string }) {
               {isAdmin
                 ? "교사 계정이라 학습 기록을 모아 보여 주지 않아요."
                 : "내 학급 학생이 아니어서 학습 기록(웹앱 결과·학생 응답·과제·피드백)을 볼 수 없어요. 학습 기록은 그 학생의 담임 선생님만 볼 수 있어요."}
-              {!isAdmin && perms.superAdmin ? " 비밀번호 초기화와 탈퇴 처리는 총괄 선생님이 할 수 있어요." : ""}
+              {!isAdmin && perms.superAdmin
+                ? purgeMode
+                  ? " 완전 삭제는 총괄 선생님이 할 수 있어요."
+                  : " 비밀번호 초기화와 탈퇴 처리는 총괄 선생님이 할 수 있어요."
+                : ""}
             </span>
           </p>
         </section>
@@ -312,6 +351,16 @@ export function MemberDetail({ id }: { id: string }) {
         onWithdrawn={(_id, withdrawnAt) =>
           patchMember((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, withdrawn_at: withdrawnAt } } : m))
         }
+      />
+
+      <MemberPurgeDialog
+        target={member}
+        open={purgeOpen}
+        onOpenChange={setPurgeOpen}
+        // 다 지웠으면(또는 이미 없으면) 이 회원의 상세 화면은 더 볼 것이 없다 → 회원 목록으로
+        onPurged={() => router.push("/admin/members/")}
+        // 계정은 지웠지만 기록 정리가 남음 → 지금 상태를 다시 읽는다(같은 버튼을 한 번 더 누르면 남은 것만 지운다)
+        onPartial={() => void reload()}
       />
 
       <RoleChangeDialog target={member} open={roleOpen} onOpenChange={setRoleOpen} onChanged={onRoleChanged} />

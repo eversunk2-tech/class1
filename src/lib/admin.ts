@@ -251,6 +251,69 @@ export function withdrawBlockReason(
   return null;
 }
 
+// ─────────────────────────────────────────────
+// 구글·깃허브(OAuth) 계정 완전 삭제 (docs/admin/oauth-delete/spec.md 개정 1)
+//   아이디 계정은 지금처럼 '탈퇴 처리'(기록 보존), OAuth 전용 계정은 '완전 삭제'(계정 + 기록 모두, 총괄만).
+//   화면 표시는 UX용이고 실제 판단은 Edge Function(admin-purge-oauth-member)과 DB 함수(admin_purge_oauth_member)가 다시 한다.
+// ─────────────────────────────────────────────
+
+/**
+ * 구글·깃허브(OAuth)로만 로그인하는 계정인지 — 가입 방식이 하나 이상 기록돼 있고 그중 아이디(email)가 없다.
+ * (= !canResetPassword 이면서 가입 방식을 아는 계정. 가입 방식이 비어 있는 계정은 false → 예전처럼 '탈퇴 처리'.)
+ * Edge Function·SQL 함수도 같은 규칙으로 확인한다.
+ */
+export function isOAuthOnlyMember(member: Pick<MemberRow, "provider" | "providers">): boolean {
+  const list = memberProviders(member);
+  return list.length > 0 && !list.includes("email");
+}
+
+/** 완전 삭제 권한(화면 표시용): 총괄 / 총괄 아님 / 아직 확인 중 / 확인 실패 */
+export type PurgeAccess = "super" | "not-super" | "checking" | "error";
+
+/** 관리자 화면 공용 정보(useAdminContext)에서 완전 삭제 권한을 읽는다. */
+export function purgeAccessFrom(ctx: { status: string; isSuperAdmin: boolean }): PurgeAccess {
+  if (ctx.status === "loading") return "checking";
+  if (ctx.status === "error") return "error";
+  return ctx.status === "ready" && ctx.isSuperAdmin ? "super" : "not-super";
+}
+
+/**
+ * 완전 삭제를 막는 이유(가능하면 null). Edge Function(admin-purge-oauth-member)도 같은 규칙으로 거부한다.
+ * 본인 계정 → 교사 계정(먼저 담임 해제) → 총괄 아님(확인 중·확인 실패 포함) → 아이디로 로그인할 수 있는 계정 → 정보 없음(이미 지워짐).
+ * 이미 탈퇴 처리한 계정은 막지 않는다 — 남은 기록을 지우는 데 쓴다(개정 1 Q7).
+ */
+export function purgeBlockReason(
+  member: Pick<MemberRow, "id" | "provider" | "providers" | "profiles">,
+  myId: string | null | undefined,
+  access: PurgeAccess,
+): { short: string; long: string } | null {
+  if (member.id === myId) {
+    return { short: "본인 계정", long: "자기 자신의 계정은 완전 삭제할 수 없습니다." };
+  }
+  if (member.profiles?.role === "admin") {
+    return {
+      short: "먼저 담임 해제",
+      long: "교사(관리자) 계정은 완전 삭제할 수 없습니다. 총괄 선생님이 먼저 담임 해제를 한 뒤 완전 삭제하세요.",
+    };
+  }
+  if (access === "checking") {
+    return { short: "확인 중", long: "관리자 권한을 확인하는 중입니다. 잠시 뒤 다시 열어 주세요." };
+  }
+  if (access === "error") {
+    return { short: "확인 실패", long: "관리자 권한을 확인하지 못했습니다. 화면을 새로 고쳐 주세요." };
+  }
+  if (access !== "super") {
+    return { short: "총괄만", long: "구글·깃허브 계정의 완전 삭제는 총괄 선생님만 할 수 있습니다." };
+  }
+  if (!isOAuthOnlyMember(member)) {
+    return { short: "아이디 계정", long: "아이디로 로그인하는 계정은 완전 삭제 대신 ‘탈퇴 처리’를 이용하세요." };
+  }
+  if (!member.profiles) {
+    return { short: "정보 없음", long: "회원 정보를 읽지 못했습니다. 이미 지워졌을 수 있으니 목록을 새로 고쳐 주세요." };
+  }
+  return null;
+}
+
 /** 로그인한 사용자가 비밀번호 로그인 계정인지(Auth User 기준) */
 export function userHasPasswordLogin(user: User | null): boolean {
   if (!user) return false;
@@ -262,6 +325,9 @@ export function userHasPasswordLogin(user: User | null): boolean {
 }
 
 export class AdminActionError extends Error {}
+
+/** 완전 삭제하려던 회원이 이미 없음(다른 창에서 지웠거나, 응답을 못 받은 채 다시 누름) — 화면은 목록을 새로 불러온다. */
+export class MemberGoneError extends AdminActionError {}
 
 /**
  * Edge Function(admin-reset-password)으로 비밀번호를 초기화한다.
@@ -348,6 +414,51 @@ const WITHDRAW_NOT_DEPLOYED_MESSAGE =
   "탈퇴 기능이 아직 준비되지 않았습니다. Supabase에 Edge Function(admin-delete-member)을 배포해 주세요.";
 const WITHDRAW_NOT_DEPLOYED_OR_NETWORK_MESSAGE =
   "탈퇴 기능에 연결하지 못했습니다. 인터넷 연결을 확인하고, Supabase에 Edge Function(admin-delete-member)이 배포되어 있는지 확인해 주세요.";
+
+/**
+ * Edge Function(admin-purge-oauth-member)으로 구글·깃허브 전용 계정을 완전 삭제한다(되돌릴 수 없음, 총괄만).
+ * 로그인 계정·올린 게임 파일·학습 기록·글·관리 기록을 모두 지운다 — 실제 보장은 Edge Function과 DB 함수가 한다.
+ * - 이미 없는 회원이면 MemberGoneError(화면은 목록을 새로 불러온다).
+ * - 계정은 지웠지만 기록 정리가 남았으면 warning(같은 회원에게 한 번 더 실행하면 남은 것만 다시 지운다).
+ * 실패 시 한국어 메시지를 담은 AdminActionError를 던진다.
+ */
+export async function purgeOAuthMember(userId: string): Promise<{ alreadyDeleted: boolean; warning?: string }> {
+  const { data, error } = await supabase.functions.invoke("admin-purge-oauth-member", { body: { userId } });
+  if (error) {
+    if (error instanceof FunctionsHttpError) {
+      const res = error.context as Response | undefined;
+      let message: string | null = null;
+      let code: string | null = null;
+      try {
+        const body = (await res?.clone().json()) as { error?: unknown; code?: unknown } | undefined;
+        if (typeof body?.error === "string") message = body.error;
+        if (typeof body?.code === "string") code = body.code;
+      } catch {
+        // 본문이 JSON이 아니면 아래 기본 문구를 쓴다.
+      }
+      if (code === "target_not_found") throw new MemberGoneError(message ?? "이미 지워진 계정입니다.");
+      if (message) throw new AdminActionError(message);
+      if (res?.status === 404) throw new AdminActionError(PURGE_NOT_DEPLOYED_MESSAGE);
+      if (res?.status === 401) throw new AdminActionError("로그인이 만료되었습니다. 다시 로그인해 주세요.");
+      throw new AdminActionError(`완전 삭제를 하지 못했습니다. (HTTP ${res?.status ?? "오류"})`);
+    }
+    if (error instanceof FunctionsFetchError) throw new AdminActionError(PURGE_NOT_DEPLOYED_OR_NETWORK_MESSAGE);
+    if (error instanceof FunctionsRelayError) {
+      throw new AdminActionError("Supabase 서버와 통신하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+    throw new AdminActionError("완전 삭제를 하지 못했습니다.");
+  }
+  const body = data as { ok?: unknown; alreadyDeleted?: unknown; warning?: unknown } | null;
+  if (!body || body.ok !== true) {
+    throw new AdminActionError("서버 응답이 올바르지 않습니다. Edge Function 코드가 최신인지 확인해 주세요.");
+  }
+  return { alreadyDeleted: body.alreadyDeleted === true, warning: typeof body.warning === "string" ? body.warning : undefined };
+}
+
+const PURGE_NOT_DEPLOYED_MESSAGE =
+  "완전 삭제 기능이 아직 준비되지 않았습니다. Supabase에 Edge Function(admin-purge-oauth-member)을 배포해 주세요.";
+const PURGE_NOT_DEPLOYED_OR_NETWORK_MESSAGE =
+  "완전 삭제 기능에 연결하지 못했습니다. 인터넷 연결을 확인하고, Supabase에 Edge Function(admin-purge-oauth-member)이 배포되어 있는지 확인해 주세요.";
 
 /** 탈퇴 기록 1건(회원 상세에서 "언제·누가" 표시). 표가 아직 없으면 null. */
 export async function fetchLatestWithdrawal(

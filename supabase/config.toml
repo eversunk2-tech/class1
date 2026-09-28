@@ -14,3 +14,7 @@ verify_jwt = true
 
 [functions.admin-reset-password]
 verify_jwt = true
+
+# 구글·깃허브 계정 완전 삭제(docs/admin/oauth-delete/) — 가장 파장이 큰 함수라 JWT 검증을 명시해 둔다(기본값도 true).
+[functions.admin-purge-oauth-member]
+verify_jwt = true
