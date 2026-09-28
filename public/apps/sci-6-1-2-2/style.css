@@ -48,10 +48,11 @@
   position: absolute; right: 10px; top: 10px; z-index: 3; padding: 3px 10px; border-radius: 999px;
   background: rgba(242, 169, 59, 0.95); color: #2a1a00; font-weight: 700; font-size: 0.82rem; pointer-events: none;
 }
-/* 초 카운터는 정원판 밖 왼쪽 위('모형' 배지 옆, 좁은 화면은 배지 아래)에 둔다 — '↑ 위쪽'·'나중 위치' 이름표를 가리지 않게 */
+/* 초 카운터는 정원판 밖 왼쪽 위('모형' 배지 옆 윗줄)에 둔다 — '↑ 위쪽'·'나중 위치' 이름표를 가리지 않게.
+   단계 D: 아래 "⛶ 전체 화면 보기" 토글(위 46px부터)에 닿지 않게 높이를 줄이고(위 8px ~ 약 37px), 2D·휴대폰도 같은 윗줄에(아래 규칙). */
 .bee-counter {
-  position: absolute; left: 64px; top: 10px; z-index: 3; max-width: calc(100% - 200px);
-  padding: 6px 14px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff; font-weight: 700; font-size: 1rem;
+  position: absolute; left: 64px; top: 8px; z-index: 3; max-width: calc(100% - 200px);
+  padding: 4px 14px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff; font-weight: 700; font-size: 1rem; line-height: 1.3;
   text-align: center; pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
@@ -68,7 +69,7 @@
 .ss-exp-view.is-2d .ss-view2d { padding-top: 84px; }
 .g2-view { position: static; }
 .g2-view .rule-badge { top: 10px; }
-.g2-view .bee-counter { top: 44px; left: 50%; transform: translateX(-50%); }
+/* (단계 D) 2D의 초 카운터도 3D처럼 윗줄 '모형' 배지 옆 — 예전 자리(위 44px 가운데)는 좁은 화면에서 토글과 겹쳤다 */
 .g2-frame {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: ". up ." "left board right" ". down .";
   align-items: center; justify-items: center; gap: 4px; max-width: 560px; margin: 0 auto;
@@ -108,6 +109,29 @@
 .g2-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin: 8px 0 0; font-size: 0.8rem; color: var(--ss-muted); }
 .lg-ghost { opacity: 0.35; }
 .g2-foot-sample { color: #b86e00; }
+/* 2D 대체 화면 + 크게 보기(단계 D, review-dock L3): 정원판이 장면 칸보다 커서 칸 안에서 밀어야 했고 아래쪽 꽃(수선화·진달래)이 처음에
+   가려졌다 → 칸 높이에 맞춰 줄인다(86px = 공통 틀의 토글 아래 빈 칸). 칸은 정사각형 그대로, 104px = 위·아래 방향 글자·범례 몫,
+   90px = 왼쪽·오른쪽 방향 글자 몫. 기본 화면의 2D는 그대로. */
+.ss-exp-layout.is-full .ss-view2d > .g2-view { height: calc(100% - 86px); min-height: 160px; }
+.ss-exp-layout.is-full .g2-fit { height: 100%; container-type: size; display: flex; flex-direction: column; justify-content: center; }
+.ss-exp-layout.is-full .g2-fit > .g2-frame { flex: none; width: min(100%, 560px, calc((100cqh - 104px) * 8 / 7 + 90px)); }
+.ss-exp-layout.is-full .g2-fit > .g2-legend { flex: none; margin-top: 6px; }
+/* 칸이 작아져도 정사각형 그대로(꽃 칸 내용이 칸을 늘리지 않게), 작은 칸에서는 꽃 표시·이름·범례를 줄인다(아주 작으면 이름은 숨김 —
+   꽃 모양 아이콘은 조건 버튼과 같다, 화면 읽기 이름은 그대로) */
+.ss-exp-layout.is-full .g2-cell { overflow: hidden; }
+@container (max-height: 380px) {
+  .g2-flower .fl-icon { width: 17px; height: 17px; font-size: 0.7rem; border-width: 1.5px; }
+  .g2-name { font-size: 0.52rem; }
+  .g2-ico { font-size: 0.85rem; }
+  .g2-foot { font-size: 0.55rem; }
+  .g2-bee span { font-size: 1.05rem; }
+  .g2-dir { font-size: 0.7rem; }
+  .g2-legend { font-size: 0.72rem; gap: 2px 10px; margin-top: 4px; }
+}
+@container (max-height: 300px) {
+  .g2-name { display: none; }
+  .g2-flower .fl-icon { width: 15px; height: 15px; font-size: 0.62rem; }
+}
 @media (prefers-reduced-motion: reduce) { .g2-bee { transition-duration: 0.2s; } }
 
 /* ── 분석 ── */
@@ -133,7 +157,9 @@
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .ss-main { padding: 12px 12px 96px; }
-  .bee-counter { font-size: 0.86rem; padding: 4px 10px; top: 42px; left: 10px; max-width: calc(100% - 20px); }
+  /* 단계 D(review-A2 N3): 예전 자리(위 42px 왼쪽)는 "⛶ 전체 화면 보기" 토글과 겹쳤다 → 윗줄 '모형' 배지와 '규칙' 배지 사이에
+     작은 글자 두 줄까지(위 8px ~ 약 44px, 토글은 46px부터) */
+  .bee-counter { font-size: 0.78rem; padding: 3px 10px; top: 8px; left: 62px; max-width: calc(100% - 190px); white-space: normal; line-height: 1.2; }
   .rule-badge { font-size: 0.74rem; }
   .g2-name { font-size: 0.56rem; }
   .g2-flower .fl-icon { width: 18px; height: 18px; font-size: 0.72rem; border-width: 1.5px; }

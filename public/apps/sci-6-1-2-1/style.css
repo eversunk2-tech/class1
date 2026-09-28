@@ -57,6 +57,19 @@
 .scene2d .lbls2d { pointer-events: none; }
 .p2-caption { margin: 6px 0 0; font-size: 0.82rem; color: var(--ss-muted); text-align: center; }
 .photo-media text { font-family: var(--ss-font); }
+/* 2D 대체 화면 + 크게 보기(단계 D, review-dock L3): 그림이 장면 칸보다 커서 칸 안에서 밀어야 했다 → 칸 높이에 맞춰 줄인다
+   (86px = 공통 틀의 토글 아래 빈 칸, 30px = 그림 설명 한 줄). 기본 화면의 2D는 그대로. */
+.ss-exp-layout.is-full .ss-view2d > .scene2d-wrap { height: calc(100% - 86px); min-height: 150px; container-type: size; display: flex; flex-direction: column; align-items: center; }
+.ss-exp-layout.is-full .scene2d-wrap > .scene2d { flex: none; width: min(100cqw, calc((100cqh - 30px) * 25 / 17.2)); height: auto; }
+.ss-exp-layout.is-full .scene2d-wrap > .p2-caption { flex: none; }
+/* 휴대폰: 초시계가 왼쪽 위 "전체 화면 보기" 토글(오른쪽 끝 약 145px)을 덮지 않게 폭을 줄인다(글자는 두 줄로 — 단계 D) */
+@media (max-width: 640px) {
+  .ss-exp-view .ss-countdown { max-width: calc(100% - 160px); gap: 6px; padding: 4px 10px 4px 4px; }
+  .ss-exp-view .ss-countdown .ss-cd-dial { width: 36px; height: 36px; }
+  .ss-exp-view .ss-countdown .ss-cd-num { font-size: 1.3rem; }
+  .ss-exp-view .ss-countdown .ss-cd-label { font-size: 0.74rem; }
+  .ss-exp-view .ss-countdown .ss-cd-note { font-size: 0.68rem; }
+}
 
 /* ── 기록·분석하기 ── */
 #summary-table .ss-matrix { min-width: 560px; }

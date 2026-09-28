@@ -34,14 +34,30 @@
 .track2d { position: relative; border-radius: 12px; overflow: hidden; }
 .p2-caption { margin: 6px 2px 0; font-size: 0.8rem; color: var(--ss-muted); }
 .track2d { padding-top: 40px; background: var(--ss-surface-2); }
+/* 2D 화면 + 크게 보기: 경주로 그림이 장면 칸 안에 들어오게 줄인다(86px = 공통 틀의 토글 아래 빈 칸, 개편 단계 D — review-dock L3).
+   칸이 넉넉하면(태블릿) 그림 크기는 그대로다. */
+.ss-exp-layout.is-full .ss-view2d > .track2d { display: flex; flex-direction: column; max-height: max(120px, calc(100% - 86px)); }
+.ss-exp-layout.is-full .track2d > .track-svg { flex: 0 1 auto; min-height: 0; }
 
 /* 달리기 표시(3D·2D 공통) */
 .run-timer {
   position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 90px);
   padding: 6px 14px; border-radius: 999px; background: rgba(20, 30, 45, 0.85); color: #fff; font-weight: 700; font-size: 0.95rem;
   text-align: center; pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .track2d .run-timer { top: 4px; }
+/* 좁은 장면(폭 520px 미만)이나 낮은 3D 장면(높이 340px 미만) — app.js가 is-compact를 붙인다: 오른쪽 위에 한 줄로
+   (왼쪽 위 "모형" 배지·전체 화면 보기 토글과 겹치지 않고, 가운데 위의 자동차·📸 표시를 덜 가리게, 개편 단계 D).
+   한 줄에 안 들어가는 덧붙임 말(.rt-more)은 is-short일 때 화면에서만 숨긴다(화면 읽기 프로그램은 읽는다). */
+.run-timer.is-compact {
+  left: auto; right: 8px; top: 8px; transform: none; max-width: calc(100% - 84px);
+  padding: 4px 10px; font-size: 0.78rem; white-space: nowrap;
+}
+.track2d .run-timer.is-compact { top: 6px; }
+.run-timer.is-short .rt-more {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
 .photo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 4; }
 .photo-flash.is-on { animation: shutter 0.5s ease-out; }
 @keyframes shutter { 0% { opacity: 0.95; } 100% { opacity: 0; } }
@@ -85,7 +101,7 @@
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .ss-main { padding: 12px 12px 96px; }
-  .run-timer { font-size: 0.78rem; padding: 4px 10px; top: 8px; max-width: calc(100% - 64px); white-space: normal; }
+  .run-timer { font-size: 0.78rem; padding: 4px 10px; top: 8px; max-width: calc(100% - 64px); }
 }
 .ss-num-unit { white-space: nowrap; }
 .bar-box { max-width: 460px; margin: 0 auto; } /* 막대 두 개뿐이라 너무 커지지 않게 */

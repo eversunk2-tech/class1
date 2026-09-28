@@ -12,6 +12,13 @@
  *
  * 2026-09-22 개정(질문 축소·7분 기준): 이동 거리는 100 cm 하나(D)만 쓰고 거리 고르기를 없앴다.
  * 자동차 2대 × 1번 측정(평균 없음), 분석은 표 + 막대그래프 + 보기 2개, 정리하기에 결론 1개와 선택 한 줄(궁금한 점)만 둔다.
+ *
+ * 2026-09-27 개편 단계 D(spec.md 개정 4 — 저장 모양·측정값·문항은 그대로):
+ *   · 3D: 자동차 둘레의 자기 차선 바닥(보이지 않는 판)을 눌러도 그 자동차가 골라진다. 이미 고른 자동차를 다시 누르면 그대로(관찰 카드 유지).
+ *     2D: 차선 줄 아무 곳을 눌러도 그 자동차(버튼은 그대로).
+ *   · 3D 화면 맞춤 가운데를 내용 가운데로(FRAME), 출발선·결승선 이름표를 테이프 앞쪽 끝 — "↔ 100.0 cm"와 한 줄로
+ *     (자동차 이름표와 겹치거나 토글에 가리지 않게). 휴대폰 가로에서는 초시계를 작게, 크게 보기의 2D는 초시계를 오른쪽 위로(style.css).
+ *   · 기록 뒤 다음 자동차를 고르지 않는 것은 공통 틀이 한다(앱에는 원래 자동 고르기가 없음).
  */
 (function () {
   "use strict";
@@ -364,16 +371,24 @@
     track.appendChild(finishLine);
     var cars = {};
     C.cars.forEach(function (c, i) {
-      var lane = el("div", { class: "t2-lane t2-lane-" + (i + 1) });
+      // 이미 고른 자동차를 다시 누르면 그대로 둔다(다시 고르면 공통 틀이 관찰 카드를 닫는다 — 3D와 같은 가드)
+      function pickCar() {
+        if (selNow.car !== c.id) ctx.onPick({ car: c.id });
+      }
+      // 차선(자동차가 달리는 줄) 아무 곳을 눌러도 그 자동차가 골라진다(단계 D, spec §3.3 — 버튼은 그대로, 마우스·손가락용 덧붙임)
+      var lane = el("div", {
+        class: "t2-lane t2-lane-" + (i + 1),
+        onclick: function (e) {
+          if (!b.contains(e.target)) pickCar();
+        },
+      });
       var b = el(
         "button",
         {
           type: "button",
           class: "t2-car car-" + c.id,
           "aria-label": c.name + " 고르기",
-          onclick: function () {
-            ctx.onPick({ car: c.id });
-          },
+          onclick: pickCar,
         },
         [el("span", { class: "t2-car-mark", "aria-hidden": "true", text: c.mark }), el("span", { class: "t2-car-name", text: c.short })]
       );
@@ -494,15 +509,24 @@
   /* ───────── 3D 화면 ───────── */
   var U = 10; // 1 단위 = 10 cm
   var START_X = -8;
+  // 화면 맞춤(단계 D): 거리 고르기(50·150 cm)를 없앤 뒤 결승선 오른쪽이 비어 장면이 왼쪽으로 쏠려 있었다(자동차 이름표가
+  // 왼쪽 위 토글에 가리고 왼쪽 끝에서 잘림). 가로 크기(width 22)·앞뒤 자리(z 0.3)는 그대로 두고 가운데를 내용(자동차 이름표
+  // 왼쪽 끝 ~ 결승선)의 가운데로 옮겼다. depth 9 → 12는 가로로 아주 긴 칸(휴대폰 가로)에서만 쓰인다(그 밖의 크기는 width가
+  // 거리를 정해 그대로) — 낮은 칸에서 위쪽 줄자 이름표·아래쪽 출발선/결승선 이름표 줄이 칸 끝·드래그 안내 줄에 닿지 않게.
+  var CENTER_X = -3.8;
+  var FRAME = { width: 22, depth: 12, center: [CENTER_X, 0, 0.3] };
   function fx(cm) {
     return START_X + cm / U;
   }
   function build3D(container, ctx) {
+    var selCar = null; // 지금 고른 자동차(highlight가 알려 준다)
     return S.Sim3D.create({
       container: container,
-      frame: { width: 22, depth: 9, center: [-0.6, 0, 0.3] },
+      frame: FRAME,
       onPick: function (p) {
-        ctx.onPick(p);
+        // 이미 고른 자동차를 다시 누르면 그대로 둔다(다시 고르면 공통 틀이 관찰 카드를 닫는다 — review-D1 L2와 같은 가드).
+        // 실행 중 누르기는 공통 틀이 무시한다.
+        if (p && p.car && p.car !== selCar) ctx.onPick(p);
       },
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -517,7 +541,7 @@
 
       // 교실 바닥(모형)
       var floor = M.table(32, 16, 0xd9c7a3);
-      floor.position.x = -0.6;
+      floor.position.x = CENTER_X;
       v.root.add(floor);
       v.onThemeChange(function (dark) {
         floor.material.color.set(dark ? 0x5b5042 : 0xd9c7a3);
@@ -531,8 +555,12 @@
       var startTape = tape(0x2f6fd6);
       startTape.position.set(START_X, 0.015, 0);
       v.root.add(startTape);
+      // 출발선·결승선 이름표는 테이프의 앞쪽 끝(보는 사람 쪽) — 거리 표시 "↔ 100.0 cm"와 한 줄(단계 D: 뒤쪽 끝에 두었을 때
+      // "출발선" 이름표가 초록색 자동차 이름표에 겹치고, 좁은 화면에서는 왼쪽 위 토글에 가렸다)
+      var LINE_LABEL_Z = 3.85;
       var startLabel = M.label("출발선", { height: 1.0, bold: true, border: "#2f6fd6" });
-      startLabel.position.set(START_X, 0.6, -3.9);
+      startLabel.name = "label:출발선";
+      startLabel.position.set(START_X, 0.6, LINE_LABEL_Z);
       v.root.add(startLabel);
 
       var finishGroup = new T.Group();
@@ -540,7 +568,8 @@
       finishTape.position.y = 0.015;
       finishGroup.add(finishTape);
       var finishLabel = M.label("결승선", { height: 1.0, bold: true, border: "#d8434f" });
-      finishLabel.position.set(0, 0.6, -3.9);
+      finishLabel.name = "label:결승선";
+      finishLabel.position.set(0, 0.6, LINE_LABEL_Z);
       finishGroup.add(finishLabel);
       v.root.add(finishGroup);
 
@@ -552,6 +581,7 @@
       var dimLabels = {};
       [D].forEach(function (d) {
         var l = M.label("↔ " + distLabel(d), { height: 0.95, bold: true });
+        l.name = "label:거리";
         l.position.set(fx(d / 2), 0.5, 3.75);
         l.visible = false;
         v.root.add(l);
@@ -573,6 +603,7 @@
       tapeCase.position.set(fx(75), 0, -5.2);
       v.root.add(tapeCase);
       var tapeLabel = M.label("줄자(말아서 보관)", { height: 0.7 });
+      tapeLabel.name = "label:줄자";
       tapeLabel.position.set(fx(75), 0.95, -5.2);
       v.root.add(tapeLabel);
 
@@ -613,6 +644,7 @@
         keyWing.position.set(-BODY_L - 0.28, 0.5, 0);
         g.add(keyStem, keyWing);
         var tag = M.label(c.mark + " " + c.name, { height: 0.9, bold: true, border: c.color });
+        tag.name = "label:" + c.name;
         tag.position.set(-BODY_L / 2, 1.75, 0);
         g.add(tag);
         // 고른 자동차 표시(바닥의 고리)
@@ -622,9 +654,16 @@
         ring.position.set(-BODY_L / 2, 0.03, 0);
         ring.visible = false;
         g.add(ring);
+        // 누르기 자리(단계 D, spec §3.3): 자동차 둘레의 자기 차선 바닥도 누르면 그 자동차가 골라진다(차를 조금 빗나가 눌러도).
+        // 보이지 않는 얇은 판(투명 재질 — 모양은 그대로)이 자동차와 함께 움직인다. 두 차선 사이 가운데 줄에서 나뉜다.
+        // 차선 전체가 아니라 자동차 둘레만: 두 번 탭(처음 방향)을 빈 트랙에 할 때 다른 자동차가 골라지지 않게.
+        // 크기(모형 1 = 10 cm): 몸체 뒤 1.1(태엽 열쇠 뒤 약 0.8) ~ 앞부분 앞 1.3, 옆으로 두 차선 가운데 줄 0.1 앞까지(폭 2.8).
+        var zone = new T.Mesh(new T.BoxGeometry(BODY_L + 2.4, 0.02, 2.8), new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+        zone.position.set(-BODY_L / 2 + 0.1, 0.01, 0);
+        g.add(zone);
         g.position.set(START_X, 0, LANE_Z[c.id]);
         v.root.add(g);
-        v.pickable(g, { car: c.id });
+        v.pickable(g, { car: c.id }); // 몸체·지붕·바퀴·이름표·누르기 자리(자식)까지
         cars[c.id] = { group: g, wheels: wheels, ring: ring, tag: tag, spin: 0 };
       });
 
@@ -691,6 +730,7 @@
         whenVisible: v.whenVisible,
         highlight: function (s) {
           rememberSel(s);
+          selCar = s.car || null;
           CAR_IDS.forEach(function (id) {
             cars[id].ring.visible = s.car === id;
           });

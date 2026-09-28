@@ -8,6 +8,10 @@
  * 2026-09-22 slim-review 반영(v3): 학생은 파랑·초록 두 대만 실행한다. 빨강·노랑은 교과서 예시 값으로 표에 미리 채운다(실행은 선택).
  * 2026-09-22 측정 단순화(v4): 자동차마다 이동 거리 1번·걸린 시간 1번만 읽는다(값은 처음부터 소수 첫째 자리: 122.0 cm·5.0초, 100.0 cm·4.2초).
  *   계산기에 '이동 거리 ÷ 걸린 시간'을 직접 누르면 결과를 소수 첫째 자리로 바로 보여 준다(학생이 반올림하지 않는다).
+ * 2026-09-27 개편 단계 D(spec.md 개정 4 — 저장 키·저장 모양·detail·qa는 그대로): 3D 장면 맞춤 범위를 옮겨 출발선 쪽 자동차 이름표가
+ *   잘리거나 토글에 닿지 않게, 달린 뒤 다가가는 과녁을 자동차 지붕 높이로(이름표가 초시계 표시 밑에 가리지 않게), '▼ 앞부분'의 ▼ 끝이
+ *   앞부분 눈금을 정확히 가리키게(3D·관찰 카드 줄자 그림), 장면 가장자리에 걸리거나 장면 위 표시에 가린 이름표는 그 순간 숨김,
+ *   이미 고른 자동차를 다시 눌러도 관찰 카드 유지, 장면 누르기 안내 글. 기록 뒤 다음 자동차를 고르는 것은 공통 틀도 앱도 하지 않는다.
  * 수치는 LessonConfig의 지도서 값만 쓴다(탐구 3·4의 예시 자료, 오차 없음). 자동차는 일정한 빠르기로 움직이는 모형이다.
  * 학생 입력은 모두 textContent/value로만 다룬다(innerHTML을 쓰지 않는다).
  */
@@ -241,7 +245,11 @@
     if (ph === 2) s.appendChild(svg("line", { x1: x(P2.distance), x2: x(P2.distance), y1: 88, y2: 100, stroke: "#7b3fa0", "stroke-width": 6 }));
     // 앞부분 표시선
     s.appendChild(svg("line", { x1: x(d), x2: x(d), y1: 22, y2: 140, stroke: "#c2185b", "stroke-width": 3, "stroke-dasharray": "7 5" }));
-    s.appendChild(svg("text", { x: x(d), y: 18, "text-anchor": "middle", class: "zoom-front" }, ph === 2 ? "▼ 앞부분(결승선에 닿은 순간)" : "▼ 앞부분"));
+    // "▼"는 표시선 바로 위 가운데, 글자는 그 옆에 따로(단계 D — 예전에는 "▼ 앞부분" 전체가 가운데 정렬이라 "▼"가 표시선보다 왼쪽이었다).
+    // 1단계 "앞부분"은 오른쪽, 2단계의 긴 글은 그림 밖으로 넘치지 않게 왼쪽(자동차 위 빈 곳)에 둔다.
+    s.appendChild(svg("text", { x: x(d), y: 18, "text-anchor": "middle", class: "zoom-front" }, "▼"));
+    if (ph === 2) s.appendChild(svg("text", { x: x(d) - 14, y: 18, "text-anchor": "end", class: "zoom-front" }, "앞부분(결승선에 닿은 순간)"));
+    else s.appendChild(svg("text", { x: x(d) + 14, y: 18, "text-anchor": "start", class: "zoom-front" }, "앞부분"));
     return el("figure", { class: "zoom" }, [s, el("figcaption", { class: "ss-help", text: "🔍 줄자 확대(모형) — 숫자는 cm, 작은 눈금 한 칸은 0.1 cm(1 mm)" })]);
   }
   function stopwatchFace(sec, caption) {
@@ -417,7 +425,8 @@
     view: {
       build3D: build3D,
       build2D: build2D,
-      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향",
+      // 장면의 자동차(차체·운전석)나 그 차선을 눌러도 고를 수 있음을 알린다(단계 D — sci-6-1-2-4와 같은 말)
+      tip3D: "👆 드래그: 돌려 보기 · 두 손가락: 확대/축소 · 두 번 탭: 처음 방향 · 자동차를 눌러 고를 수도 있어요",
       tip2D: "2D 화면(위에서 본 모형)이에요. 자동차 이름을 눌러 고를 수 있어요.",
     },
     observe: observeCard,
@@ -490,6 +499,7 @@
     var hud = makeHud();
     var max = C.trackMaxCm;
     var lanes = {};
+    var selCar = null; // 지금 고른 자동차 — 다시 눌러도 관찰 카드가 닫히지 않게 그대로 둔다(3D와 같음)
     var list = el("div", { class: "t2-lanes", role: "group", "aria-label": "경주로(2D 모형)" });
     C.cars.forEach(function (c) {
       var ph = phaseOf(c.id);
@@ -513,6 +523,7 @@
           type: "button",
           class: "t2-name",
           onclick: function () {
+            if (c.id === selCar) return;
             ctx.onPick({ car: c.id });
           },
         },
@@ -539,6 +550,7 @@
     return {
       highlight: function (s) {
         rememberSel(s);
+        selCar = s.car || null;
         if (s.car !== lastRun) hud.hide(); // 다른 자동차를 고르면 지난 초시계 값을 치운다
         Object.keys(lanes).forEach(function (id) {
           lanes[id].lane.classList.toggle("is-sel", s.car === id);
@@ -622,11 +634,34 @@
     tex.anisotropy = 8;
     return tex;
   }
+  // "▼ …" 이름표에서 "▼" 가운데가 이름표 너비의 어디쯤인지(0~1) — 공통 틀 label()이 그린 캔버스를 그 글꼴 그대로 잰다
+  // (한 줄 가운데 정렬). 잴 수 없으면 0.5(가운데).
+  function triCenter(sp, text) {
+    try {
+      var cv = sp.material.map.image;
+      var g = cv.getContext("2d");
+      var f = (cv.width / 2 - g.measureText(text).width / 2 + g.measureText("▼").width / 2) / cv.width;
+      return f > 0 && f < 1 ? f : 0.5;
+    } catch (e) {
+      return 0.5;
+    }
+  }
+  // 화면 맞춤 범위(단계 D, 2026-09-27): 출발선 왼쪽에 선 자동차의 이름표가 장면 왼쪽 끝에서 잘리거나(노랑) 왼쪽 위
+  // '⛶ 전체 화면 보기' 토글에 닿지 않게(빨강) 가운데를 왼쪽·뒤로 옮기고 조금 넓혔다(예전 width 19.2, center [-0.4, 0, 0.3] — review-A2 N5).
+  var FRAME3D = { width: 19.6, depth: 7.6, center: [-1.0, 0, -0.2] };
+  // 달린 뒤 다가가 보는 곳(과녁)의 높이·앞뒤: 자동차 지붕 높이쯤으로 올려, 자동차와 그 위 이름표가 장면 위쪽 초시계 표시(와 그 아래
+  // 이동 화살표 ▲) 밑에 가리지 않고 앞쪽 줄자도 보이게 한다(예전 과녁 높이 0, 차선 앞쪽 0.3 — 세로 화면에서 이름표가 초시계에 가렸다).
+  var CLOSE_Y = 0.7;
+  var CLOSE_DZ = 0.05;
   function build3D(container, ctx) {
+    var selCar = null; // 지금 고른 자동차(highlight에서 받는다)
     return S.Sim3D.create({
       container: container,
-      frame: { width: 19.2, depth: 7.6, center: [-0.4, 0, 0.3] },
+      frame: FRAME3D,
       onPick: function (p) {
+        // 이미 고른 자동차를 다시 누르면 공통 틀이 관찰 카드를 닫는다(select → afterSelect) — 읽던 값·계산기를 잃지 않게 그대로 둔다
+        // (단계 D, sci-6-2-2-4·6-2-3-1과 같음). 실행 중 누르기는 공통 틀이 무시하고, 잠긴 자동차는 공통 틀이 잠김 알림을 띄운다.
+        if (!p || !p.car || p.car === selCar) return;
         ctx.onPick(p);
       },
       onLost: ctx.onLost,
@@ -662,18 +697,27 @@
         tape.position.set(X0 + trackLen / 2, 0.03, z + 0.52);
         v.root.add(tape);
       });
+      // 이름표(안 바뀌는 글만 — 값은 초시계 표시·관찰 카드에): 3D 칸 가장자리에 걸리거나(잘림) 장면 위 표시(토글·"모형" 배지·
+      // 초시계 표시·드래그 안내 글)에 가리면 그 순간에는 숨긴다(단계 D — 휴대폰·머리말을 편 크게 보기·확대처럼 칸이 좁을 때 잘리거나
+      // 가린 글자를 보이지 않게, sci-6-2-2-4와 같은 방식). 이동 화살표는 옅어서 넣지 않는다(spec 개정 8 보충).
+      var tags = [];
+      function tag(sp) {
+        sp.userData.want = true;
+        tags.push(sp);
+        return sp;
+      }
       // 출발선(색 테이프)
       var startLine = new T.Mesh(new T.BoxGeometry(0.12, 0.03, 6.1), M.material(0x2a2f38));
       startLine.position.set(X0, 0.03, 0.2);
       v.root.add(startLine);
-      var startL = M.label("출발선 (0 cm)", { height: 0.42 });
+      var startL = tag(M.label("출발선 (0 cm)", { height: 0.42 }));
       startL.position.set(X0, 0.35, 3.55);
       v.root.add(startL);
       // 100 cm 결승선(2단계 차선만)
       var finish = new T.Mesh(new T.BoxGeometry(0.12, 0.03, 2.9), M.material(0x7b3fa0));
       finish.position.set(X(P2.distance), 0.035, (LANE_Z.green + LANE_Z.yellow) / 2 + 0.05);
       v.root.add(finish);
-      var finL = M.label("결승선 100 cm (2단계)", { height: 0.42, border: "#7b3fa0" });
+      var finL = tag(M.label("결승선 100 cm (2단계)", { height: 0.42, border: "#7b3fa0" }));
       finL.position.set(X(P2.distance), 0.35, 3.55);
       v.root.add(finL);
       // 단계 이름(차선 끝)
@@ -681,7 +725,7 @@
         { text: "1단계: 5초 동안", z: (LANE_Z.red + LANE_Z.blue) / 2 },
         { text: "2단계: 100 cm까지", z: (LANE_Z.green + LANE_Z.yellow) / 2 },
       ].forEach(function (g) {
-        var l = M.label(g.text, { height: 0.42, bg: "rgba(255,255,255,0.85)", color: "#374151" });
+        var l = tag(M.label(g.text, { height: 0.42, bg: "rgba(255,255,255,0.85)", color: "#374151" }));
         l.position.set(X(max) - 0.9, 0.6, g.z);
         v.root.add(l);
       });
@@ -720,7 +764,7 @@
         key.add(loop);
         key.position.set(-0.45, 0.52, 0);
         g.add(key);
-        var lbl = M.label(c.name, { height: 0.5, border: c.color });
+        var lbl = tag(M.label(c.name, { height: 0.5, border: c.color }));
         lbl.position.set(0, 1.3, 0);
         g.add(lbl);
         g.position.set(X(0) - CAR_LEN / 2, 0, LANE_Z[c.id] - 0.12);
@@ -740,18 +784,82 @@
       selBox.position.y = 0.005;
       selBox.visible = false;
       v.root.add(selBox);
-      // 앞부분 표시(마지막으로 달린 자동차)
-      var frontMark = M.label("▼ 앞부분", { height: 0.36, bg: "rgba(255,255,255,0.95)", color: "#c2185b", border: "#c2185b" });
+      // 앞부분 표시(1단계 자동차가 5초 동안 달린 뒤): "▼"의 끝이 줄자의 앞부분 눈금을 정확히 가리키게 한다(단계 D — 예전에는 이름표
+      // 가운데가 앞부분이라 "▼"가 약 3 cm 왼쪽을 가리켰고, 이름표가 줄자 눈금 위를 덮었다). 기준점 = 줄자 안쪽 가장자리(눈금이 시작하는 곳),
+      // 이름표는 그 위(줄자를 덮지 않음)·"앞부분" 글자는 "▼" 오른쪽(자동차를 덮지 않음). 글자는 안 바뀌는 이름만(측정값은 관찰 카드).
+      var frontMark = tag(M.label("▼ 앞부분", { height: 0.36, bg: "rgba(255,255,255,0.95)", color: "#c2185b", border: "#c2185b", depthTest: false }));
+      frontMark.center.set(triCenter(frontMark, "▼ 앞부분"), 0);
+      frontMark.userData.want = false;
       frontMark.visible = false;
       v.root.add(frontMark);
+      var TAPE_EDGE = 0.52 - trackLen / 51.2 / 2; // 차선 가운데에서 줄자 안쪽 가장자리까지(z)
       function showFrontMark(id) {
         if (phaseOf(id) !== 1) {
-          frontMark.visible = false;
+          frontMark.userData.want = false;
           return;
         }
-        frontMark.position.set(X(truth(id).distance), 0.42, LANE_Z[id] + 0.52);
-        frontMark.visible = true;
+        frontMark.position.set(X(truth(id).distance), 0.04, LANE_Z[id] + TAPE_EDGE);
+        frontMark.userData.want = true;
       }
+
+      // 이름표가 3D 칸 가장자리에 걸리거나 장면 위 표시에 가리는가(화면 좌표로 재어 본다, 기준점 sp.center 반영)
+      var wp = new T.Vector3();
+      var cp = new T.Vector3();
+      var host = (container.closest && container.closest(".ss-exp-view")) || container;
+      var overlayRects = [];
+      var overlayAt = -1e9;
+      function overlays() {
+        var now = performance.now();
+        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
+        overlayAt = now;
+        overlayRects = [];
+        var cr = container.getBoundingClientRect();
+        function add(r) {
+          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
+        }
+        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .sw-hud, .ss-view-tip").forEach(function (el) {
+          if (el.closest("[hidden]") || !el.getClientRects().length) return;
+          if (el.classList.contains("ss-view-tip")) {
+            // 바탕 없는 안내 글은 글자 줄만
+            var rg = document.createRange();
+            rg.selectNodeContents(el);
+            [].forEach.call(rg.getClientRects(), add);
+          } else add(el.getBoundingClientRect());
+        });
+        return overlayRects;
+      }
+      function blocked(sp) {
+        sp.getWorldPosition(wp);
+        cp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
+        var dist = -cp.z;
+        if (dist <= v.camera.near) return true;
+        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
+        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
+        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
+        wp.project(v.camera);
+        var x0 = wp.x - wN * sp.center.x,
+          x1 = wp.x + wN * (1 - sp.center.x),
+          y0 = wp.y - hN * sp.center.y,
+          y1 = wp.y + hN * (1 - sp.center.y);
+        if (x0 < -0.995 || x1 > 0.995 || y0 < -0.995 || y1 > 0.995) return true; // 가장자리(잘림)
+        var cw = container.clientWidth || 1;
+        var ch = container.clientHeight || 1;
+        var l = ((x0 + 1) / 2) * cw,
+          r = ((x1 + 1) / 2) * cw,
+          t = ((1 - y1) / 2) * ch,
+          b = ((1 - y0) / 2) * ch;
+        var list = overlays();
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
+        }
+        return false;
+      }
+      v.scene.onBeforeRender = function () {
+        tags.forEach(function (sp) {
+          sp.visible = sp.userData.want !== false && !blocked(sp);
+        });
+      };
 
       var lastRun = null;
       v.render();
@@ -759,9 +867,10 @@
         whenVisible: v.whenVisible,
         highlight: function (s) {
           rememberSel(s);
+          selCar = s.car || null;
           if (s.car !== lastRun) {
             hud.hide(); // 다른 자동차를 고르면 지난 초시계 값과 앞부분 표시를 치운다
-            frontMark.visible = false;
+            frontMark.userData.want = false;
           }
           if (s.car) {
             selBox.position.set(laneMeshes[s.car].position.x, 0.005, laneMeshes[s.car].position.z);
@@ -773,7 +882,7 @@
           var id = sel.car;
           var plan = runPlan(id);
           var z = LANE_Z[id];
-          frontMark.visible = false;
+          frontMark.userData.want = false;
           lastRun = id;
           hud.show(0, "");
           try {
@@ -798,7 +907,8 @@
             hud.show(plan.stopAt, doneText(id));
             showFrontMark(id);
             var fx = phaseOf(id) === 1 ? X(plan.t.distance) : X(P2.distance);
-            await v.focus([fx, 0, z + 0.3], 0.42, 700);
+            // 다가가기(v.focus)는 지금 보는 방향 그대로 거리만 줄인다 — 좌우·출발선 쪽(왼쪽)이 뒤집히지 않는다(시작할 때 flyHome으로 처음 방향)
+            await v.focus([fx, CLOSE_Y, z + CLOSE_DZ], 0.42, 700);
           } finally {
             v.render();
           }
@@ -812,13 +922,14 @@
             setFront(c.id, 0);
             cars[c.id].key.rotation.y = 0;
           });
-          frontMark.visible = false;
+          frontMark.userData.want = false;
           lastRun = null;
           hud.hide();
           v.render();
         },
         resetView: v.resetView,
         dispose: function () {
+          v.scene.onBeforeRender = function () {};
           if (hud.node.parentNode) hud.node.parentNode.removeChild(hud.node);
           v.dispose();
         },

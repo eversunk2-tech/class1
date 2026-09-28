@@ -448,10 +448,14 @@
     if (s.from || s.to) exp.select(s);
   }
   // 정원판의 꽃을 눌렀을 때: 출발 꽃이 없으면 출발 꽃, 있으면 도착 꽃으로 고른다
+  // 단계 D: 실행 중 누르기는 알림 없이 무시하고, 지금 고른 도착 꽃을 다시 누르면 무시한다(다시 고르면 공통 틀이 관찰 카드를 닫아
+  // 적던 걸린 시간·문장이 사라지고 꿀벌을 다시 움직여야 했다).
   function onFlowerTap(ctx, id) {
     if (!F[id]) return;
+    if (typeof exp !== "undefined" && exp && exp.isBusy()) return;
     if (!curSel.from) ctx.onPick({ from: id });
     else if (curSel.from === id) toast("여기는 출발 꽃이에요. 도착할 꽃을 눌러 주세요. (출발 꽃을 바꾸려면 ① 버튼을 눌러요)", 3200);
+    else if (curSel.to === id) return;
     else ctx.onPick({ to: id });
   }
 
@@ -529,7 +533,9 @@
 
     var viewBox = el("div", { class: "g2-view" });
     var nodes = counterNodes(viewBox);
-    viewBox.appendChild(
+    // g2-fit: 크게 보기에서 정원판·범례를 장면 칸 높이에 맞추는 틀(단계 D — style.css). 기본 화면에서는 아무 일도 하지 않는다.
+    var fit = el("div", { class: "g2-fit" });
+    fit.appendChild(
       el("div", { class: "g2-frame" }, [
         el("span", { class: "g2-dir g2-up", text: "↑ 위쪽" }),
         el("span", { class: "g2-dir g2-left" }, [el("span", { text: "←" }), el("span", { text: "왼쪽" })]),
@@ -538,13 +544,14 @@
         el("span", { class: "g2-dir g2-down", text: "↓ 아래쪽" }),
       ])
     );
-    viewBox.appendChild(
+    fit.appendChild(
       el("p", { class: "g2-legend" }, [
         el("span", { class: "lg-item" }, [el("span", { class: "lg-ghost", "aria-hidden": "true", text: "🐝" }), " 흐린 꿀벌: 처음 위치"]),
         el("span", { class: "lg-item" }, [el("span", { "aria-hidden": "true", text: "🐝" }), " 진한 꿀벌: 나중 위치"]),
         el("span", { class: "lg-item" }, [el("span", { class: "g2-foot-sample", "aria-hidden": "true", text: "●" }), " 발자국: 꿀벌이 지나간 칸"]),
       ])
     );
+    viewBox.appendChild(fit);
     root.appendChild(viewBox);
 
     function place(node, x, y, instant) {
@@ -664,7 +671,9 @@
     var cz = (-(B.yMin + B.yMax) / 2) * CS;
     return S.Sim3D.create({
       container: container,
-      frame: { width: W + 3.2, depth: D + 3.2, center: [cx, 0, cz + 0.8] }, // 아래쪽 도움말 글자에 정원판이 덜 가리도록 조금 위로
+      // 아래쪽 도움말 글자에 정원판이 덜 가리도록 조금 위로. 단계 D: 세로 태블릿·크게 보기에서 뒤쪽 꽃(유채꽃)의 '나중 위치' 이름표가 장면 위
+      // 가장자리에서 잘리고 '↓ 아래쪽'이 드래그 안내 줄에 가려 세로 여유를 조금 더 둔다(depth +0.6 — 가로로 맞추는 화면은 그대로)
+      frame: { width: W + 3.2, depth: D + 3.8, center: [cx, 0, cz + 0.8] },
       onPick: function (id) {
         onFlowerTap(ctx, id);
       },
@@ -707,7 +716,7 @@
         v.root.add(s);
       }
       dirLabel("↑ 위쪽", cx, Z(B.yMax) - CS * 0.95);
-      dirLabel("↓ 아래쪽", cx, Z(B.yMin) + CS * 0.95);
+      dirLabel("↓ 아래쪽", cx, Z(B.yMin) + CS * 0.8); // 단계 D: 장면 아래 드래그 안내 줄에 덜 가리게 정원판 쪽으로 조금(전 0.95)
       dirLabel("← 왼쪽", X(B.xMin) - CS * 0.95, cz);
       dirLabel("오른쪽 →", X(B.xMax) + CS * 0.95, cz);
 
@@ -902,7 +911,7 @@
         g.rotation.y = Math.atan2(dy, dx);
       }
 
-      /* 발자국·처음/나중 위치 이름표·초 말풍선(잠깐 쓰는 물체는 discard로 해제) */
+      /* 발자국·처음/나중 위치 이름표(잠깐 쓰는 물체는 discard로 해제) */
       var temps = [];
       var footGeo = new T.CylinderGeometry(0.18, 0.18, 0.03, 16);
       var footMat = mat(0x8a4f0a); // 짙은 갈색: 주황 고리(도착 꽃)와 구별되게
@@ -926,28 +935,19 @@
       }
       function tag(text, pos, dark) {
         var s = M.label(text, { height: 0.6, bold: true, bg: dark ? "rgba(31,39,51,0.9)" : "rgba(255,255,255,0.8)", color: dark ? "#ffffff" : "#5b6676", depthTest: false });
-        // 꽃 이름표보다 높이 띄워 발자국·꽃 이름을 덮지 않게 한다
-        s.position.set(pos[0], pos[1] + 2.4, pos[2]);
+        // 꽃 이름표보다 높이 띄워 발자국·꽃 이름을 덮지 않게 한다(단계 D: 2.4 → 1.95 — 꽃 이름표 위 틈은 남기고, 뒤쪽 꽃(유채꽃)에서
+        // 장면 위 가장자리에 잘리지 않게)
+        s.position.set(pos[0], pos[1] + 1.95, pos[2]);
         v.root.add(s);
         temps.push(s);
         return s;
       }
-      var bubble = null;
-      function setBubble(text) {
-        if (bubble) {
-          v.discard(bubble);
-          bubble = null;
-        }
-        if (!text) return;
-        bubble = M.label(text, { height: 0.5, bold: true, bg: "rgba(255,248,214,0.96)", border: "#f2a93b", depthTest: false });
-        bubble.position.set(0, 0.75, 0);
-        bee.add(bubble);
-      }
+      // (단계 D) 꿀벌 위 말풍선("출발!"·"1초"·"2초"…)은 없앴다 — 바뀌는 값(초)을 3D 이름표로 띄우지 않는다(CLAUDE.md "장면 속 글자":
+      // 말풍선이 출발 꽃의 이름표를 덮었다). 같은 값은 장면 왼쪽 위 초 표시(DOM, .bee-counter)에 그대로 나온다.
       function clearTrail() {
         temps.splice(0).forEach(function (o) {
           v.discard(o);
         });
-        setBubble(null);
         ghost.visible = false;
         shown = null;
       }
@@ -1025,7 +1025,6 @@
           face(bee, path[0].x - F[a].x, path[0].y - F[a].y);
           await v.flyHome(350);
           setCounter(nodes.counter, "⏱ 0초 · 출발! (⏩ 빨리 감기)");
-          setBubble("출발!");
           await v.wait(600);
           if (my !== anim || v.isDisposed()) return;
           var pa = beePos(F[a].x, F[a].y);
@@ -1049,7 +1048,6 @@
             if (my !== anim || v.isDisposed()) return;
             footAt(c);
             setCounter(nodes.counter, "⏱ " + (i + 1) + "초 (⏩ 빨리 감기)");
-            setBubble(i + 1 + "초");
             prev = c;
           }
           beeAt = b;
@@ -1063,7 +1061,6 @@
           });
           bee.scale.setScalar(BEE_S);
           if (my !== anim || v.isDisposed()) return;
-          setBubble(null);
           tag("나중 위치", beePos(F[b].x, F[b].y), true);
           setCounter(nodes.counter, "🏁 도착! 몇 초가 걸렸나요?");
           v.render();

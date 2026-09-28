@@ -349,6 +349,12 @@
     if (s.scene) store.set("curSel", curSel);
     drawOverview();
   }
+  // 장면(3D·2D)에서 물체를 눌렀을 때: 지금 고른 물체를 다시 누르면 무시한다(단계 D — 다시 고르면 공통 틀이 관찰 카드를 닫아
+  // 찍은 사진과 고른 보기가 사라지고 5초를 다시 기다려야 했다). 실행 중 누르기는 공통 틀이 무시한다.
+  function pickFromScene(ctx, p) {
+    if (!p || (p.scene === curSel.scene && p.obj === curSel.obj)) return;
+    ctx.onPick(p);
+  }
   function firstOpenScene() {
     for (var i = 0; i < C.scenes.length; i++) if (!exp.phaseDone(C.scenes[i].id)) return C.scenes[i].id;
     return C.scenes[0].id;
@@ -827,7 +833,7 @@
           var q = P2(d[0], 0, d[2]);
           var dg = svgEl("g", { transform: "translate(" + q[0] + "," + q[1] + ") scale(" + S2 + ")", class: "pick2d" }, [desk2d()]);
           dg.addEventListener("click", function () {
-            ctx.onPick({ scene: "A", obj: "desk" });
+            pickFromScene(ctx, { scene: "A", obj: "desk" });
           });
           svg.appendChild(dg);
         });
@@ -851,7 +857,7 @@
         it.g.setAttribute("class", "pick2d");
         it.g.setAttribute("tabindex", "-1");
         it.g.addEventListener("click", function () {
-          ctx.onPick({ scene: sc, obj: x.o.id });
+          pickFromScene(ctx, { scene: sc, obj: x.o.id });
         });
         // 이름표(모든 물체에 똑같이 — 움직이는 물체만 따로 표시하지 않는다)
         it.lbl = svgEl("text", { class: "lbl2d", "text-anchor": "middle", "font-size": "0.4" }, [document.createTextNode(x.o.name)]);
@@ -912,7 +918,8 @@
           if (shown === sc) applyTime(sc);
           if (k < 1) requestAnimationFrame(frame);
         })();
-        await S.Countdown.run(wrap, WAIT, { label: "초 뒤에 사진 2를 찍어요", note: "실제 시간 " + WAIT + "초 (초시계)" });
+        // 초시계는 그림 밖 장면 칸 윗줄(토글 오른쪽)에 — 그림 안 오른쪽 위에 두면 벽시계(시곗바늘)를 덮었다(단계 D)
+        await S.Countdown.run(root, WAIT, { label: "초 뒤에 사진 2를 찍어요", note: "실제 시간 " + WAIT + "초 (초시계)" });
         stop = true;
         sceneTime[sc] = t0 + WAIT;
         saveTime();
@@ -947,7 +954,7 @@
       frame: FRAME,
       viewDir: [0, 0.62, 0.79],
       onPick: function (p) {
-        ctx.onPick(p);
+        pickFromScene(ctx, p);
       },
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -963,10 +970,14 @@
     var cur = null; // { id, group, objs: { id: { target, radius, update(t) } } }
     var selObj = null;
 
-    // 선택 표시: 아래를 가리키는 화살표 + 이름표(장면을 바꿔도 남는다)
+    // 선택 표시: 물체를 가리키는 화살표 + 이름표(장면을 바꿔도 남는다).
+    // 단계 D(2026-09-27): 늘 물체 위에 두면 벽시계·창문·등대·비행기처럼 높은 물체는 장면 위 가장자리에서 잘리고, 왼쪽 위 물체는
+    // '모형' 배지·"전체 화면 보기" 토글에 가렸다 → 물체 위에 둘 자리가 3D 칸 안에서 가리는 것 없이 보이지 않으면 물체 아래(화살표가
+    // 위를 가리킴)로 옮긴다(placeSel). 화살표·이름표는 다른 물체에 가리지 않게 늘 위에 그린다(depthTest: false — 화면 표시 구실).
     var selGroup = new T.Group();
-    var arrow = new T.Mesh(new T.ConeGeometry(0.28, 0.6, 16), new T.MeshBasicMaterial({ color: 0xe8590c }));
+    var arrow = new T.Mesh(new T.ConeGeometry(0.28, 0.6, 16), new T.MeshBasicMaterial({ color: 0xe8590c, depthTest: false }));
     arrow.rotation.x = Math.PI;
+    arrow.renderOrder = 11;
     selGroup.add(arrow);
     var selLabel = null;
     selGroup.visible = false;
@@ -1523,6 +1534,98 @@
       var c = b.getCenter(new T.Vector3());
       return c;
     }
+    /* 고른 물체 표시 자리(단계 D) — 물체 위(기본) 또는 아래.
+     * 화면에서 화살표·이름표가 차지할 자리를 재서, 3D 칸 밖으로 잘리거나 장면 위 표시(모형 배지·토글·초시계·드래그 안내 글·
+     * 이동 화살표)와 겹치면 반대쪽을 쓴다(둘 다 안 되면 덜 가리는 쪽). 이름표는 좁은 화면에서도 읽히게 화면에서 LABEL_MIN_PX보다
+     * 작아지지 않게 키운다. 카메라가 움직이거나(돌리기·확대·이동 화살표·처음 방향으로) 칸 크기가 바뀌어도 다시 잰다. */
+    var LABEL_H = 0.62;
+    var LABEL_MIN_PX = 22;
+    var CONE_H = 0.6;
+    var CONE_R = 0.28;
+    var viewBox = container.closest(".ss-exp-view") || container;
+    var tmpV = new T.Vector3();
+    var camFwd = new T.Vector3();
+    function shown(n) {
+      // 장면 칸 안에서만 본다(장면 칸 자체가 안 보이면 placeSel이 먼저 그만둔다)
+      for (var e = n; e && e.nodeType === 1 && e !== viewBox.parentElement; e = e.parentElement) {
+        if (e.hidden) return false;
+        var cs = getComputedStyle(e);
+        if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return false;
+      }
+      return true;
+    }
+    // 이름표·화살표가 피할 장면 위 표시들(화면 px 사각형)
+    function blockers() {
+      var out = [];
+      function add(n) {
+        if (!n || !shown(n)) return;
+        var r = n.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) out.push(r);
+      }
+      add(viewBox.querySelector(".ss-view-badge"));
+      add(viewBox.querySelector(".ss-scene-toggle"));
+      add(container.querySelector(".ss-countdown"));
+      viewBox.querySelectorAll(".ss-pan-btn").forEach(add);
+      var tip = viewBox.querySelector(".ss-view-tip");
+      if (tip && shown(tip)) {
+        var rg = document.createRange();
+        rg.selectNodeContents(tip); // 드래그 안내는 바탕이 없는 글이라 글자 줄만 피한다
+        [].forEach.call(rg.getClientRects(), function (r) {
+          if (r.width > 0 && r.height > 0) out.push(r);
+        });
+      }
+      return out;
+    }
+    function toScreen(p, cr) {
+      var q = v.project([p.x, p.y, p.z]);
+      return { x: cr.left + q.x * cr.width, y: cr.top + q.y * cr.height };
+    }
+    function pxPerUnit(p, cr) {
+      var d = tmpV.copy(p).sub(v.camera.position).dot(camFwd);
+      return d > 0.01 ? cr.height / (2 * d * Math.tan((v.camera.fov * Math.PI) / 360)) : 0;
+    }
+    // 한쪽(side: 1 = 위, -1 = 아래) 자리: 화살표·이름표의 장면 좌표와 화면 사각형
+    function layoutAt(b, c, side, cr, labelH) {
+      var edge = side > 0 ? b.max.y : b.min.y;
+      var coneC = edge + side * (0.25 + CONE_H / 2);
+      var labC = edge + side * (0.25 + CONE_H + 0.19 + labelH / 2);
+      var a0 = toScreen(tmpV.set(c.x, coneC - CONE_H / 2, c.z), cr);
+      var a1 = toScreen(tmpV.set(c.x, coneC + CONE_H / 2, c.z), cr);
+      var k = pxPerUnit(tmpV.set(c.x, coneC, c.z), cr);
+      var cw = CONE_R * k;
+      var lp = toScreen(tmpV.set(c.x, labC, c.z), cr);
+      var lk = pxPerUnit(tmpV.set(c.x, labC, c.z), cr);
+      var lh = (labelH * lk) / 2;
+      var lw = selLabel ? (lh * selLabel.scale.x) / selLabel.scale.y : 0;
+      // 물체가 장면 왼쪽·오른쪽 끝에 있으면 이름표만 칸 안쪽으로 옆으로 민다(화살표는 물체 위 그대로)
+      var shift = 0;
+      if (selLabel && 2 * lw < cr.width - 8) {
+        if (lp.x - lw < cr.left + 4) shift = cr.left + 4 - (lp.x - lw);
+        else if (lp.x + lw > cr.right - 4) shift = cr.right - 4 - (lp.x + lw);
+      }
+      var rects = [{ left: Math.min(a0.x, a1.x) - cw, right: Math.max(a0.x, a1.x) + cw, top: Math.min(a0.y, a1.y), bottom: Math.max(a0.y, a1.y) }];
+      if (selLabel) rects.push({ left: lp.x - lw + shift, right: lp.x + lw + shift, top: lp.y - lh, bottom: lp.y + lh });
+      return { side: side, coneC: coneC, labC: labC, rects: rects, shiftPx: shift, lk: lk, ok: k > 0 && lk > 0 };
+    }
+    // 가리거나 잘리는 넓이(px²) — 0이면 깨끗
+    function badness(L, cr, obs) {
+      if (!L.ok) return Infinity;
+      var M = 3;
+      var bad = 0;
+      L.rects.forEach(function (r) {
+        var w = r.right - r.left;
+        var h = r.bottom - r.top;
+        var iw = Math.max(0, Math.min(r.right, cr.right - M) - Math.max(r.left, cr.left + M));
+        var ih = Math.max(0, Math.min(r.bottom, cr.bottom - M) - Math.max(r.top, cr.top + M));
+        bad += w * h - iw * ih; // 3D 칸 밖(잘림)
+        obs.forEach(function (o) {
+          var ow = Math.min(r.right, o.right + 2) - Math.max(r.left, o.left - 2);
+          var oh = Math.min(r.bottom, o.bottom + 2) - Math.max(r.top, o.top - 2);
+          if (ow > 0 && oh > 0) bad += ow * oh;
+        });
+      });
+      return bad;
+    }
     function placeSel() {
       if (!cur || !selObj || !cur.objs[selObj]) {
         selGroup.visible = false;
@@ -1531,10 +1634,39 @@
       var ent = cur.objs[selObj];
       var b = new T.Box3().setFromObject(ent.target);
       var c = b.getCenter(new T.Vector3());
-      arrow.position.set(c.x, b.max.y + 0.55, c.z);
-      if (selLabel) selLabel.position.set(c.x, b.max.y + 1.35, c.z);
+      var cr = container.getBoundingClientRect();
+      var labelH = LABEL_H;
+      var L = null;
+      if (cr.width > 0 && cr.height > 0) {
+        v.camera.updateMatrixWorld();
+        v.camera.getWorldDirection(camFwd);
+        if (selLabel) {
+          var k0 = pxPerUnit(tmpV.set(c.x, b.max.y + 1.35, c.z), cr);
+          if (k0 > 0) labelH = Math.max(LABEL_H, LABEL_MIN_PX / k0);
+        }
+        var obs = blockers();
+        var up = layoutAt(b, c, 1, cr, labelH);
+        var upBad = badness(up, cr, obs);
+        L = up;
+        if (upBad > 0) {
+          var down = layoutAt(b, c, -1, cr, labelH);
+          if (badness(down, cr, obs) < upBad) L = down;
+        }
+      }
+      var side = L ? L.side : 1;
+      arrow.rotation.x = side > 0 ? Math.PI : 0; // 위에 있으면 아래를, 아래에 있으면 위를 가리킨다
+      arrow.position.set(c.x, L ? L.coneC : b.max.y + 0.55, c.z);
+      if (selLabel) {
+        selLabel.scale.set((labelH * selLabel.scale.x) / selLabel.scale.y, labelH, 1);
+        selLabel.position.set(c.x, L ? L.labC : b.max.y + 1.35, c.z);
+        if (L && L.shiftPx) selLabel.position.addScaledVector(tmpV.set(1, 0, 0).applyQuaternion(v.camera.quaternion), L.shiftPx / L.lk);
+      }
       selGroup.visible = true;
     }
+    // 카메라가 움직이거나(돌리기·확대·이동 화살표·트윈) 3D 칸 크기가 바뀌면 표시 자리를 다시 잰다
+    v.controls.addEventListener("change", placeSel);
+    var selRO = typeof ResizeObserver === "function" ? new ResizeObserver(placeSel) : null;
+    if (selRO) selRO.observe(container);
     function setSel(id) {
       if (selObj === id && (id == null || selLabel)) {
         placeSel();
@@ -1612,6 +1744,61 @@
     function shoot(ent, pose) {
       return v.snapshot({ pose: pose, width: 560, marks: [markFor(ent, pose)], hide: [selGroup] });
     }
+    // 초시계 자리(단계 D): 공통 틀은 3D 칸 오른쪽 위에 둔다. 고른 물체가 초시계가 도는 동안 있을(지나갈) 화면 자리를 가리면
+    // 오른쪽 아래(드래그 안내 줄 위)로 옮긴다(둘 다 가리면 덜 가리는 쪽) — "장면을 잘 지켜보세요" 동안 그 물체가 보이게
+    // (세로 태블릿에서 비행기, 휴대폰에서 벽시계·갈매기를 덮었다). 사진에는 초시계가 찍히지 않는다.
+    function pathBox(ent, sc, from, secs) {
+      var cr = container.getBoundingClientRect();
+      var keep = sceneTime[sc];
+      var n = MOVERS[selObj] ? 6 : 1;
+      var box = null;
+      for (var i = 0; i < n; i++) {
+        sceneTime[sc] = from + (n > 1 ? (secs * i) / (n - 1) : 0);
+        applyTime();
+        var b = new T.Box3().setFromObject(ent.target);
+        for (var k = 0; k < 8; k++) {
+          var q = v.project([k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, k & 4 ? b.max.z : b.min.z]);
+          var x = cr.left + q.x * cr.width;
+          var y = cr.top + q.y * cr.height;
+          if (!box) box = { left: x, right: x, top: y, bottom: y };
+          else {
+            box.left = Math.min(box.left, x);
+            box.right = Math.max(box.right, x);
+            box.top = Math.min(box.top, y);
+            box.bottom = Math.max(box.bottom, y);
+          }
+        }
+      }
+      sceneTime[sc] = keep;
+      applyTime();
+      return box;
+    }
+    function placeCountdown(ent, sc, from, secs) {
+      var list = container.querySelectorAll(".ss-countdown");
+      var cdEl = list[list.length - 1];
+      if (!cdEl || !ent) return;
+      var box = pathBox(ent, sc, from, secs);
+      var cr = container.getBoundingClientRect();
+      var r = cdEl.getBoundingClientRect();
+      if (!box || !(r.height > 0)) return;
+      var floor = cr.bottom - 8;
+      var tip = viewBox.querySelector(".ss-view-tip");
+      if (tip && shown(tip)) {
+        var tr = tip.getBoundingClientRect();
+        if (tr.height > 0) floor = Math.min(floor, tr.top - 6);
+      }
+      var low = { left: r.left, right: r.right, top: floor - r.height, bottom: floor };
+      function cover(a) {
+        var w = Math.min(a.right, box.right) - Math.max(a.left, box.left);
+        var h = Math.min(a.bottom, box.bottom) - Math.max(a.top, box.top);
+        return w > 0 && h > 0 ? w * h : 0;
+      }
+      if (low.top > r.bottom && cover(low) < cover(r)) {
+        cdEl.style.top = "auto";
+        cdEl.style.bottom = Math.round(cr.bottom - floor) + "px";
+        placeSel(); // 고른 물체 표시가 바뀐 초시계 자리를 피하게
+      }
+    }
 
     showScene(firstOpenScene());
     v.render();
@@ -1638,7 +1825,9 @@
           var need = secondsUntilFramed(ent, sc, pose);
           if (need > 0) {
             var tw = sceneTime[sc];
-            var cdw = S.Countdown.run(container, need, { label: "초 뒤에 사진 1을 찍어요", note: "고른 물체가 화면 안에 들어올 때까지 기다려요 (실제 시간)" });
+            // 안내 글은 '물체가 들어온다'(= 움직인다)는 말을 하지 않는다(단계 D — 답을 먼저 알려 주지 않기)
+            var cdw = S.Countdown.run(container, need, { label: "초 뒤에 사진 1을 찍어요", note: "사진 1을 찍기 좋은 때를 기다려요 (실제 시간)" });
+            placeCountdown(ent, sc, sceneTime[sc], need);
             v.tween(need * 1000, function (e, lin) {
               if (!cur || cur.id !== sc) return;
               sceneTime[sc] = tw + need * lin;
@@ -1654,6 +1843,7 @@
         shutterFlash(container);
         var t0 = sceneTime[sc];
         var cd = S.Countdown.run(container, WAIT, { label: "초 뒤에 사진 2를 찍어요", note: "실제 시간 " + WAIT + "초 (초시계)" });
+        placeCountdown(ent, sc, t0, WAIT);
         v.tween(WAIT * 1000, function (e, lin) {
           if (!cur || cur.id !== sc) return;
           sceneTime[sc] = t0 + WAIT * lin;
@@ -1697,6 +1887,8 @@
       },
       resetView: v.resetView,
       dispose: function () {
+        if (selRO) selRO.disconnect();
+        v.controls.removeEventListener("change", placeSel);
         v.dispose();
       },
     };

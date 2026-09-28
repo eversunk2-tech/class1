@@ -8,6 +8,8 @@
  * 개정(2026-09-22, 질문 축소·7분 기준): 관찰 시간은 교과서 값 5초 하나, 한 번 달려 두 자동차 거리를 함께 기록한다.
  * 개정 3(측정 1회·소수 첫째 자리): 무작위 오차·눈금 읽기·반올림 입력·확대 화면·다시 확인 안내를 뺐다.
  *   측정 버튼이 지도서 값(135.0 / 122.0 cm)을 소수 첫째 자리로 보여 주고, 그 값을 그대로 기록한다.
+ * 개정 4(개편 단계 D, 2026-09-27 — 화면만, 저장 모양 그대로): 좁거나 낮은 장면의 달리기 표시를 오른쪽 위 한 줄로, 3D 이름표가 잘리거나
+ *   장면 위 표시에 가리면 그 순간 숨김, 빨간색 '📸 사진 속 위치' 표시를 조금 높게, 화면 맞춤 가운데·낮은 칸 다가가기 거리, 2D + 크게 보기 맞춤.
  *
  * 과학 원칙
  *  - 두 자동차는 동시에 출발해 5초 동안 '실제 시간'대로 달리고, 그 시간이 된 '순간' 사진을 찍는다.
@@ -264,8 +266,12 @@
     );
   }
 
-  /* ───────── 3D·2D 공통: 달리기 표시(타이머, 셔터) ───────── */
-  function overlayEls(host) {
+  /* ───────── 3D·2D 공통: 달리기 표시(타이머, 셔터) ─────────
+   * 개편 단계 D(2026-09-27): 좁은 장면(폭 520px 미만 — 휴대폰)이나 낮은 3D 장면(높이 340px 미만 — 휴대폰 가로)에서는 늘 한 줄로
+   * 오른쪽 위에 둔다(is-compact). 2D는 경주로 그림 칸이 늘 낮으므로 폭만 본다(태블릿 2D는 예전처럼 가운데).
+   * 예전에는 가운데 위에서 세 줄로 늘어나 왼쪽 위 "⛶ 전체 화면 보기" 토글과 겹치고, 📸 사진을 찍는 순간 빨간색 자동차·📸 표시를 가렸다.
+   * 한 줄에 안 들어가는 덧붙임 말(more)은 화면에서만 숨긴다(is-short — 화면 읽기 프로그램은 그대로 읽는다). */
+  function overlayEls(host, shortH) {
     var timer = el("div", { class: "run-timer", "aria-live": "polite", hidden: true });
     var flash = el("div", { class: "photo-flash", "aria-hidden": "true" });
     host.appendChild(timer);
@@ -273,9 +279,15 @@
     return {
       timer: timer,
       flash: flash,
-      setTimer: function (text) {
+      setTimer: function (text, more) {
         timer.hidden = !text;
         timer.textContent = text || "";
+        timer.classList.toggle("is-compact", (host.clientWidth || 0) < 520 || (shortH > 0 && (host.clientHeight || 0) < shortH));
+        timer.classList.remove("is-short");
+        if (text && more) {
+          timer.appendChild(el("span", { class: "rt-more", text: " " + more }));
+          if (timer.scrollWidth > timer.clientWidth + 1) timer.classList.add("is-short");
+        }
       },
       shutter: function () {
         if (reduceMotion() || document.hidden) return;
@@ -364,7 +376,7 @@
           CAR_IDS.forEach(function (id) {
             tr.setMark(id, run.dist[id]);
           });
-          ov.setTimer("📸 찰칵! " + f1(t) + "초가 된 순간을 찍었어요 (자동차는 계속 달려요)");
+          ov.setTimer("📸 찰칵! " + f1(t) + "초가 된 순간을 찍었어요", "(자동차는 계속 달려요)");
           lastRunShown = true;
           label();
           await animate(t, t + OVERRUN);
@@ -403,9 +415,12 @@
    * 1 단위 = 10 cm. 경주로는 +x 방향. 자동차 그룹의 원점 = 자동차 앞부분(줄자로 재는 곳). */
   function build3D(container, ctx) {
     var U = 0.1; // cm → 장면 단위
+    // 화면 맞춤 범위. 개편 단계 D: 가운데를 12.4 → 11.8로 조금 왼쪽에(넓고 낮은 칸 — 휴대폰 가로 — 에서 출발선의 파란색 자동차 쪽이
+    // 원근 때문에 왼쪽 가장자리에서 잘리던 것). 크기는 그대로라 태블릿 처음 시점은 약 2% 오른쪽으로 옮겨질 뿐이다.
+    var FRAME = { width: 28.5, depth: 9, center: [11.8, 0, -0.6] };
     return S.Sim3D.create({
       container: container,
-      frame: { width: 28.5, depth: 9, center: [12.4, 0, -0.6] },
+      frame: FRAME,
       minDistance: 3,
       onLost: ctx.onLost,
     }).then(function (v) {
@@ -452,10 +467,12 @@
       var reel = new T.Mesh(new T.BoxGeometry(0.8, 0.6, 0.8), M.material(0x3a4452));
       reel.position.set(-0.9, 0.3, 0);
       root.add(reel);
+      var tags = []; // 3D 이름표(글자가 바뀌지 않는 것만) — 아래 '이름표 가림 막기'가 본다
       for (var lb = 0; lb <= C.trackMax; lb += 50) {
         var sp = M.label(lb + " cm", { height: 0.5, bg: "rgba(255,244,190,0.95)" });
         sp.position.set(lb * U, 0.45, -0.05);
         root.add(sp);
+        tags.push(sp);
       }
 
       // 출발선(색 테이프)
@@ -465,6 +482,7 @@
       var startLbl = M.label("출발선", { height: 0.5 });
       startLbl.position.set(-0.2, 0.55, 2.7);
       root.add(startLbl);
+      tags.push(startLbl);
 
       // 태엽 자동차
       var LANE_Z = { red: -1.2, blue: 1.2 };
@@ -510,12 +528,15 @@
         var name = M.label(c.mark + " " + c.short, { height: 0.46, border: c.color });
         name.position.set(-0.6, 1.1, 0);
         g.add(name);
+        // (개정 3 뒤로는 자동차를 고르지 않아 이 이름표가 보이는 때가 없다 — highlight가 늘 숨긴다)
         var measure = M.label("📏 잴 자동차", { height: 0.42, bg: "rgba(255,236,170,0.96)", border: "#b7791f" });
         measure.position.set(-0.6, 1.62, 0);
         measure.visible = false;
+        measure.userData.want = false;
         g.add(measure);
         g.position.set(0, 0, LANE_Z[id]);
         root.add(g);
+        tags.push(name, measure);
         cars[id] = { g: g, wheels: wheels, key: key, measure: measure, cm: 0 };
       });
       // 📸 사진을 찍은 순간 자동차 앞부분이 있던 곳 표시(자동차는 사진 뒤에도 계속 달린다)
@@ -527,10 +548,13 @@
         var line = new T.Mesh(new T.BoxGeometry(0.06, 0.03, 1.1), markMat);
         line.position.set(0, 0.03, 0);
         var side = id === "red" ? -1 : 1;
-        var post = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, 0.8, 8), markMat);
-        post.position.set(0, 0.4, side * 0.55);
+        // 먼 쪽(빨간색) 표시는 기둥·이름표를 조금 높게 — 사진을 찍는 순간 바로 앞에 있는 '● 빨간색' 이름표에 가리지 않게(개편 단계 D)
+        var postH = id === "red" ? 1.0 : 0.8;
+        var post = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, postH, 8), markMat);
+        post.position.set(0, postH / 2, side * 0.55);
         var lbl = M.label("📸 사진 속 위치", { height: 0.38, border: c.color });
-        lbl.position.set(0, 1.0, side * 0.55);
+        lbl.position.set(0, postH + 0.2, side * 0.55);
+        tags.push(lbl);
         mg.add(line, post, lbl);
         mg.position.set(0, 0, LANE_Z[id]);
         mg.visible = false;
@@ -580,14 +604,90 @@
       var phoneLbl = M.label("스마트 기기(삼각대)", { height: 0.45 });
       phoneLbl.position.set(12.5, 4.8, -4.6);
       root.add(phoneLbl);
+      tags.push(phoneLbl);
 
-      // 좁은 화면(휴대폰·세로)에서는 더 가까이 다가가 자동차가 작게 보이지 않게 한다
+      // 좁은 화면(휴대폰·세로)에서는 더 가까이 다가가 자동차가 작게 보이지 않게 한다.
+      // 단 낮은 칸(휴대폰 가로 크게 보기)에서는 두 경주로·이름표·📸 표시가 위아래로 다 들어오게 덜 다가간다(개편 단계 D —
+      // 과녁 둘레로 보이는 높이가 5.0 단위 이상. 태블릿·휴대폰 세로·휴대폰 가로 기본 화면은 예전 비율 그대로).
       function near() {
-        return container.clientWidth < 520 ? 0.3 : 0.42;
+        var r = container.clientWidth < 520 ? 0.3 : 0.42;
+        var w = container.clientWidth || 1;
+        var h = container.clientHeight || 1;
+        var vf = (v.camera.fov * Math.PI) / 180;
+        var hf = 2 * Math.atan(Math.tan(vf / 2) * (w / h));
+        var fit = Math.max(FRAME.width / 2 / Math.tan(hf / 2), (FRAME.depth * 0.8) / 2 / Math.tan(vf / 2)) * 1.04 + 0.5; // sim3d.js computeFit과 같은 식
+        var minD = 5.0 / (2 * Math.tan(vf / 2));
+        return Math.max(r, minD / fit);
       }
       var host = container.parentNode;
-      var ov = overlayEls(host);
+      var ov = overlayEls(host, 340);
       var selCar = null;
+
+      /* 이름표 가림 막기(개편 단계 D, 2026-09-27): 이름표가 3D 칸 가장자리에 걸려 잘리거나 장면 위 표시("모형" 배지·전체 화면 보기 토글·
+       * 달리기 표시·드래그 안내 글)에 가리면 그 순간에는 숨긴다 — 잘리거나 겹친 글자가 보이지 않게(휴대폰·크게 보기처럼 칸이 좁거나 낮을 때,
+       * 달리는 동안 카메라가 자동차를 따라갈 때). 가릴 것이 없어지면 다시 보인다. 이동 화살표는 옅어서 넣지 않는다(spec 개정 8 보충).
+       * 보여야 하는지(userData.want)와 부모(📸 표시 묶음)의 보임은 그대로 따른다. 글자·자리·크기는 바꾸지 않는다. */
+      var wp = new T.Vector3();
+      var vp = new T.Vector3();
+      var overlayRects = [];
+      var overlayAt = -1e9;
+      function overlays() {
+        var now = performance.now();
+        if (now - overlayAt < 250) return overlayRects; // 0.25초마다 다시 잰다
+        overlayAt = now;
+        overlayRects = [];
+        var cr = container.getBoundingClientRect();
+        function add(r) {
+          if (r.width > 0 && r.height > 0) overlayRects.push({ l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top });
+        }
+        host.querySelectorAll(".ss-scene-toggle, .ss-view-badge, .run-timer, .ss-view-tip").forEach(function (n) {
+          if (n.closest("[hidden]") || !n.getClientRects().length) return;
+          if (n.classList.contains("ss-view-tip")) {
+            // 바탕 없는 안내 글은 글자 줄만
+            var rg = document.createRange();
+            rg.selectNodeContents(n);
+            [].forEach.call(rg.getClientRects(), add);
+          } else add(n.getBoundingClientRect());
+        });
+        return overlayRects;
+      }
+      function parentShown(o) {
+        for (var p = o.parent; p; p = p.parent) if (p.visible === false) return false;
+        return true;
+      }
+      function blocked(sp, cw, ch) {
+        sp.getWorldPosition(wp);
+        vp.copy(wp).applyMatrix4(v.camera.matrixWorldInverse);
+        var dist = -vp.z;
+        if (dist <= v.camera.near) return true;
+        var worldH = 2 * dist * Math.tan((v.camera.fov * Math.PI) / 360);
+        var hN = (2 * sp.scale.y) / worldH; // 화면 좌표(-1~1)로 본 이름표 높이·너비
+        var wN = (2 * sp.scale.x) / (worldH * (v.camera.aspect || 1));
+        wp.project(v.camera);
+        if (wp.x - wN / 2 < -1 || wp.x + wN / 2 > 1 || wp.y - hN / 2 < -1 || wp.y + hN / 2 > 1) return true; // 가장자리에 걸림
+        var l = ((wp.x - wN / 2 + 1) / 2) * cw,
+          r = ((wp.x + wN / 2 + 1) / 2) * cw,
+          t = ((1 - wp.y - hN / 2) / 2) * ch,
+          b = ((1 - wp.y + hN / 2) / 2) * ch;
+        var list = overlays();
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (l < o.r + 2 && r > o.l - 2 && t < o.b + 2 && b > o.t - 2) return true; // 장면 위 표시에 가림
+        }
+        return false;
+      }
+      v.scene.onBeforeRender = function () {
+        var cw = container.clientWidth || 1;
+        var ch = container.clientHeight || 1;
+        tags.forEach(function (sp) {
+          if (sp.userData.want === false) {
+            sp.visible = false;
+            return;
+          }
+          if (!parentShown(sp)) return;
+          sp.visible = !blocked(sp, cw, ch);
+        });
+      };
 
       function place(dist) {
         CAR_IDS.forEach(function (id) {
@@ -605,6 +705,7 @@
         highlight: function (s) {
           selCar = s.car || null;
           CAR_IDS.forEach(function (id) {
+            cars[id].measure.userData.want = id === selCar;
             cars[id].measure.visible = id === selCar;
           });
           v.render();
@@ -636,7 +737,7 @@
           ov.shutter();
           flashPhone();
           setMarks(run.dist);
-          ov.setTimer("📸 찰칵! " + f1(t) + "초가 된 순간을 찍었어요 (자동차는 계속 달려요)");
+          ov.setTimer("📸 찰칵! " + f1(t) + "초가 된 순간을 찍었어요", "(자동차는 계속 달려요)");
           await v.tween(OVERRUN * 1000, function (e, lin) {
             var mids = 0;
             CAR_IDS.forEach(function (id) {

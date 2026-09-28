@@ -77,6 +77,19 @@
 .t2-caption { margin: 8px 2px 0; font-size: 0.8rem; color: var(--ss-muted); }
 .ss-exp-view.is-2d .ss-view2d { padding-top: 12px; }
 .t2-wrap .sw-hud { top: 0; max-width: 100%; }
+/* 2D + 크게 보기(단계 D — review-dock L3): 장면 칸 높이가 정해져 있으므로 경주로 네 줄과 설명이 칸 안에 다 들어오게 한다(태블릿 크기).
+   초시계 표시는 공통 틀이 토글 아래에 둔 빈 칸(86px) 안 — 토글 오른쪽 — 으로 올리고, 줄 높이·틈을 줄인다(누르는 곳은 44px 그대로).
+   기본 화면의 2D는 그대로다. */
+.ss-exp-layout.is-full .t2-wrap { padding-top: 0; }
+.ss-exp-layout.is-full .t2-wrap .sw-hud { top: -88px; left: 120px; right: 8px; transform: none; width: max-content; max-width: calc(100% - 128px); margin: 0 auto; }
+.ss-exp-layout.is-full .t2-lanes { gap: 4px; }
+.ss-exp-layout.is-full .t2-lane { padding: 2px 4px; }
+.ss-exp-layout.is-full .t2-name { min-height: 44px; padding: 2px 6px; gap: 0 6px; line-height: 1.25; }
+.ss-exp-layout.is-full .t2-track { height: 44px; }
+.ss-exp-layout.is-full .t2-car { top: 2px; height: 20px; }
+.ss-exp-layout.is-full .t2-tick { height: 8px; }
+.ss-exp-layout.is-full .t2-scale::after { height: 8px; }
+.ss-exp-layout.is-full .t2-caption { margin-top: 4px; }
 
 /* ── 분석: 교통수단 표(접을 수 있음) ── */
 .tr-more > summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
@@ -101,7 +114,16 @@
   .hud-digits { font-size: 1.3rem; }
   .hud-status { font-size: 0.74rem; }
   .sw-hud { padding: 4px 10px; max-width: calc(100% - 64px); }
+  /* 좁은 화면의 3D: 가운데에 두면 긴 안내 글 때문에 넓어져 왼쪽 위 '⛶ 전체 화면 보기' 토글을 덮는다 → 토글 오른쪽 빈 곳에(단계 D) */
+  .ss-view3d > .sw-hud { left: auto; right: 8px; transform: none; max-width: calc(100% - 150px); }
   .calc { max-width: none; }
+}
+
+/* 낮은 화면(휴대폰 가로 등, 단계 D): 초시계 표시를 한 줄로 낮게 — 3D 칸이 낮아 두 줄 표시가 자동차를 덮지 않게 */
+@media (max-height: 480px) {
+  .sw-hud { flex-direction: row; align-items: center; column-gap: 10px; padding: 3px 12px; }
+  .hud-digits { font-size: 1.15rem; }
+  .hud-status { font-size: 0.74rem; }
 }
 
 /* 관찰 카드 입력칸 단위가 좁은 화면에서 세로로 쪼개지지 않게 */

@@ -1395,14 +1395,17 @@
       // 크게 보기: 관찰 카드가 닫혀 조작 칸이 짧아진 뒤, 조건 고르기 카드들이 칸 밖이면 칸 안에서만 최소로 올려 보인다
       // (review-D1 M1 — 예전에는 다음 칸이 저절로 골라져 막대의 ▶만 누르면 됐다. 어느 칸을 하라고 가리키지는 않는다). 기본 화면은 예전처럼
       // 움직이지 않는다. '확인하기' 뒤의 피드백 스크롤(약 0.3초)이 끝난 다음에 올린다(review-D2 R1 — 그 스크롤이 이 올림을 덮었다).
+      // 보이는 카드만 센다(review-D3 M1 — 방금 닫힌 관찰 카드·막대로 옮긴 실행 카드는 크기가 0이라, 넣으면 범위가 비어 올림이 한 번도 일어나지 않았다).
       if (R.enl.isOn() && !allDone()) {
         setTimeout(function () {
           if (!R.enl.isOn()) return;
-          var cards = o.root.querySelectorAll(".ss-exp-panel .ss-step-card");
+          var cards = [].slice.call(o.root.querySelectorAll(".ss-exp-panel .ss-step-card")).filter(function (c) {
+            return c.getBoundingClientRect().height > 0;
+          });
           if (!cards.length) return;
           var first = cards[0].getBoundingClientRect();
           var last = cards[cards.length - 1].getBoundingClientRect();
-          if (first.height > 0) revealInDock(dockOf(cards[0]), first.top, last.bottom);
+          revealInDock(dockOf(cards[0]), first.top, last.bottom);
         }, 450);
       }
       if (o.onRecorded) o.onRecorded({ record: r.record, replaced: r.replaced, phaseCompleted: completed ? completed.id : null, allDone: allDone() });
