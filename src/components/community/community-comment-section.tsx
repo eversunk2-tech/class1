@@ -57,10 +57,21 @@ export function CommunityCommentSection({
   postId,
   postHidden,
   isGame,
+  canWrite = true,
+  readOnlyNote,
+  hideReport = false,
 }: {
   postId: string;
   postHidden: boolean;
   isGame: boolean;
+  /**
+   * 댓글을 쓸 수 있나(담임교사별 게시판 — 그 게시판 참여자만, 서버 RLS도 거부). null = 아직 모름(입력칸을 잠시 비움).
+   * false면 입력칸 대신 readOnlyNote를 보인다(총괄의 관리용 보기 · 반을 옮긴 뒤 예전 게시판의 내 글).
+   */
+  canWrite?: boolean | null;
+  readOnlyNote?: string;
+  /** 댓글 신고 버튼을 숨긴다(총괄의 관리용 보기 — 신고 대신 바로 숨기기·삭제) */
+  hideReport?: boolean;
 }) {
   const { loading: sessionLoading, user, isAdmin } = useSession();
   const userId = user?.id ?? null;
@@ -195,7 +206,7 @@ export function CommunityCommentSection({
               comment={c}
               isMine={!!userId && userId === c.user_id}
               isAdmin={isAdmin}
-              loggedIn={!!userId}
+              loggedIn={!!userId && !hideReport}
               isGame={isGame}
               onDelete={() => onDelete(c.id)}
               onToggleHidden={() => onToggleHidden(c)}
@@ -215,6 +226,10 @@ export function CommunityCommentSection({
         </div>
       ) : postHidden ? (
         <p className="text-sm text-muted-foreground">숨긴 글에는 댓글을 달 수 없어요.</p>
+      ) : canWrite === null ? null : !canWrite ? (
+        <p role="note" className="rounded-2xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          {readOnlyNote ?? "이 글에는 댓글을 남길 수 없어요."}
+        </p>
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-2">
           <label htmlFor="comment-body" className="sr-only">

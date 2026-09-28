@@ -1,11 +1,9 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { PencilLineIcon } from "lucide-react";
-import { CommunityPostList } from "@/components/community/community-post-list";
+import { BoardListSection, BoardListSectionSkeleton } from "@/components/community/board-list-section";
 import { PropStage, StageIcon, type StageProp } from "@/components/illustrations/prop-stage";
-import { Highlight, SectionHeading } from "@/components/layout/highlight";
+import { Highlight } from "@/components/layout/highlight";
 import { PageHero } from "@/components/layout/page-hero";
-import { primaryPillClass } from "@/lib/pill";
 
 export const metadata: Metadata = {
   title: "자유게시판",
@@ -19,7 +17,9 @@ const BOARD_PROPS: StageProp[] = [
   { name: "light-bulb", size: 48, className: "bottom-[10%] left-[2%] w-9 @4xl:w-11", tilt: -12, dur: 5, delay: -0.3, always: true },
 ];
 
-// 자유게시판 목록(docs/community/spec.md §2·§3). 누구나 읽고, 로그인하면 글을 쓸 수 있다.
+// 자유게시판 목록(docs/community/spec.md §2·§3). 로그인한 사람만(LoginGate · RLS), 담임교사별 게시판
+// (docs/community/teacher-boards/spec.md 개정 1 — 학생은 자기 담임 게시판 하나, 교사는 게시판이 둘 이상이면 고르기).
+// 목록 칸은 주소(?board=)를 읽으므로 Suspense 경계 안에 둔다(정적 export).
 export default function BoardPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10">
@@ -39,16 +39,9 @@ export default function BoardPage() {
           </PropStage>
         }
       />
-      <section aria-labelledby="board-heading" className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionHeading id="board-heading">글 목록</SectionHeading>
-          <Link href="/board/new/" className={primaryPillClass}>
-            <PencilLineIcon className="size-4.5" aria-hidden />
-            글쓰기
-          </Link>
-        </div>
-        <CommunityPostList kind="board" />
-      </section>
+      <Suspense fallback={<BoardListSectionSkeleton />}>
+        <BoardListSection />
+      </Suspense>
     </div>
   );
 }

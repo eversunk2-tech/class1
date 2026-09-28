@@ -29,8 +29,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBoardAccess } from "@/hooks/use-board-access";
 import { useSession } from "@/hooks/use-session";
 import { isWithdrawnProfile, UUID_RE } from "@/lib/admin";
+import { boardLabel, boardListHref, teacherTitle } from "@/lib/boards";
 import {
   authorName,
   communityEditHref,
@@ -57,7 +59,12 @@ type State =
   | { status: "error" }
   | { status: "ready"; post: CommunityPost };
 
-/** 자유게시판 · 학습게임 상세(`?id=<uuid>`). 숨긴 글은 RLS가 작성자·관리자에게만 돌려준다. */
+/**
+ * 자유게시판 · 학습게임 상세(`?id=<uuid>`). 숨긴 글은 RLS가 작성자·관리자에게만 돌려준다.
+ * 자유게시판은 담임교사별 게시판(docs/community/teacher-boards/spec.md 개정 1): 다른 게시판 글은 RLS가 돌려주지 않아
+ * "찾을 수 없어요"가 된다. 보이지만 내가 참여하지 않는 게시판의 글(총괄의 관리용 보기 · 반을 옮긴 뒤 예전에 쓴 내 글)은
+ * 댓글·좋아요 칸 대신 안내를 보인다(서버도 거부한다).
+ */
 export function CommunityPostDetail({ kind }: { kind: CommunityKind }) {
   const searchParams = useSearchParams();
   const raw = searchParams.get("id")?.trim() ?? "";
@@ -71,7 +78,7 @@ export function CommunityPostDetail({ kind }: { kind: CommunityKind }) {
   useEffect(() => {
     if (!id || sessionLoading) return;
     let active = true;
-    fetchCommunityPost(id)
+    fetchCommunityPost(id, { withBoard: kind === "board" })
       .then((post) => {
         if (!active) return;
         setState({ key, value: post && post.kind === kind ? { status: "ready", post } : { status: "not-found" } });
@@ -113,6 +120,30 @@ export function CommunityPostDetail({ kind }: { kind: CommunityKind }) {
   );
 }
 
+/** 게시판 주인(담임)의 이름 — 내 게시판 목록에 없는 게시판(총괄의 관리용 보기)을 표시할 때만 읽는다. undefined = 읽는 중 */
+function useBoardOwnerName(ownerId: string | null): string | null | undefined {
+  const [state, setState] = useState<{ id: string | null; name: string | null }>({ id: null, name: null });
+  useEffect(() => {
+    if (!ownerId) return;
+    let active = true;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", ownerId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active) return;
+        const name = !error ? ((data as { display_name: string | null } | null)?.display_name ?? null) : null;
+        setState({ id: ownerId, name });
+      });
+    return () => {
+      active = false;
+    };
+  }, [ownerId]);
+  if (!ownerId) return null;
+  return state.id === ownerId ? state.name : undefined;
+}
+
 function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: CommunityPost) => void }) {
   const router = useRouter();
   const { user, isAdmin } = useSession();
@@ -122,6 +153,40 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
   const name = authorName(post);
   const edited = new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 60_000;
   const [hiding, setHiding] = useState(false);
+
+  // 담임교사별 게시판: 게시판 주인을 읽었을 때(SQL 적용 뒤)만 따진다. 적용 전·학습게임은 예전처럼 누구나 참여.
+  const boardKnown = post.kind === "board" && post.board_owner !== undefined;
+  const boardAccess = useBoardAccess(boardKnown);
+  const myBoards = boardAccess.status === "ready" && boardAccess.access.mode === "boards" ? boardAccess.access.boards : null;
+  const myBoard = myBoards?.find((b) => b.ownerId === post.board_owner) ?? null;
+  // 이 글의 게시판에 댓글·좋아요를 남길 수 있나: null = 아직 모름(칸을 잠시 비움). 게시판 목록을 못 읽으면 막지 않는다(서버가 판단).
+  const canParticipate: boolean | null = !boardKnown
+    ? true
+    : boardAccess.status === "ready"
+      ? boardAccess.access.mode === "legacy" || !!myBoard
+      : boardAccess.status === "error"
+        ? true
+        : null;
+  // 관리용 보기 = 교사가 참여하지 않는 게시판의 남의 글을 볼 때(총괄은 모든 게시판을 관리한다)
+  const managementView = boardKnown && canParticipate === false && isAdmin && !isMine;
+  // 교사에게만 "어느 게시판 글인지" 표시: 게시판이 둘 이상이거나, 내 게시판이 아닌 글을 관리용으로 볼 때
+  const showBoard = isAdmin && boardKnown && !!myBoards && (!myBoard || myBoards.length > 1);
+  const otherOwnerName = useBoardOwnerName(showBoard && !myBoard && post.board_owner ? post.board_owner : null);
+  const boardText = !showBoard
+    ? null
+    : myBoard
+      ? boardLabel(myBoard)
+      : !post.board_owner
+        ? "주인 없는 게시판"
+        : otherOwnerName === undefined
+          ? null
+          : `${teacherTitle(otherOwnerName)} 게시판`;
+  // 목록으로: 관리용으로 연 글은 커뮤니티 관리로, 게시판 글은 그 게시판 목록(?board=)으로
+  const listHref = managementView ? "/admin/community/" : boardKnown && post.board_owner ? boardListHref(post.board_owner) : meta.listHref;
+  const listLabel = managementView ? "커뮤니티 관리" : `${meta.label} 목록`;
+  const readOnlyNote = managementView
+    ? "관리용으로 보는 글이에요. 이 게시판에는 댓글과 좋아요를 남길 수 없어요."
+    : "지금 내가 참여하는 게시판의 글이 아니라서 댓글과 좋아요를 남길 수 없어요.";
 
   async function toggleHidden() {
     setHiding(true);
@@ -143,15 +208,15 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
     }
     await removeGameFile(post.game_path);
     toast.success("삭제했어요.");
-    router.replace(meta.listHref);
+    router.replace(listHref);
     return true;
   }
 
   return (
     <article className="flex flex-col gap-6">
-      <Link href={meta.listHref} className={backPillClass}>
+      <Link href={listHref} className={backPillClass}>
         <ArrowLeftIcon className="size-4" aria-hidden />
-        {meta.label} 목록
+        {listLabel}
       </Link>
 
       {/* 제목·작성자·본문을 흰 둥근 판에(디자인 개편 2단계). 게임은 판 아래에 실행기를 둔다. */}
@@ -165,7 +230,18 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
           >
             <Icon3D name={isGame ? "video-game" : "speech-balloon"} size={20} className="size-5" />
             {meta.label}
+            {boardText ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>{boardText}</span>
+              </>
+            ) : null}
           </span>
+          {managementView ? (
+            <Badge variant="outline" className="w-fit">
+              관리용으로 보는 글
+            </Badge>
+          ) : null}
           {post.hidden ? (
             <Badge variant="outline" className="w-fit gap-1">
               <EyeOffIcon className="size-3" aria-hidden />
@@ -205,7 +281,7 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
                 </Button>
               ) : null}
               {isMine || isAdmin ? <DeletePostButton noun={meta.noun} onConfirm={onDelete} /> : null}
-              {user && !isMine ? <ReportButton postId={post.id} targetLabel={meta.noun} isGame={isGame} /> : null}
+              {user && !isMine && !managementView ? <ReportButton postId={post.id} targetLabel={meta.noun} isGame={isGame} /> : null}
             </div>
           </div>
         </header>
@@ -224,10 +300,17 @@ function PostView({ post, onChange }: { post: CommunityPost; onChange: (p: Commu
       {isGame ? <GamePostPlayer path={post.game_path} title={post.title} /> : null}
 
       <div className="flex justify-center">
-        <CommunityLikeButton postId={post.id} disabled={post.hidden} />
+        <CommunityLikeButton postId={post.id} disabled={post.hidden || canParticipate !== true} />
       </div>
 
-      <CommunityCommentSection postId={post.id} postHidden={post.hidden} isGame={isGame} />
+      <CommunityCommentSection
+        postId={post.id}
+        postHidden={post.hidden}
+        isGame={isGame}
+        canWrite={canParticipate}
+        readOnlyNote={readOnlyNote}
+        hideReport={managementView}
+      />
     </article>
   );
 }

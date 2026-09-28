@@ -19,6 +19,12 @@ export type CommunityPost = {
   game_path: string | null;
   game_size: number | null;
   author_id: string | null;
+  /**
+   * 자유게시판 글의 게시판 주인(담임 profiles.id — 담임교사별 게시판, 20260928010000_teacher_boards.sql).
+   * 학습게임은 늘 null. 주인 계정이 지워진 게시판 글도 null(총괄·글쓴이만 봄).
+   * undefined = 이 열을 읽지 않음(학습게임 조회 · SQL 적용 전).
+   */
+  board_owner?: string | null;
   hidden: boolean;
   created_at: string;
   updated_at: string;
@@ -27,7 +33,7 @@ export type CommunityPost = {
 
 export type CommunityPostSummary = Pick<
   CommunityPost,
-  "id" | "kind" | "title" | "body" | "author_id" | "hidden" | "created_at" | "profiles"
+  "id" | "kind" | "title" | "body" | "author_id" | "board_owner" | "hidden" | "created_at" | "profiles"
 > & {
   community_comments: { count: number }[] | null;
   community_likes: { count: number }[] | null;
@@ -54,6 +60,9 @@ export const POST_SUMMARY_COLUMNS =
   `id,kind,title,body,author_id,hidden,created_at,${POST_AUTHOR},` +
   "community_comments!community_comments_post_id_fkey(count),community_likes!community_likes_post_id_fkey(count)";
 export const COMMENT_COLUMNS = `id,post_id,user_id,body,hidden,created_at,${COMMENT_AUTHOR}`;
+/** 담임교사별 게시판 SQL(20260928010000) 적용 뒤에만 읽는 열(게시판 주인). 적용 전에 읽으면 42703 오류라 따로 둔다. */
+export const POST_COLUMNS_WITH_BOARD = `${POST_COLUMNS},board_owner`;
+export const POST_SUMMARY_COLUMNS_WITH_BOARD = `${POST_SUMMARY_COLUMNS},board_owner`;
 
 /** 글자 수 제한(DB check 제약과 같은 값) */
 export const LIMITS = {
@@ -155,11 +164,31 @@ export function communityErrorMessage(error: unknown, fallback: string): string 
 // 조회
 // ─────────────────────────────────────────────
 
-export async function fetchCommunityPosts(kind: CommunityKind, offset: number, size: number) {
-  const { data, error } = await supabase
+/**
+ * 자유게시판을 게시판 주인으로 거르는 값(담임교사별 게시판 — src/lib/boards.ts의 boardOwnersOf).
+ * - undefined · null: 거르지 않는다(학습게임, SQL 적용 전 = 예전처럼 하나의 게시판)
+ * - []: 쓸 수 있는 게시판이 없다(학급 없는 계정) → 조회하지 않고 빈 결과
+ * - [id, …]: 이 게시판(들)의 글만(RLS가 이미 "볼 수 있는 글"로 좁히고, 여기서는 고른 게시판만 남긴다 —
+ *   내가 예전 게시판에 쓴 글이나 총괄의 관리용 보기처럼 RLS로는 보이지만 이 화면에 섞지 않을 글을 뺀다)
+ */
+export type BoardOwnersFilter = readonly string[] | null | undefined;
+
+/** 조회에 게시판 거르기를 더한다(PostgREST in.(…) / eq). */
+function withBoardOwners<Q extends { eq(column: string, value: string): Q; in(column: string, values: readonly string[]): Q }>(
+  query: Q,
+  boardOwners: BoardOwnersFilter,
+): Q {
+  if (!boardOwners) return query;
+  return boardOwners.length === 1 ? query.eq("board_owner", boardOwners[0]) : query.in("board_owner", boardOwners);
+}
+
+export async function fetchCommunityPosts(kind: CommunityKind, offset: number, size: number, boardOwners?: BoardOwnersFilter) {
+  if (boardOwners && boardOwners.length === 0) return [] as CommunityPostSummary[];
+  const query = supabase
     .from("community_posts")
-    .select(POST_SUMMARY_COLUMNS)
-    .eq("kind", kind)
+    .select(boardOwners ? POST_SUMMARY_COLUMNS_WITH_BOARD : POST_SUMMARY_COLUMNS)
+    .eq("kind", kind);
+  const { data, error } = await withBoardOwners(query, boardOwners)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, offset + size - 1);
@@ -167,18 +196,26 @@ export async function fetchCommunityPosts(kind: CommunityKind, offset: number, s
   return (data ?? []) as unknown as CommunityPostSummary[];
 }
 
-export async function fetchCommunityPost(id: string): Promise<CommunityPost | null> {
-  const { data, error } = await supabase.from("community_posts").select(POST_COLUMNS).eq("id", id).maybeSingle();
-  if (error) throw error;
-  return (data as unknown as CommunityPost | null) ?? null;
+/**
+ * 글 1개. `withBoard`면 게시판 주인(board_owner)도 읽는다(자유게시판 상세). SQL 적용 전이라 그 열이 없으면
+ * 예전 열로 한 번 더 읽는다(board_owner = undefined → 화면은 예전처럼 동작).
+ */
+export async function fetchCommunityPost(id: string, { withBoard = false }: { withBoard?: boolean } = {}): Promise<CommunityPost | null> {
+  const read = (columns: string) => supabase.from("community_posts").select(columns).eq("id", id).maybeSingle();
+  let res = await read(withBoard ? POST_COLUMNS_WITH_BOARD : POST_COLUMNS);
+  if (res.error && withBoard && isMissingSchemaError(res.error)) res = await read(POST_COLUMNS);
+  if (res.error) throw res.error;
+  return (res.data as unknown as CommunityPost | null) ?? null;
 }
 
-export async function countCommunityPosts(kind: CommunityKind): Promise<number> {
-  const { count, error } = await supabase
+export async function countCommunityPosts(kind: CommunityKind, boardOwners?: BoardOwnersFilter): Promise<number> {
+  if (boardOwners && boardOwners.length === 0) return 0;
+  const query = supabase
     .from("community_posts")
     .select("id", { count: "exact", head: true })
     .eq("kind", kind)
     .eq("hidden", false);
+  const { count, error } = await withBoardOwners(query, boardOwners);
   if (error) throw error;
   // HEAD 요청은 테이블이 없으면(404, 빈 본문) 오류 없이 count=null로 끝난다 → "SQL 실행 필요"로 본다.
   if (count == null) throw { code: "PGRST205", message: "Could not find the table 'public.community_posts'" };

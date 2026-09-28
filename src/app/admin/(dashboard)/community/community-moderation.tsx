@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2Icon,
@@ -12,13 +12,14 @@ import {
   MessageSquareIcon,
   RotateCcwIcon,
   Trash2Icon,
+  UsersIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminSurfaceClass, dangerSolidClass } from "@/components/admin/admin-styles";
 import { CommunitySetupNotice } from "@/components/community/community-setup-notice";
 import { REPORT_REASON_LABELS, type ReportReason } from "@/components/community/report-dialog";
-import { ListSkeleton } from "@/components/learning/learning-ui";
+import { ListSkeleton, NativeSelect } from "@/components/learning/learning-ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import {
   AlertDialog,
@@ -33,6 +34,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAdminContext } from "@/hooks/use-admin-context";
+import { useBoardAccess } from "@/hooks/use-board-access";
+import { boardLabel, teacherTitle, type Board } from "@/lib/boards";
 import {
   authorName,
   communityErrorMessage,
@@ -54,6 +58,12 @@ type ReportRow = {
   comment_id: string | null;
   /** 신고 시점 스냅샷 */
   target_kind: CommunityKind | "comment" | null;
+  /**
+   * 신고한 글(댓글 신고면 그 글)의 종류 · 게시판 주인 스냅샷(담임교사별 게시판, 20260928010000 — 적용 전에는 읽지 않아 undefined).
+   * 종류가 null = 대상이 이미 지워진 옛 댓글 신고(게시판인지 모름 — 총괄만 봄).
+   */
+  target_post_kind?: CommunityKind | null;
+  target_board_owner?: string | null;
   target_title: string | null;
   target_body: string | null;
   target_author: { display_name: string | null; withdrawn_at: string | null } | null;
@@ -73,6 +83,8 @@ const REPORT_COLUMNS =
   "target_author:profiles!community_reports_target_author_id_fkey(display_name,withdrawn_at)," +
   "community_posts!community_reports_post_id_fkey(id,kind,title,hidden,game_path)," +
   "community_comments!community_reports_comment_id_fkey(id,body,hidden)";
+/** 담임교사별 게시판 SQL 적용 뒤: 신고의 게시판 스냅샷도 읽는다(적용 전에 읽으면 42703 — 따로 둔다) */
+const REPORT_COLUMNS_WITH_BOARD = `${REPORT_COLUMNS},target_post_kind,target_board_owner`;
 
 type PostRow = {
   id: string;
@@ -80,6 +92,8 @@ type PostRow = {
   title: string;
   hidden: boolean;
   game_path: string | null;
+  /** 자유게시판 글의 게시판 주인(담임교사별 게시판 — SQL 적용 전에는 읽지 않아 undefined) */
+  board_owner?: string | null;
   created_at: string;
   profiles: { display_name: string | null; withdrawn_at: string | null } | null;
   community_reports: { count: number }[] | null;
@@ -88,6 +102,142 @@ type PostRow = {
 const ADMIN_POST_COLUMNS =
   "id,kind,title,hidden,game_path,created_at,profiles!community_posts_author_id_fkey(display_name,withdrawn_at)," +
   "community_reports!community_reports_post_id_fkey(count)";
+const ADMIN_POST_COLUMNS_WITH_BOARD = `${ADMIN_POST_COLUMNS},board_owner`;
+
+/** 글 목록의 게시판 거르기 값: "all" = 모든 게시판, "none" = 주인 없는 글(총괄만), 그 밖 = 게시판 주인 id */
+type BoardFilter = "all" | "none" | string;
+
+const NO_BOARDS: Board[] = [];
+
+type ClassTeacherRow = { class_id: string; teacher_id: string; created_at: string };
+
+/**
+ * 게시판이 있는 교사 = 학급마다 "먼저 맡은 지금 교사"(SQL class_board_owner 와 같은 규칙: created_at, 같으면 teacher_id 순 —
+ * spec 개정 2). 보조로만 맡은 교사·학급 없는 교사는 게시판이 없다. created_at 은 PostgREST 가 같은 모양(같은 시간대)으로
+ * 주므로 글자 비교로 순서를 정한다(Date.parse 는 마이크로초를 버리고 기기마다 다르게 읽을 수 있다).
+ */
+function classBoardOwnerIds(rows: readonly ClassTeacherRow[], teacherIds: ReadonlySet<string>): string[] {
+  const first = new Map<string, ClassTeacherRow>();
+  for (const r of rows) {
+    if (!teacherIds.has(r.teacher_id)) continue; // 지금 교사(role 'admin')만
+    const cur = first.get(r.class_id);
+    if (!cur || r.created_at < cur.created_at || (r.created_at === cur.created_at && r.teacher_id < cur.teacher_id)) {
+      first.set(r.class_id, r);
+    }
+  }
+  return [...new Set([...first.values()].map((r) => r.teacher_id))];
+}
+
+/**
+ * 담임교사별 게시판 표시(docs/community/teacher-boards/spec.md 개정 1) — 이 화면 전용.
+ * - 누가 어떤 글·신고를 보는지는 RLS가 정한다: 담임 = 자기 게시판(보조 담임은 그 학급 게시판도) + 학습게임 전부,
+ *   총괄 = 관리용으로 모든 게시판. 이 훅은 "어느 선생님 게시판인지" 이름표와 게시판 거르기만 만든다.
+ * - 이름표는 총괄과 게시판이 둘 이상인 교사에게만(게시판이 하나면 모두 내 게시판이라 붙이지 않는다).
+ * - 이름: 내 게시판 목록(my_boards) → 총괄은 교사 목록(profiles 공개 열: 이름·역할) → 그래도 없으면(담임 해제된 옛 주인) id로 읽는다.
+ * - SQL 적용 전(my_boards() 없음 — "legacy")이면 예전 화면 그대로(게시판 열을 읽지 않음).
+ */
+function useBoardDirectory(ownerIds: readonly (string | null | undefined)[]) {
+  const access = useBoardAccess();
+  const ctx = useAdminContext();
+  const superAdmin = ctx.status === "ready" && ctx.isSuperAdmin;
+  const mode: "loading" | "legacy" | "boards" =
+    access.status === "ready" ? (access.access.mode === "legacy" ? "legacy" : "boards") : access.status === "error" ? "legacy" : "loading";
+  // 같은 사용자의 게시판 목록은 기억된 같은 배열이다(src/lib/boards.ts) — 매번 새 배열을 만들지 않는다.
+  const myBoards: Board[] = access.status === "ready" && access.access.mode === "boards" ? access.access.boards : NO_BOARDS;
+  const boardsMode = mode === "boards";
+  const showLabels = boardsMode && (superAdmin || myBoards.length > 1);
+
+  // 총괄: 모든 교사 이름(이름표) + 게시판이 있는 교사(학급마다 먼저 맡은 지금 교사 — 게시판 거르기 목록, 재확인 N1)
+  const [teachers, setTeachers] = useState<{ id: string; name: string | null }[] | null>(null);
+  const [boardOwnerIds, setBoardOwnerIds] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!boardsMode || !superAdmin) return;
+    let active = true;
+    Promise.all([
+      supabase.from("profiles").select("id,display_name").eq("role", "admin").order("display_name"),
+      supabase.from("class_teachers").select("class_id,teacher_id,created_at"),
+    ]).then(
+      ([t, ct]) => {
+        if (!active) return;
+        // 못 읽으면 빈 목록(이름은 아래에서 id로 다시 읽는다 — 이름표가 기다리다 멈추지 않게)
+        const rows = !t.error ? ((t.data ?? []) as { id: string; display_name: string | null }[]) : [];
+        setTeachers(rows.map((r) => ({ id: r.id, name: r.display_name })));
+        // 학급 담임 줄을 못 읽으면 null → 거르기 목록은 예전처럼 교사 전체
+        setBoardOwnerIds(
+          !t.error && !ct.error ? classBoardOwnerIds((ct.data ?? []) as ClassTeacherRow[], new Set(rows.map((r) => r.id))) : null,
+        );
+      },
+      () => {
+        if (!active) return;
+        setTeachers([]);
+        setBoardOwnerIds(null);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [boardsMode, superAdmin]);
+
+  // 목록에 나온 주인 중 이름을 모르는 사람(담임 해제된 옛 주인 등)은 id로 읽는다
+  const [extraNames, setExtraNames] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  const known = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const t of teachers ?? []) m.set(t.id, t.name);
+    for (const b of myBoards) m.set(b.ownerId, b.teacherName);
+    return m;
+  }, [teachers, myBoards]);
+  const missingKey = showLabels
+    ? [...new Set(ownerIds.filter((id): id is string => !!id && !known.has(id) && !extraNames.has(id)))].sort().join(",")
+    : "";
+  useEffect(() => {
+    if (!missingKey || (superAdmin && !teachers)) return; // 총괄은 교사 목록을 먼저 읽는다
+    let active = true;
+    const ids = missingKey.split(",");
+    supabase
+      .from("profiles")
+      .select("id,display_name")
+      .in("id", ids)
+      .then(({ data, error }) => {
+        if (!active) return;
+        const rows = !error ? ((data ?? []) as { id: string; display_name: string | null }[]) : [];
+        setExtraNames((prev) => {
+          const next = new Map(prev);
+          for (const id of ids) next.set(id, rows.find((r) => r.id === id)?.display_name ?? null);
+          return next;
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [missingKey, superAdmin, teachers]);
+
+  const labelOf = useCallback(
+    (ownerId: string | null | undefined): string => {
+      if (!ownerId) return "주인 없는 게시판";
+      const mine = myBoards.find((b) => b.ownerId === ownerId);
+      if (mine) return boardLabel(mine);
+      return `${teacherTitle(known.get(ownerId) ?? extraNames.get(ownerId) ?? null)} 게시판`;
+    },
+    [myBoards, known, extraNames],
+  );
+
+  // 게시판 거르기 목록(총괄 = 게시판이 있는 교사 + 주인 없는 글, 게시판이 둘 이상인 교사 = 내 게시판들)
+  const filterOptions: { value: BoardFilter; label: string }[] = useMemo(() => {
+    if (!showLabels) return [];
+    const base: { value: BoardFilter; label: string }[] = [{ value: "all", label: "모든 게시판" }];
+    if (superAdmin) {
+      const owners = boardOwnerIds ?? (teachers ?? []).map((t) => t.id);
+      const ids = new Set<string>([...myBoards.map((b) => b.ownerId), ...owners]);
+      const items = [...ids].map((id) => ({ value: id, label: labelOf(id), mine: myBoards.some((b) => b.ownerId === id && b.mine) }));
+      items.sort((a, b) => (a.mine === b.mine ? a.label.localeCompare(b.label, "ko") : a.mine ? -1 : 1));
+      return [...base, ...items.map(({ value, label }) => ({ value, label })), { value: "none", label: "주인 없는 게시판(담임 해제·계정 삭제)" }];
+    }
+    return [...base, ...myBoards.map((b) => ({ value: b.ownerId, label: boardLabel(b) }))];
+  }, [showLabels, superAdmin, myBoards, teachers, boardOwnerIds, labelOf]);
+
+  return { mode, showLabels, labelOf, filterOptions };
+}
+
 const PAGE = 50;
 
 type Load<T> = { status: "loading" } | { status: "setup" } | { status: "error" } | { status: "ready"; rows: T[]; hasMore: boolean };
@@ -96,7 +246,10 @@ type Target = { postId: string; commentId: string | null; kind: CommunityKind; t
 
 /**
  * 관리자 커뮤니티 관리(spec §13): 신고 목록 + 글·게임 목록(숨김/삭제).
- * 숨김·신고 처리는 SECURITY DEFINER RPC(set_community_*), 삭제는 RLS delete 정책(관리자 허용)으로 처리한다.
+ * 숨김·신고 처리는 SECURITY DEFINER RPC(set_community_*), 삭제는 RLS delete 정책으로 처리한다.
+ * 자유게시판은 담임교사별(20260928010000): 담임은 자기 게시판(보조 담임은 그 학급 게시판도)과 학습게임 전부,
+ * 총괄은 관리용으로 모든 게시판의 글·신고를 본다 — 서버(RLS·RPC)가 거른다. 총괄·게시판이 둘 이상인 교사에게는
+ * 글·신고마다 "○○ 선생님 게시판" 이름표와 게시판 거르기를 보인다.
  */
 export function CommunityModeration() {
   const [tab, setTab] = useState<"reports" | "posts">("reports");
@@ -133,12 +286,15 @@ function ReportsPanel() {
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Target | null>(null);
+  const board = useBoardDirectory(state.status === "ready" ? state.rows.map((r) => r.target_board_owner) : []);
+  const boardMode = board.mode;
 
   useEffect(() => {
+    if (boardMode === "loading") return; // 게시판 SQL 적용 여부(읽을 열)를 알고 나서 읽는다
     let active = true;
     supabase
       .from("community_reports")
-      .select(REPORT_COLUMNS)
+      .select(boardMode === "boards" ? REPORT_COLUMNS_WITH_BOARD : REPORT_COLUMNS)
       .eq("status", filter)
       .order("created_at", { ascending: false })
       .limit(200)
@@ -150,7 +306,7 @@ function ReportsPanel() {
     return () => {
       active = false;
     };
-  }, [filter, attempt]);
+  }, [filter, attempt, boardMode]);
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -216,14 +372,28 @@ function ReportsPanel() {
           {state.rows.map((r) => {
             const post = r.community_posts;
             const comment = r.community_comments;
-            const kind: CommunityKind = post?.kind ?? (r.target_kind === "game" ? "game" : "board");
+            const kind: CommunityKind = post?.kind ?? (r.target_kind === "game" || r.target_post_kind === "game" ? "game" : "board");
             const isComment = r.target_kind === "comment" || !!r.comment_id;
             const targetHidden = isComment ? comment?.hidden : post?.hidden;
+            // 어느 게시판 신고인지(총괄 · 게시판이 둘 이상인 교사). 학습게임은 이름표 없음.
+            const boardText = !board.showLabels
+              ? null
+              : r.target_post_kind === "board"
+                ? board.labelOf(r.target_board_owner)
+                : r.target_post_kind === null
+                  ? "게시판 알 수 없음(옛 신고)"
+                  : null;
             return (
               <li key={r.id} className={cn("flex flex-col gap-3 rounded-xl p-4", adminSurfaceClass)}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Badge variant="destructive">{REPORT_REASON_LABELS[r.reason] ?? r.reason}</Badge>
                   <Badge variant="outline">{isComment ? "댓글" : KIND_META[kind].noun}</Badge>
+                  {boardText ? (
+                    <Badge variant="secondary" className="gap-1">
+                      <UsersIcon className="size-3" aria-hidden />
+                      {boardText}
+                    </Badge>
+                  ) : null}
                   {targetHidden ? (
                     <Badge variant="outline" className="gap-1 text-muted-foreground">
                       <EyeOffIcon className="size-3" aria-hidden />
@@ -308,22 +478,33 @@ function ReportsPanel() {
 
 function PostsPanel() {
   const [kind, setKind] = useState<CommunityKind | "all">("all");
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [state, setState] = useState<Load<PostRow>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Target | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const board = useBoardDirectory(state.status === "ready" ? state.rows.map((r) => r.board_owner) : []);
+  const boardMode = board.mode;
+  const boardPickerId = useId();
+  // 게시판 거르기는 "자유게시판"을 골랐을 때만(거를 게시판이 둘 이상일 때)
+  const showBoardFilter = kind === "board" && board.filterOptions.length > 2;
+  const appliedBoardFilter: BoardFilter = showBoardFilter && board.filterOptions.some((o) => o.value === boardFilter) ? boardFilter : "all";
 
   const query = useCallback(
     (from: number) => {
-      let q = supabase.from("community_posts").select(ADMIN_POST_COLUMNS);
+      let q = supabase.from("community_posts").select(boardMode === "boards" ? ADMIN_POST_COLUMNS_WITH_BOARD : ADMIN_POST_COLUMNS);
       if (kind !== "all") q = q.eq("kind", kind);
+      if (kind === "board" && appliedBoardFilter !== "all") {
+        q = appliedBoardFilter === "none" ? q.is("board_owner", null) : q.eq("board_owner", appliedBoardFilter);
+      }
       return q.order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, from + PAGE - 1);
     },
-    [kind],
+    [kind, boardMode, appliedBoardFilter],
   );
 
   useEffect(() => {
+    if (boardMode === "loading") return; // 게시판 SQL 적용 여부(읽을 열)를 알고 나서 읽는다
     let active = true;
     query(0).then(({ data, error }) => {
       if (!active) return;
@@ -336,7 +517,7 @@ function PostsPanel() {
     return () => {
       active = false;
     };
-  }, [query, attempt]);
+  }, [query, attempt, boardMode]);
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -381,6 +562,29 @@ function PostsPanel() {
           </Button>
         ))}
       </div>
+      {showBoardFilter ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor={boardPickerId} className="flex items-center gap-1.5 text-sm font-medium">
+            <UsersIcon className="size-4 text-muted-foreground" aria-hidden />
+            게시판
+          </label>
+          <NativeSelect
+            id={boardPickerId}
+            value={appliedBoardFilter}
+            onChange={(e) => {
+              setState({ status: "loading" });
+              setBoardFilter(e.target.value);
+            }}
+            className="h-11 max-w-full min-w-[14rem] px-3"
+          >
+            {board.filterOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      ) : null}
 
       {state.status === "loading" ? (
         <ListSkeleton rows={4} label="글을 불러오는 중" />
@@ -408,6 +612,12 @@ function PostsPanel() {
                     </Link>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {r.kind === "board" && board.showLabels ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <UsersIcon className="size-3" aria-hidden />
+                        {board.labelOf(r.board_owner)}
+                      </Badge>
+                    ) : null}
                     <span>{authorName(r)}</span>
                     <span>{formatDateTime(r.created_at)}</span>
                     {r.hidden ? (

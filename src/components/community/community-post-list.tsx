@@ -12,8 +12,10 @@ import { EmptyOwl, EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { outlinePillClass } from "@/lib/pill";
+import { boardOwnersOf, useBoardAccess } from "@/hooks/use-board-access";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
+import { noBoardNotice } from "@/lib/boards";
 import {
   authorName,
   communityPostHref,
@@ -38,57 +40,103 @@ type Status = "loading" | "ready" | "error" | "setup";
  * - `loginOnly`면 로그인한 사용자에게만 글을 불러와 보여 주고, 로그인하지 않은 방문자에게는 로그인 안내를 보인다
  *   (홈 '최근 자유게시판' 미리보기 — 2026-09-26 사용자 결정. 화면에서만 가리는 것이며, 게시판 자체의 공개 범위는
  *   "로그인해야만 이용" 스위치·RLS가 정한다).
+ * - 자유게시판은 담임교사별로 나뉜다(docs/community/teacher-boards/spec.md 개정 1): 내가 참여할 수 있는 게시판의 글만 보인다.
+ *   `boardOwner`(게시판 주인 id)를 주면 그 게시판만(자유게시판 목록 — 교사의 게시판 고르기), 안 주면 내 게시판을 모두 합쳐(홈 미리보기).
+ *   학급이 없는 계정은 "아직 배정된 담임 선생님이 없어요". SQL 적용 전(my_boards() 없음)에는 예전처럼 거르지 않는다.
  */
-export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: CommunityKind; limit?: number; loginOnly?: boolean }) {
-  const { loading: sessionLoading, user } = useSession();
+export function CommunityPostList({
+  kind,
+  limit,
+  loginOnly = false,
+  boardOwner,
+}: {
+  kind: CommunityKind;
+  limit?: number;
+  loginOnly?: boolean;
+  /** 자유게시판에서 이 게시판(주인 id)만 보기. 내가 참여할 수 없는 게시판이면 무시한다(내 게시판 모두). */
+  boardOwner?: string | null;
+}) {
+  const { loading: sessionLoading, user, isAdmin, profileStatus } = useSession();
   // "로그인해야만 이용"이 켜져 있으면 RLS가 글을 돌려주지 않는다 → 빈 목록 대신 까닭을 알려 준다.
   const locked = useLoginLocked();
   const userId = user?.id ?? null;
   const hiddenForGuest = loginOnly && !sessionLoading && !userId;
   const pageSize = limit ?? PAGE_SIZE;
   const meta = KIND_META[kind];
-  const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
-  const [status, setStatus] = useState<Status>("loading");
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [moreError, setMoreError] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const isBoard = kind === "board";
+  const boardAccess = useBoardAccess(isBoard);
 
-  // 로그인 사용자가 바뀌면(내 숨김 글 노출 여부) 다시 조회한다.
+  // 게시판 거르기: "?" = 아직 모름(게시판 목록을 읽는 중), "*" = 거르지 않음(학습게임 · SQL 적용 전 · 비로그인), 그 밖 = 주인 id 목록
+  let ownersKey = "*";
+  let noBoard = false;
+  if (isBoard) {
+    if (boardAccess.status === "ready") {
+      const all = boardOwnersOf(boardAccess.access);
+      if (all) {
+        const picked = boardOwner && all.includes(boardOwner) ? [boardOwner] : all;
+        ownersKey = picked.join(",");
+        noBoard = all.length === 0;
+      }
+    } else if (boardAccess.status === "loading" || boardAccess.status === "error") {
+      ownersKey = "?";
+    }
+  }
+
+  // 목록 상태는 "무엇을 불러온 것인지"(열쇠)와 함께 둔다 — 게시판을 바꾸면 이전 게시판 글이 잠깐도 보이지 않게.
+  const [attempt, setAttempt] = useState(0);
+  const listKey = `${kind}|${pageSize}|${userId ?? ""}|${ownersKey}|${attempt}`;
+  const [list, setList] = useState<{ key: string; status: Status; posts: CommunityPostSummary[]; hasMore: boolean }>({
+    key: "",
+    status: "loading",
+    posts: [],
+    hasMore: false,
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
+  // "더 불러오지 못했어요"는 그 목록(열쇠)에서 난 것만 보인다 — 게시판을 바꾸면 사라진다.
+  const [moreErrorKey, setMoreErrorKey] = useState<string | null>(null);
+  const moreError = moreErrorKey === listKey;
+
+  // 로그인 사용자가 바뀌면(내 숨김 글 노출 여부) · 게시판이 바뀌면 다시 조회한다.
   useEffect(() => {
     if (sessionLoading) return;
     if (loginOnly && !userId) return; // 로그인하지 않은 방문자에게는 불러오지도 않는다
+    if (ownersKey === "?" || noBoard) return; // 게시판 목록을 아직 모르거나, 쓸 수 있는 게시판이 없다
     let active = true;
-    fetchCommunityPosts(kind, 0, pageSize)
+    const owners = ownersKey === "*" ? null : ownersKey.split(",");
+    fetchCommunityPosts(kind, 0, pageSize, owners)
       .then((page) => {
-        if (!active) return;
-        setPosts(page);
-        setHasMore(page.length === pageSize);
-        setStatus("ready");
+        if (active) setList({ key: listKey, status: "ready", posts: page, hasMore: page.length === pageSize });
       })
       .catch((error: unknown) => {
-        if (active) setStatus(isSetupMissing(error) ? "setup" : "error");
+        if (active) setList({ key: listKey, status: isSetupMissing(error) ? "setup" : "error", posts: [], hasMore: false });
       });
     return () => {
       active = false;
     };
-  }, [kind, pageSize, userId, sessionLoading, attempt, loginOnly]);
+  }, [kind, pageSize, userId, sessionLoading, loginOnly, ownersKey, noBoard, listKey]);
+
+  const current = list.key === listKey ? list : { key: listKey, status: "loading" as Status, posts: [], hasMore: false };
+  const { status, posts, hasMore } = current;
 
   const retry = useCallback(() => {
-    setStatus("loading");
+    setMoreErrorKey(null);
     setAttempt((n) => n + 1);
   }, []);
 
   async function loadMore() {
     setLoadingMore(true);
-    setMoreError(false);
+    setMoreErrorKey(null);
     try {
-      const page = await fetchCommunityPosts(kind, posts.length, pageSize);
+      const owners = ownersKey === "*" ? null : ownersKey.split(",");
+      const page = await fetchCommunityPosts(kind, posts.length, pageSize, owners);
       const known = new Set(posts.map((p) => p.id));
-      setPosts((prev) => [...prev, ...page.filter((p) => !known.has(p.id))]);
-      setHasMore(page.length === pageSize);
+      setList((prev) =>
+        prev.key === listKey
+          ? { ...prev, posts: [...prev.posts, ...page.filter((p) => !known.has(p.id))], hasMore: page.length === pageSize }
+          : prev,
+      );
     } catch {
-      setMoreError(true);
+      setMoreErrorKey(listKey);
     } finally {
       setLoadingMore(false);
     }
@@ -97,6 +145,22 @@ export function CommunityPostList({ kind, limit, loginOnly = false }: { kind: Co
   if (locked) return <LoginNeededNotice what={meta.label} className="py-8" />;
   if (hiddenForGuest) {
     return <LoginNeededNotice what={meta.label} description={`최근 ${meta.label} 글은 로그인한 친구들에게만 보여요.`} className="py-8" />;
+  }
+
+  if (isBoard && boardAccess.status === "error") {
+    return (
+      <ErrorState
+        message={`${meta.label}을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.`}
+        onRetry={boardAccess.retry}
+        illustration={<ErrorFaceIllustration className="size-24" />}
+      />
+    );
+  }
+
+  // 교사·학생 안내가 다르다 — 역할(프로필)을 읽는 동안은 아래 "불러오는 중"을 보인다(재확인 N2)
+  if (noBoard && profileStatus !== "loading") {
+    const notice = noBoardNotice(isAdmin);
+    return <EmptyState title={notice.title} description={notice.description} illustration={<EmptyOwl />} className="py-8" />;
   }
 
   if (status === "loading") {

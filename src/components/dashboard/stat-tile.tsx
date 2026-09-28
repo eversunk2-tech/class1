@@ -8,6 +8,7 @@ import type { MenuColor } from "@/data/menu";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
 import { fetchLoginRequired } from "@/lib/admin";
+import { fetchBoardAccess } from "@/lib/boards";
 import { formatCount } from "@/lib/format";
 import { countCommunityPosts, isSetupMissing, type CommunityKind } from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
@@ -128,7 +129,8 @@ export function StatTile({
 
 /**
  * 개수를 스스로 불러오는 통계 타일. 타일마다 독립적으로 로딩/오류 상태를 갖는다.
- * source: 자유게시판·학습게임 = community_posts(kind)의 숨기지 않은 글 수,
+ * source: 자유게시판·학습게임 = community_posts(kind)의 숨기지 않은 글 수(자유게시판은 내가 참여하는 게시판만 —
+ *         담임교사별 게시판, docs/community/teacher-boards/spec.md 개정 1: 학생 = 자기 담임 게시판, 교사 = 내 게시판들),
  *         "notices" = 학급별 선생님 글(class_notices) 중 지금 보이는 글 수 — 몇 개가 보이는지는 RLS가 정한다
  *         (로그인한 학생 = 자기 학급 글, 담임 = 자기 학급 글, 방문자 = 총괄 선생님 글, docs/classes/spec.md 개정 2).
  */
@@ -170,7 +172,14 @@ function CountTile({
       // 방문자는 잠금 여부를 먼저 확인한다(홈 '선생님 글' 목록과 같게, Review L5): 켜져 있으면 세지 않고 "로그인 필요".
       // 공용 훅(useLoginLocked)은 설정을 늦게 알 수 있어, 그 사이에 개수 요청이 먼저 나가지 않게 한다.
       if (!sessionLoading && !userId && (await fetchLoginRequired())) return null;
-      return source === "notices" ? countVisibleNotices() : countCommunityPosts(source);
+      if (source === "notices") return countVisibleNotices();
+      if (source === "board" && userId) {
+        // 내가 참여하는 게시판의 글만 센다(총괄이 관리용으로 볼 수 있는 다른 게시판 글·반을 옮기기 전에 쓴 내 글은 빼고).
+        // SQL 적용 전(my_boards() 없음)이면 예전처럼 모두, 학급이 없는 계정이면 0.
+        const access = await fetchBoardAccess(userId);
+        return countCommunityPosts("board", access.mode === "legacy" ? null : access.boards.map((b) => b.ownerId));
+      }
+      return countCommunityPosts(source);
     })()
       .then((n) => {
         if (!active) return;

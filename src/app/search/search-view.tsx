@@ -14,9 +14,17 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { scienceHref } from "@/data/science-curriculum";
+import { boardOwnersOf, useBoardAccess } from "@/hooks/use-board-access";
 import { useLoginLocked } from "@/hooks/use-login-lock";
 import { useSession } from "@/hooks/use-session";
-import { loginHrefHere, POST_SUMMARY_COLUMNS, type CommunityKind, type CommunityPostSummary } from "@/lib/community";
+import { noBoardNotice } from "@/lib/boards";
+import {
+  loginHrefHere,
+  POST_SUMMARY_COLUMNS,
+  POST_SUMMARY_COLUMNS_WITH_BOARD,
+  type CommunityKind,
+  type CommunityPostSummary,
+} from "@/lib/community";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { outlinePillClass, primaryPillClass } from "@/lib/pill";
 import { supabase } from "@/lib/supabase";
@@ -25,7 +33,8 @@ import { cn } from "@/lib/utils";
 /*
  * 검색(2026-09-26 사용자 결정): 블로그 글이 아니라 **실험 앱·자유게시판·학습게임**을 함께 찾는다.
  *  - 실험 앱: 사이트에 들어 있는 과학 차시 자료(src/data/science-curriculum.ts)에서 찾는다(DB 조회 없음) — 차시 제목·단원·학기.
- *  - 자유게시판: 로그인한 사람만(게시판 자체가 로그인 전용 — RLS도 비로그인에게 돌려주지 않음).
+ *  - 자유게시판: 로그인한 사람만(게시판 자체가 로그인 전용 — RLS도 비로그인에게 돌려주지 않음), 내가 참여하는 게시판만
+ *    (담임교사별 게시판 — docs/community/teacher-boards/spec.md 개정 1: 학생 = 자기 담임 게시판, 교사 = 내 게시판들).
  *  - 학습게임: "로그인해야만 이용" 스위치대로(RLS).
  *  태그 칩은 종류(실험 앱·자유게시판·학습게임) 고르기다. 주소: /search/?q=…&kind=app|board|game
  */
@@ -74,9 +83,17 @@ function searchApps(q: string) {
   });
 }
 
-/** 자유게시판·학습게임 글 찾기(제목·내용). RLS가 볼 수 있는 글만 돌려준다. */
-async function searchCommunity(kind: CommunityKind, q: string, offset: number) {
-  let query = supabase.from("community_posts").select(POST_SUMMARY_COLUMNS).eq("kind", kind);
+/**
+ * 자유게시판·학습게임 글 찾기(제목·내용). RLS가 볼 수 있는 글만 돌려준다.
+ * boardOwners: 자유게시판을 이 게시판(주인 id)들로 거른다. null = 거르지 않음(학습게임 · SQL 적용 전).
+ */
+async function searchCommunity(kind: CommunityKind, q: string, offset: number, boardOwners: string[] | null = null) {
+  if (boardOwners && !boardOwners.length) return [] as CommunityPostSummary[];
+  let query = supabase
+    .from("community_posts")
+    .select(boardOwners ? POST_SUMMARY_COLUMNS_WITH_BOARD : POST_SUMMARY_COLUMNS)
+    .eq("kind", kind);
+  if (boardOwners) query = boardOwners.length === 1 ? query.eq("board_owner", boardOwners[0]) : query.in("board_owner", boardOwners);
   if (q) query = query.or(`title.ilike.${ilikeValue(q)},body.ilike.${ilikeValue(q)}`);
   const { data, error } = await query
     .order("created_at", { ascending: false })
@@ -261,7 +278,7 @@ type CommunityState = { status: "loading" } | { status: "error" } | { status: "r
 
 function CommunityResults({ kind, q }: { kind: "board" | "game"; q: string }) {
   const label = kind === "board" ? "자유게시판" : "학습게임";
-  const { loading: sessionLoading, user } = useSession();
+  const { loading: sessionLoading, user, isAdmin, profileStatus } = useSession();
   const userId = user?.id ?? null;
   const locked = useLoginLocked();
   // 자유게시판은 늘 로그인 전용, 학습게임은 잠금 스위치가 켜졌을 때 로그인 전용
@@ -270,11 +287,23 @@ function CommunityResults({ kind, q }: { kind: "board" | "game"; q: string }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // 자유게시판은 내가 참여하는 게시판만(담임교사별 게시판). "?" = 게시판 목록을 읽는 중, "*" = 거르지 않음, 그 밖 = 주인 id 목록
+  const boardAccess = useBoardAccess(kind === "board" && !needLogin);
+  const boardOwners = kind === "board" && boardAccess.status === "ready" ? boardOwnersOf(boardAccess.access) : null;
+  const ownersKey =
+    kind !== "board" || boardAccess.status === "idle"
+      ? "*"
+      : boardAccess.status === "ready"
+        ? boardOwners
+          ? boardOwners.join(",")
+          : "*"
+        : "?";
+  const noBoard = !!boardOwners && boardOwners.length === 0;
 
   useEffect(() => {
-    if (sessionLoading || needLogin) return;
+    if (sessionLoading || needLogin || ownersKey === "?") return;
     let active = true;
-    searchCommunity(kind, q, 0).then(
+    searchCommunity(kind, q, 0, ownersKey === "*" ? null : ownersKey ? ownersKey.split(",") : []).then(
       (posts) => {
         if (active) setState({ status: "ready", posts, hasMore: posts.length === PAGE_SIZE });
       },
@@ -285,14 +314,14 @@ function CommunityResults({ kind, q }: { kind: "board" | "game"; q: string }) {
     return () => {
       active = false;
     };
-  }, [kind, q, sessionLoading, needLogin, userId, attempt]);
+  }, [kind, q, sessionLoading, needLogin, userId, attempt, ownersKey]);
 
   async function loadMore() {
     if (state.status !== "ready") return;
     setLoadingMore(true);
     setMoreError(false);
     try {
-      const page = await searchCommunity(kind, q, state.posts.length);
+      const page = await searchCommunity(kind, q, state.posts.length, ownersKey === "*" ? null : ownersKey ? ownersKey.split(",") : []);
       const known = new Set(state.posts.map((p) => p.id));
       setState({ status: "ready", posts: [...state.posts, ...page.filter((p) => !known.has(p.id))], hasMore: page.length === PAGE_SIZE });
     } catch {
@@ -315,7 +344,25 @@ function CommunityResults({ kind, q }: { kind: "board" | "game"; q: string }) {
       </ResultSection>
     );
   }
-  if (state.status === "loading") {
+  if (kind === "board" && boardAccess.status === "error") {
+    return (
+      <ResultSection id={id} title={label}>
+        <ErrorState message={`${label} 검색 결과를 불러오지 못했어요.`} onRetry={boardAccess.retry} />
+      </ResultSection>
+    );
+  }
+  // 교사·학생 안내가 다르다 — 역할(프로필)을 읽는 동안은 아래 "불러오는 중"을 보인다(재확인 N2)
+  if (noBoard && profileStatus !== "loading") {
+    const notice = noBoardNotice(isAdmin);
+    return (
+      <ResultSection id={id} title={label}>
+        <p className="text-sm text-muted-foreground">
+          {notice.title}. {notice.description}
+        </p>
+      </ResultSection>
+    );
+  }
+  if (state.status === "loading" || noBoard) {
     return (
       <ResultSection id={id} title={label}>
         <div className="flex flex-col gap-3" aria-busy="true" aria-label={`${label} 검색 결과를 불러오는 중`}>
