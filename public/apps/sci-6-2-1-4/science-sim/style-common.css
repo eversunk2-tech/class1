@@ -355,6 +355,8 @@ a.ss-btn { display: inline-flex; align-items: center; justify-content: center; t
 
 /* ── 실험하기 화면 틀(experiment.js): 가로 화면은 좌우, 세로 화면·좁은 화면은 위아래 ── */
 .ss-wide { width: 100%; }
+/* 앱의 '학습 마치기' 버튼(class "wide")도 폭 전체 — 23개 앱 중 12개는 앱 style.css에 .wide가 없어 버튼이 작게 나왔다(2026-09-29 사용자 지적) */
+.ss-btn.wide { width: 100%; }
 .ss-intro summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; gap: 6px; list-style: none; }
 .ss-intro summary::-webkit-details-marker { display: none; }
 .ss-intro summary::after { content: "접기 ▴"; margin-left: auto; font-size: 0.85rem; font-weight: 600; color: var(--ss-muted); }
