@@ -250,13 +250,18 @@
           var noteText = el("span", { class: "ss-submit-note-text" });
           var submitNote = el("p", { class: "ss-submit-note", role: "note" }, [noteTag, noteText]);
           if (f.button.parentNode) f.button.parentNode.insertBefore(submitNote, f.button);
-          /** kind: "todo"(아직 안 냄) | "done"(제출함) | "warn"(마쳤지만 저장되지 않음) */
+          /** kind: "todo"(아직 안 냄) | "done"(제출함) | "trial"(체험 모드로 마침 — 저장은 안 되지만 학습은 마침) | "warn"(마쳤지만 저장되지 않음) */
           function setNote(kind) {
-            submitNote.classList.toggle("is-done", kind === "done");
+            // 체험 모드로 마치면 로그인해서 제출했을 때와 같은 바탕(is-done)에 "학습 완료"(2026-09-29 사용자 요청 — 로그인 없이 쓰는
+            // 학급도 학습을 마친 느낌이 들게). 결과 저장 안내는 버튼 아래 로그인 안내 줄이 맡는다.
+            submitNote.classList.toggle("is-done", kind === "done" || kind === "trial");
             submitNote.classList.toggle("is-warn", kind === "warn");
             if (kind === "done") {
               noteTag.textContent = "제출 완료";
               noteText.textContent = "✅ 선생님에게 제출했어요. 고친 내용이 있으면 다시 눌러 주세요.";
+            } else if (kind === "trial") {
+              noteTag.textContent = "학습 완료";
+              noteText.textContent = "✅ 학습을 마쳤어요!"; // 제출 완료와 같은 초록 체크(2026-09-29 사용자 요청)
             } else if (kind === "warn") {
               noteTag.textContent = "제출 안 됨";
               noteText.textContent = "⚠️ 아직 선생님에게 제출되지 않았어요. 아래 안내를 읽고 다시 눌러 주세요.";
@@ -412,7 +417,7 @@
             // 체험 모드(비로그인 + 사이트 잠금 꺼짐): 서버에 아무것도 보내지 않는다(persist.js 맨 위 주석 ⑦).
             if (SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial()) {
               f.msgEl.textContent = "";
-              setNote("warn");
+              setNote("trial");
               if (f.loginHintEl) window.Class1Record.renderLoginHint(f.loginHintEl, "로그인한 뒤 다시 '학습 마치기'를 누르면 결과가 저장돼요.");
               drawDone("체험 모드라서 결과는 저장되지 않았어요. 로그인하면 기록이 남아요.");
               return;
@@ -466,7 +471,13 @@
           }
           api.onStage(function (id) {
             if (id !== (f.stage || "curiosity")) return;
-            if (meta.finishedAt) setNote(meta.savedAt ? "done" : "warn");
+            if (meta.finishedAt && meta.savedAt) setNote("done");
+            else if (meta.finishedAt)
+              // 마쳤지만 저장 안 됨: 체험 모드면 "학습 완료", 아니면 "제출 안 됨" — 체험 여부는 로그인 여부가 정해진 뒤에 고른다
+              whenLoginKnown(function () {
+                if (!meta.finishedAt || meta.savedAt) return;
+                setNote(SciSim.Sync && SciSim.Sync.isTrial && SciSim.Sync.isTrial() ? "trial" : "warn");
+              });
             if (meta.finishedAt && f.doneEl.hidden) drawDone(meta.savedAt ? "✅ 결과를 저장했어요." : "");
             if (!loginChecked && recordReady && f.loginHintEl) {
               loginChecked = true;
