@@ -45,6 +45,7 @@
 * 웹앱 전용 테이블은 `app_{앱이름}_` 접두사를 붙인다.
 * 스키마 변경은 `supabase/migrations/`에 SQL 파일로 남긴다.
 * **Supabase 프로젝트의 조직은 사용자가 옮겼다(2026-10-07 점검)** — 프로젝트 주소·공개 키·데이터·로그인 계정·함수·Secret은 그대로다. 조직 단위의 것(요금제·백업·일시 정지)은 Claude가 볼 수 없으므로 단정하지 말고 사용자에게 대시보드 확인을 부탁한다. 무료 요금제 프로젝트는 한동안 쓰지 않으면 일시 정지될 수 있다 — 다시 켜는 방법(Resume project)과 그 뒤 할 일은 `docs/STATUS.md` Supabase 절. Supabase·GitHub·Vercel의 요금제·정책처럼 바뀔 수 있는 사실은 기억으로 답하지 말고 공식 문서를 확인해 출처와 함께 알린다.
+* **일시 정지 막기 예약 읽기**(2026-10-07 사용자 요청 "방학 중 정지 안 되게"): `.github/workflows/keep-supabase-awake.yml`(이름 `Keep Supabase awake`) — GitHub Actions가 하루 네 번 공개 키로 `site_settings` 한 줄을 읽는다(읽기만, `permissions: {}`, 저장소 Actions 비밀값 2개를 그대로 씀, 외부 액션·체크아웃 없음). **GitHub는 공개 저장소에 60일 동안 활동이 없으면 예약 작업을 끈다 — 이 규칙을 피해 가는 장치(작업이 스스로 다시 켜기·빈 커밋·그런 일을 하는 외부 액션)는 넣지 않는다**(그런 도구의 저장소를 GitHub가 약관 위반으로 막아 둠 — 근거는 `docs/STATUS.md` Supabase 절). 꺼지면 사용자가 Actions 화면에서 "Enable workflow"를 누르거나, 사용자가 부탁하면 Claude가 `gh workflow enable`. `site_settings` 공개 읽기 정책이나 Actions 비밀값 이름을 바꾸면 이 작업도 함께 고친다. 정지를 **보장하지는 않는다**(Supabase가 기준 수를 밝히지 않음)고 알린다 — 확실한 방법은 유료 요금제.
 
 ### SQL 적용 절차
 * SQL은 **사용자가 Supabase SQL Editor에서 직접 실행**한다. Claude와 서브에이전트는 실 DB에 쓰지 않는다(anon key로 읽기·거부되어야 할 요청 확인만).
@@ -85,7 +86,7 @@
 * **사이트(Next) 화면을 고쳤을 때** '후' 모습은 `blog-dev` 미리보기(`preview_start`)로 띄워 확인하고 끝나면 끈다(`preview_stop`). 개발 서버 화면 왼쪽 아래의 동그란 'N' 표시는 배포에 없으니 사진을 보낼 때 알린다. 과학 앱은 아래 서브에이전트 규칙대로 정적 서버로 본다.
 * **배포 뒤 기록만 고친 문서 커밋**(`docs/STATUS.md`·`CLAUDE.md`)은 따로 올리지 않고 다음 배포 때 함께 올린다(사용자가 원하면 바로). `git log origin/main..main`에 문서 커밋만 남아 있는 것은 정상이다.
 * **연동 점검**(사용자가 "연동 확인해줘"라고 하거나, 조직·계정을 옮긴 뒤, 일시 정지된 Supabase 프로젝트를 다시 켠 뒤 — 2026-10-07에 한 방식): **읽기 요청만**으로 본다.
-  * GitHub: 저장소 위치(`gh repo view`)·Pages 설정·Actions 비밀값 이름·마지막 배포 기록.
+  * GitHub: 저장소 위치(`gh repo view`)·Pages 설정·Actions 비밀값 이름·마지막 배포 기록, 예약 작업 `Keep Supabase awake`의 상태(active)와 마지막 실행 결과(`gh run list --workflow keep-supabase-awake.yml`).
   * 두 사이트: 200, 내보내는 파일 해시가 `origin/main`과 같은지, 빌드 묶음이 같은 Supabase 프로젝트를 가리키는지.
   * Supabase(공개 키): Auth health, `/auth/v1/settings`의 켜진 로그인 수단, `site_settings` 읽기, 비로그인 게시판 글 0, 함수 5개(두 사이트 주소 허용·다른 주소 거부, 토큰 없이 401, `check-answer`는 공개 키 + 빈 본문에 400 — **Gemini는 부르지 않는다**), 구글 로그인 시작 주소 302.
   * 자동 배포: 사용자 허락을 받고 문서만 바뀐 커밋을 올려, GitHub 배포 기록에 `github-pages`와 `vercel[bot]` Production이 둘 다 생기는지 본다.

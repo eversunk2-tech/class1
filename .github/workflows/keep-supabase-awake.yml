@@ -1,0 +1,46 @@
+name: Keep Supabase awake
+
+# 무료 요금제 Supabase 프로젝트는 한 주 동안 데이터베이스 사용이 적으면 일시 정지된다.
+# 방학처럼 사이트를 쓰지 않는 때에도 하루 네 번, 사이트가 늘 읽는 공개 설정 한 줄을 읽어 둔다(공개 키로 읽기만).
+# 저장소에 60일 동안 활동이 없으면 GitHub가 이 예약 작업을 끈다 — Actions 화면의 "Enable workflow"로 다시 켠다.
+# 그 규칙을 피해 가는 장치(스스로 다시 켜기·빈 커밋)는 넣지 않는다. 자세한 것은 docs/STATUS.md의 Supabase 절.
+
+on:
+  schedule:
+    # UTC 기준 — 한국 시간 0시·6시·12시·18시 23분쯤(정각은 붐벼서 피함)
+    - cron: "23 3,9,15,21 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the public settings row
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Actions 비밀값 NEXT_PUBLIC_SUPABASE_URL·NEXT_PUBLIC_SUPABASE_ANON_KEY를 읽지 못했어요."
+            exit 1
+          fi
+          endpoint="${SUPABASE_URL%/}/rest/v1/site_settings?select=login_required&limit=1"
+          # 예약 실행이 빠지는 날을 생각해 한 번 돌 때 세 번 읽는다.
+          ok=0
+          for n in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "Accept: application/json" \
+              "$endpoint") || true
+            echo "읽기 $n: HTTP $code"
+            if [ "$code" = "200" ]; then ok=$((ok + 1)); fi
+            if [ "$n" -lt 3 ]; then sleep 15; fi
+          done
+          if [ "$ok" -eq 0 ]; then
+            echo "::error::Supabase 읽기에 실패했어요(마지막 응답 HTTP $code). 프로젝트가 일시 정지됐는지 Supabase 대시보드에서 확인하고, 주소나 공개 키를 바꿨다면 Actions 비밀값도 바꿔 주세요."
+            exit 1
+          fi
