@@ -12,7 +12,8 @@ export function loginIdToEmail(id: string): string {
   return (trimmed.includes("@") ? trimmed : `${trimmed}@${LOGIN_EMAIL_DOMAIN}`).toLowerCase();
 }
 
-export type OAuthProvider = "github" | "google";
+/** 로그인은 관리자가 만든 아이디와 Google만 쓴다(2026-10-07 사용자 결정 — GitHub 로그인은 화면에서 뺐고 Supabase에서도 꺼져 있다). */
+export type OAuthProvider = "google";
 
 export async function signInWithId(id: string, password: string) {
   return supabase.auth.signInWithPassword({ email: loginIdToEmail(id), password });
