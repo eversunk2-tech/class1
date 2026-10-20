@@ -8,6 +8,13 @@
  *     rethink … "다시 한번 생각해서 써 볼까요?" 카드. **그대로 제출도 할 수 있다.** 질문당 평생 1번만 뜬다.
  *     block   … "아직 이 질문과 어울리는 답이 아니에요" 카드. 다시 쓰기 전에는 못 넘어간다.
  *
+ * ▶ AI 판정은 꺼져 있다(2026-10-20 사용자 결정 — 아래 AI_CHECK = false)
+ *   Gemini API 추가 약관(2026-03-23 시행)이 "18세 미만이 쓰거나 쓸 가능성이 높은 웹사이트·앱의 일부로 서비스를 쓰지 않는다"고 해서
+ *   check-answer를 부르지 않는다 — 학생이 적은 글은 이 기기와 이 사이트의 서버 밖으로 나가지 않는다(체험 모드도 같다).
+ *   지금은 로컬 규칙(확실한 무의미)만 막고 나머지는 모두 그대로 통과한다(rethink 카드·"질문과 관련 없음" 차단·스피너가 나오지 않는다).
+ *   아래의 Gemini 설명은 다시 켤 때를 위한 기록이다. 다시 켜려면 학생용으로 쓸 수 있는 AI와 그 약관을 확인하고
+ *   사용자가 정한 뒤 AI_CHECK를 true로 바꾼다(정본 두 개 → 앱 사본 23개, docs/privacy/spec.md).
+ *
  * ▶ 느슨한 단계(stage: "curiosity") — '더 탐구하고 싶은 점'
  *   정답이 없는 질문이라 **무의미한 글·완전히 딴 이야기만** 막는다(ok / block만 쓴다).
  *   내용이 아쉽다는 이유로는 절대 되짚지 않는다(rethink 없음). Edge Function도 이 단계는 같은 기준으로 본다.
@@ -49,6 +56,8 @@
   var SciSim = (window.SciSim = window.SciSim || {});
   var el = SciSim.el;
 
+  /* AI(Gemini) 판정 스위치 — 2026-10-20 사용자 결정으로 끔(머리말 "AI 판정은 꺼져 있다"). false면 check-answer를 부르지 않는다. */
+  var AI_CHECK = false;
   var STORE_KEY = "answerCheck"; /* store의 새 키 — 저장 구조·버전은 그대로 */
   var TIMEOUT_MS = 9000; /* 클라이언트 전체 대기 한도 — 서버의 Gemini 대기(7초) + 함수가 처음 켜지는 시간. 2026-09-26: 3.5초로는 Gemini가 조금만 늦어도 판단을 놓쳤다(로그 "Gemini 호출 실패 timeout") */
   var TEACHER_AT = 3; /* 같은 질문에서 이 횟수째 block부터 교사 확인 버튼 */
@@ -346,6 +355,7 @@
     var st = get(key);
     if (st.teacherOverride) return true;
     if (Rules.block(t, question)) return false; /* 확실한 무의미는 언제든 다시 막는다 */
+    if (!AI_CHECK) return true; /* AI 판정이 꺼져 있으면 로컬 규칙을 지난 글은 verify()도 그대로 통과시킨다 */
     if (st.nudged) return true;
     if (st.okFp && st.okFp === fp(t)) return true;
     if (o && o.stage === "conclude" && modelWordHit(t, o.model)) return true;
@@ -397,9 +407,10 @@
     /* ④ 정리하기 통과 지름길(모범 답안 낱말이 이미 들어 있음) */
     if (o.stage === "conclude" && modelWordHit(text, o.model)) return Promise.resolve(pass());
 
-    /* ⑤ 체험 모드도 아래에서 Gemini에게 묻는다(2026-09-26 사용자 결정 — 전에는 로컬 규칙만으로 통과시켰다). */
+    /* ⑤ AI 판정이 꺼져 있으면(2026-10-20 — AI_CHECK) 로컬 규칙을 지난 글은 그대로 통과한다. 서버를 부르지 않는다. */
+    if (!AI_CHECK) return Promise.resolve(pass());
 
-    /* ⑥ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) */
+    /* ⑥ Gemini에게 묻는다(응답하지 못하면 절대 막지 않는다) — AI_CHECK가 켜졌을 때만. 체험 모드도 묻는다(2026-09-26 사용자 결정). */
     if (cfg.appId && !APP_ID_RE.test(cfg.appId)) return Promise.resolve(true);
     showWait(o.mount);
     return ask(payloadFor(o, st.blockCount)).then(function (r) {
@@ -552,6 +563,7 @@
     },
     /* 시험·점검용(내부) */
     _rules: Rules,
+    _aiCheck: AI_CHECK,
     _timeoutMs: TIMEOUT_MS,
     _teacherAt: TEACHER_AT,
     _lenientStage: LENIENT_STAGE,
