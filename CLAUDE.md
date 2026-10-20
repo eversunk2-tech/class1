@@ -38,7 +38,7 @@
 * 학습 테이블: `member_directory`, `app_results`, `app_progress`, `post_reads`, `assignments`, `assignment_submissions`, `feedback_threads`, `feedback_messages`, `feedback_read_marks`, `praise_presets` (설계: `docs/admin/spec.md`, `docs/admin/responses-spec.md`).
 * 관리 테이블: `site_settings`(로그인 잠금 스위치 한 줄, 읽기는 항상 공개), `password_reset_log`, `member_withdrawal_log`, `member_create_log`(감사 로그, 관리자만 조회, 쓰기는 service_role 함수로만) (설계: `docs/admin/admin-tools/spec.md`, `docs/admin/create-members/`).
 * 커뮤니티 테이블: `community_posts`(kind: board|game, 게시판 글의 `board_owner` = 게시판 주인 담임 — 09-28), `community_comments`, `community_likes`, `community_reports`(`target_board_owner`·`target_post_kind` 스냅샷), Storage 버킷 `game-uploads`(비공개) (설계: `docs/community/spec.md`, 담임교사별 게시판 `docs/community/teacher-boards/spec.md`).
-* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `admin-purge-oauth-member`(구글·깃허브 전용 계정 완전 삭제 — 총괄만, 2026-09-28), `check-answer`(Gemini, 비밀 `GEMINI_API_KEY`). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지). 함수의 허용 출처(CORS)는 GitHub Pages·localhost + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 주소, 지금 `https://class1-chi.vercel.app`) — 주소를 더할 때 코드는 고치지 않고 Secret을 바꾼 뒤 함수 5개를 모두 다시 배포한다.
+* service_role이 필요한 작업은 Supabase Edge Function(`supabase/functions/`)으로만 하고, 호출자의 관리자 여부를 함수 안에서 검증한다. 지금 함수: `admin-reset-password`, `admin-delete-member`, `admin-create-member`, `admin-purge-oauth-member`(구글·깃허브 전용 계정 완전 삭제 — 총괄만, 2026-09-28), `check-answer`(Gemini, 비밀 `GEMINI_API_KEY` — 2026-10-20부터 앱이 부르지 않음). **개인정보 작업으로 2개 추가 예정**(배포 전 — `member-self-delete` 본인 가입 취소·탈퇴, `admin-clear-students` 학급 정리·학생 한 명 기록까지 삭제; `admin-create-member`는 보호자 동의 필수로 수정). 함수 코드를 고치면 사용자가 `npx supabase functions deploy <이름>`으로 다시 배포해야 한다고 알린다(`--no-verify-jwt` 금지). 함수의 허용 출처(CORS)는 GitHub Pages·localhost + Supabase Secrets `EXTRA_ALLOWED_ORIGINS`(쉼표로 구분한 추가 주소, 지금 `https://class1-chi.vercel.app`) — 주소를 더할 때 코드는 고치지 않고 Secret을 바꾼 뒤 함수 5개를 모두 다시 배포한다.
 * 함수 배포·Secret 설정은 **사용자가 자기 Mac 터미널에서** 한다(Supabase CLI 로그인 되어 있음, 토큰은 macOS 키체인). "Access token not provided"가 나오면 `npx supabase login`부터(브라우저 승인 → 확인 코드). Claude는 토큰·암호·확인 코드를 묻거나 입력하지 않는다. `supabase/.temp/`는 커밋하지 않는다(09-28부터 `.gitignore` — 추적 해제).
 * `check-answer`는 Gemini를 7초까지 기다리고 생각(thinking)을 끈다(`thinkingBudget:0` → 400이면 `thinkingLevel:"low"` → 설정 없음), 앱(`answer-check.js`)은 9초까지 기다린다 — **함수 대기 시간을 늘리면 앱 대기도 그보다 길게**. 대답을 못 받으면 차단하지 않고 그 질문을 "되짚음"으로 기록하지 않는다. 함수 로그에 켜질 때 모델 정보, 판정마다 `ms`·`modelVersion`이 남는다 — 느리거나 모델이 바뀌면 코드 대신 Secret `GEMINI_MODEL`을 바꾼다.
 * 외부 AI API 키 등 비밀값은 Supabase Secrets에만 두고 코드·저장소·로그·브라우저에 절대 넣지 않는다. 외부로 보내는 학생 데이터는 답 글·질문·모범 답안뿐(이름·학번·user id·이메일 금지).
@@ -68,6 +68,24 @@
 * **학급(반별 구분, 2026-09-26 사용자 결정 — `docs/classes/spec.md` 개정 1·2, 09-26 배포: SQL ①~④ 사용자 실행·함수 3개 재배포·화면 `e4d33ce`)**: 역할 = **총괄**(`profiles.is_super_admin`, 사이트 관리자 — 부엉이반 담임 겸임) / **담임**(`role='admin'`, 자기가 개설한 학급 — `class_teachers`) / **학생**(`profiles.class_id`). 학습 기록(과학 앱 결과·진행, 학생 응답, 과제 제출, 피드백)은 **그 반 담임만** 본다(총괄도 다른 반은 못 봄 — RLS `teaches_student()`에 총괄 예외 없음). 비밀번호 초기화·탈퇴 = 담임(자기 반) + 총괄(모든 반), 학생 등록 = 담임(자기 반만), 담임 지정·교사 계정·로그인 잠금 스위치 = 총괄만. 담임이 학급을 개설하고 이름을 정한다. 학급 이름은 **관리자 화면에서만** — 학생 화면에는 소속 정보를 보이지 않는다(`class_id`·`is_super_admin`은 공개 열이 아님). 지금 학생 = '부엉이반'(담임 = 총괄). **과제·블로그 글의 고치기·지우기 = 쓴 교사 또는 총괄**, **과제도 학급별**(학생 = 자기 반 공개 과제만·비로그인 없음, 만들기 = 자기 학급에만 — 09-26 사용자 결정, spec 개정 3, SQL ⑤ `20260927030000`·⑥ `20260927040000` 사용자 실행·배포 09-26). 선생님 글은 학급별(로그인한 학생 = 자기 담임 글만 — 다른 반 학생은 총괄 글도 안 봄, 비로그인 = 총괄 글(로그인 잠금 스위치가 켜지면 이것도 안 보임 — 09-26 사용자 확정), 안내 문구 없음).
 * redirect URL은 `https://eversunk2-tech.github.io/class1/**`와 `http://localhost:3000/class1/**`, `https://class1-chi.vercel.app/class1/**`(Vercel)를 등록한다(Supabase Authentication → URL Configuration — 아이디·비밀번호 로그인에는 필요 없고 Google 로그인이 그 주소로 돌아오게 할 때 필요).
 
+
+## 개인정보·교사 인증 규칙 (2026-10-20 — 설계 `docs/privacy/spec.md`, 화면 글 원문 `docs/privacy/privacy-policy.md`, 진행은 `docs/STATUS.md`)
+
+* **교사 인증 코드의 실제 값(6자리)은 저장소·문서·지침·보고·메모리 어디에도 적지 않는다**(공개 저장소). 시험·예시는 `000000`. 총괄이 관리자 화면 '개인정보 설정'에서 넣고 바꾸며 서버에는 bcrypt 해시만 둔다.
+* **화면 글의 원문은 `docs/privacy/privacy-policy.md`**(사용자가 문장 단위로 승인 — 묻지 않고 바꾸지 않는다). 화면 코드는 원문 글자 그대로 옮기고, 원문에 없는 새 문장은 보고에 문장 그대로 적어 사용자에게 확인받는다. 고칠 때는 고친 문장만이 아니라 그 구역 전체를 보여 준다.
+* 처리방침에는 **사실만**(코드·SQL·각 회사 공식 문서와 대조), 불리한 사실도(무료 요금제라 자동 백업 없음, Supabase 서버 관리 화면에 로그인 정보가 남음 등). 법에 관한 말은 국가법령정보센터 원문을 받아 조문·시행일과 함께 말하고 **"법적으로 문제없다"고 단정하지 않는다**(Claude는 법률 자문이 아님 — 학교 개인정보 담당자 확인을 권한다). 바뀔 수 있는 회사 약관·요금은 공식 문서로 확인.
+* **구글 계정만** 개인정보 확인 창 + 교사 인증 코드. 인증하면 교사(role admin) + **자기 학급 일만**(`profiles.teacher_scope='class'` — `is_full_admin()`이 아니면 학습게임 전체 관리·신고 처리·블로그 글·함께 쓰는 칭찬 문구를 못 함). 관리자가 만든 아이디 계정(학생·교사)은 코드 없이. **학생 확인 창은 두지 않는다**(만 14세 미만은 보호자 동의가 근거 — 법 제22조의2).
+* **학생 계정은 보호자 동의서(종이, 담임 보관)를 받은 학생만** 만든다 — 회원 추가에서 학생이면 필수 체크 + 누가 언제 체크했는지 기록. 동의서 양식 `public/templates/guardian-consent.hwpx`(교사 대시보드에서만 링크).
+* **보유 기간: 종업식 뒤 그 학년도의 2월 28일까지** 담임(또는 총괄)이 '학급 정리'로 학생 계정·기록을 지운다(사람이 실행 — 자동 삭제 없음, 관리자 화면에 기한 알림).
+* **학생 아이디·이름은 그 학생의 담임만 온전히** 보고, 총괄을 포함한 그 밖의 사람에게는 **첫 글자 + `***`**(2026-10-20 사용자 결정 — 설계·구현은 STATUS '이어서 할 일'). 구글 선생님 이메일도 사이트의 표·화면에서 첫 글자 + `***`.
+* 처리방침 시행 전에는 `/privacy/`가 "준비 중"만 보인다(시행 시각 = SQL ③ 실행, `site_settings.policy_effective_at`). 화면 상수 `POLICY_VERSION`과 DB `site_settings.privacy_version`이 같아야 한다.
+
+## 한글(hwpx) 파일
+
+* 한글 파일은 **hwpx 스킬**(`anthropic-skills:hwpx`)로 만든다. 사용자가 양식(hwpx)을 주거나 가리키면 **그 양식의 칸·쪽 구조를 그대로 두고 글만 바꾸는 레퍼런스 복원**: `hwpx_slots.py`로 칸 목록 → 칸별 글자 수 한도 안에서 값 작성 → `edit_hwpx.py --slot-json` → `validate.py` → `fix_namespaces.py` → `finalize_hwpx.py --strip-linesegarray --layout` → `validate.py --layout` → **`page_guard.py`(쪽수·구조)·`content_guard.py`(옛 글·학교명이 남지 않았는지)** 모두 통과해야 완료. 사용자가 좋아한 예: 노트북LM 기본과정 강의원고(사용자 양식을 따름), 2026-10-20 보호자 동의서(사용자의 예전 '생성형 AI 학부모 사용 동의서' 양식).
+* 이 Mac에는 `lxml`이 없고 파이썬이 3.9다: 스크래치에 가상환경(`python3 -m venv` + `pip install lxml` — **내려받기라 사용자 허락 필요**, 10-20 허락받음)과, 스킬 스크립트 복사본에 `from __future__ import annotations`를 넣은 것을 쓴다(스킬 원본은 고치지 않음). 스크래치는 며칠 뒤 지워지므로 없으면 다시 만든다(내려받기는 다시 허락).
+* 공개되는 파일(저장소·사이트)에는 학교명·주소·전화·교표·사람 이름, 출처를 모르는 그림, **미리보기(Preview/PrvText·PrvImage)에 남은 옛 문서 모습**을 남기지 않는다(빈칸 `(  )초등학교`로).
+* 사용자 화면이 전체 화면 Space면 Claude는 한글 창을 보거나 옮길 수 없다(`app_bring_to_current_space` 거부) — 파일을 보내고(`SendUserFile`) 한글에서 열어 둔 뒤 사용자에게 확인을 부탁한다.
 
 ## 작업 사이클
 
