@@ -107,8 +107,10 @@ export type MemberRow = MemberDirectory & {
 
 /** must_change_password는 컬럼 권한으로 막혀 있어(20260922000000) embed하지 않는다 → admin.ts가 RPC로 채운다.
  *  withdrawn_at은 20260923000000에서 공개 컬럼으로 열어 두었다. */
+// 외래키 이름(member_directory_id_fkey)을 꼭 붙인다: 개인정보 SQL ①이 member_directory.guardian_consent_by → profiles 외래키를
+// 더해 그냥 profiles(...)라고 쓰면 PGRST201(관계가 둘)로 회원 목록 전체가 실패한다(2026-10-21 배포 뒤 사용자 발견).
 export const MEMBER_ROW_COLUMNS =
-  "id,email,provider,providers,signed_up_at,last_sign_in_at,updated_at,profiles(display_name,avatar_url,role,withdrawn_at)";
+  "id,email,provider,providers,signed_up_at,last_sign_in_at,updated_at,profiles!member_directory_id_fkey(display_name,avatar_url,role,withdrawn_at)";
 
 /** 학급 기능 SQL(20260927000000_classes_schema.sql) 적용 뒤의 회원 행 컬럼: 위 + 학급 id. 이름은 classes 목록으로 붙인다. */
 export const MEMBER_ROW_COLUMNS_WITH_CLASS = `${MEMBER_ROW_COLUMNS},class_id`;

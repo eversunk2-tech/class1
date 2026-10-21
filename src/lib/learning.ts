@@ -1006,7 +1006,7 @@ export async function fetchStudents(classIds: readonly string[] | null = null): 
   const data = await fetchAllPages<unknown>((from, to) => {
     let q = supabase
       .from("member_directory")
-      .select(`id,email,${classIds ? "class_id," : ""}profiles!inner(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
+      .select(`id,email,${classIds ? "class_id," : ""}profiles!member_directory_id_fkey!inner(${AUTHOR_PROFILE_COLUMNS},role)`, { count: "exact" })
       .eq("profiles.role", "user");
     if (classIds) q = q.in("class_id", [...classIds]);
     return q.order("id").range(from, to);
