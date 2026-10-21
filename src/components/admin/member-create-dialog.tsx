@@ -520,13 +520,18 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   const contextReady = perms.legacy || ctx.status === "ready";
   // 학급이 없는 담임은 만들 수 있는 것이 없다(학생은 학급 필요, 교사는 총괄만).
   const nothingAllowed = ctx.status === "ready" && !ctx.classes.length && !perms.canCreateTeacher;
+  // 학생을 만들 수 있는가(학급 기능 전이면 예전처럼 학생도 만든다). 교사만 만들 수 있는 총괄(학급 없음)에게는 동의 칸이 필요 없다.
+  const canMakeStudents = perms.legacy || (ctx.status === "ready" && ctx.classes.length > 0);
 
   async function onPick(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    // 동의 체크는 "이 파일에 있는 학생"에 대한 표시 — 다른 파일을 고르면 다시 체크해야 만들 수 있다(검토 R2 M2)
-    setConsent(false);
-    setConsentTried(false);
+    // 동의 체크는 "이 파일에 있는 학생"에 대한 표시 — 이미 고른 파일을 다른 파일로 바꾸면 다시 체크해야 만들 수 있다(검토 R2 M2).
+    // 파일을 고르기 전에 먼저 체크한 것은 그대로 둔다(체크 칸은 파일을 고르기 전부터 보인다 — 2026-10-21 사용자 지적).
+    if (fileName) {
+      setConsent(false);
+      setConsentTried(false);
+    }
     setFileName(file.name);
     setError(null);
     setNotice(null);
@@ -672,17 +677,20 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
               ) : null}
             </p>
           ) : null}
-          {studentCount > 0 ? (
-            <GuardianConsentField
-              kind="file"
-              checked={consent}
-              onChange={setConsent}
-              showRequired={consentTried}
-              disabled={busy}
-              inputRef={consentRef}
-            />
-          ) : null}
         </>
+      ) : null}
+
+      {/* 보호자 동의(8-1): 파일을 고르기 전부터 보인다(양식 내려받기 링크도 여기 — 2026-10-21 사용자 지적).
+          학생을 만들 수 없는 계정(학급 없음)이거나, 고른 파일에 학생 줄이 없으면 숨긴다. */}
+      {canMakeStudents && phase.kind !== "done" && (checked.length === 0 || studentCount > 0) ? (
+        <GuardianConsentField
+          kind="file"
+          checked={consent}
+          onChange={setConsent}
+          showRequired={consentTried}
+          disabled={busy}
+          inputRef={consentRef}
+        />
       ) : null}
 
       {phase.kind === "working" ? (
