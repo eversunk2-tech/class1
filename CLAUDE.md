@@ -54,6 +54,7 @@
 * 사용자에게 실행을 부탁하기 전에 Claude가 SQL을 직접 검토한다. 로컬 Postgres가 없으므로 RLS 정책 안에서 같은 테이블을 다시 조회하지 않는다(42P17 정책 재귀 오류 — 필요하면 `security definer` 함수로 분리).
 * 배열을 돌려주는 함수와 비교할 때는 `x = any (public.f())`로 쓴다 — `x = any ((select public.f()))`처럼 괄호를 겹치면 Postgres가 하위 쿼리 형태로 읽어 `uuid = uuid[]` 오류(42883)가 난다(2026-09-26 `20260927020000_class_notices.sql` 첫 실행 실패 — 읽어서 하는 검토에서 놓침).
 * 앱·사이트 코드가 새 SQL에 의존하면 SQL 실행 → 확인 → push 순서로 배포한다(그 반대면 사이트가 깨질 수 있음).
+* **새 SQL이 어떤 표에 `profiles`(등)로 가는 외래키를 하나 더 만들면** 화면의 `profiles(...)` embed가 PGRST201(관계가 둘)로 통째로 실패한다(2026-10-21 회원 목록 — `member_directory.guardian_consent_by`). 외래키를 더할 때는 그 표를 embed하는 곳을 모두 찾아 `profiles!<외래키 이름>(...)`으로 고치고, SQL 실행 뒤 공개 키로 `?select=id,profiles(id)`를 불러 PGRST201이 아닌지(권한 거부 42501이면 정상) 본다 — 가짜 응답 시험으로는 잡히지 않는다.
 * 반별 권한 SQL(`20260927010000_classes_rls.sql`)을 적용한 뒤에는 그보다 앞선 마이그레이션을 다시 실행하지 않는다 — 옛 정책·함수가 되살아나 권한이 소리 없이 넓어진다(바꿀 것은 새 파일로, 비상 되돌리기는 `docs/classes/rollback-classes-rls.sql`).
 
 ### 로그인 (Auth)
