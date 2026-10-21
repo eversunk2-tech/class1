@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { PRIVACY_ADMIN_EXTRA_TEXT } from "@/data/privacy-admin-text";
 import {
   canModifyContent,
   contentLockReason,
@@ -52,6 +53,8 @@ async function fetchAll(): Promise<AdminRow[]> {
 
 export function AdminPostList() {
   const ctx = useAdminContext();
+  // "자기 학급 일만" 선생님은 블로그 글을 쓸 수 없다(docs/privacy/spec.md 4.6 — 서버 is_full_admin()이 거부) → 새 글 단추를 끄고 안내 한 줄.
+  const canWrite = ctx.isFullAdmin;
   const [state, setState] = useState<State>({ status: "loading" });
   // 여러 행을 연달아 토글해도 각 행의 진행 상태가 서로 풀리지 않도록 id 집합으로 관리한다.
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
@@ -128,11 +131,23 @@ export function AdminPostList() {
         title="글 관리"
         description="발행된 글과 초안을 모두 볼 수 있습니다."
         actions={
-          <Button className="h-9 px-4" render={<Link href="/admin/write/" />} nativeButton={false}>
-            <PlusIcon />새 글 작성
-          </Button>
+          canWrite ? (
+            <Button className="h-9 px-4" render={<Link href="/admin/write/" />} nativeButton={false}>
+              <PlusIcon />새 글 작성
+            </Button>
+          ) : (
+            <Button className="h-9 px-4" disabled aria-describedby="blog-class-only">
+              <PlusIcon />새 글 작성
+            </Button>
+          )
         }
       />
+      {!canWrite ? (
+        <p id="blog-class-only" role="note" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <LockIcon className="size-4 shrink-0" aria-hidden />
+          {PRIVACY_ADMIN_EXTRA_TEXT.blogClassOnly}
+        </p>
+      ) : null}
 
       {state.status === "loading" ? (
         <div className="flex flex-col gap-2" aria-busy="true" aria-label="글 목록을 불러오는 중">
@@ -146,9 +161,11 @@ export function AdminPostList() {
         <EmptyState
           title="작성된 글이 없습니다"
           action={
-            <Button variant="outline" render={<Link href="/admin/write/" />} nativeButton={false}>
-              첫 글 작성하기
-            </Button>
+            canWrite ? (
+              <Button variant="outline" render={<Link href="/admin/write/" />} nativeButton={false}>
+                첫 글 작성하기
+              </Button>
+            ) : undefined
           }
         />
       ) : (

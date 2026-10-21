@@ -10,10 +10,12 @@ import {
   LogOutIcon,
   PenSquareIcon,
   SproutIcon,
+  UserMinusIcon,
   UserPenIcon,
   UsersIcon,
 } from "lucide-react";
 import { UnreadCount } from "@/components/learning/learning-ui";
+import { MemberSelfWithdrawDialog, useSelfWithdrawAvailable } from "@/components/member-self-withdraw-dialog";
 import { ProfileDialog } from "@/components/profile-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SELF_WITHDRAW_TEXT } from "@/data/privacy-policy";
 import { displayNameOf, useSession } from "@/hooks/use-session";
 import { useUnreadFeedback } from "@/hooks/use-unread-feedback";
 import { userHasPasswordLogin } from "@/lib/admin";
@@ -36,6 +39,9 @@ export function UserMenu() {
   const { loading, user, profile, isAdmin } = useSession();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  // 구글 선생님(총괄 제외)의 스스로 회원 탈퇴(docs/privacy/spec.md 4.7-2, privacy-policy.md 8-6절)
+  const canWithdraw = useSelfWithdrawAvailable();
   // 학생: 선생님이 보낸 안 읽은 메시지 / 관리자: 학생이 보낸 안 읽은 메시지
   const unread = useUnreadFeedback();
 
@@ -139,9 +145,16 @@ export function UserMenu() {
             <LogOutIcon />
             로그아웃
           </DropdownMenuItem>
+          {canWithdraw ? (
+            <DropdownMenuItem onClick={() => setWithdrawOpen(true)} className="text-muted-foreground">
+              <UserMinusIcon />
+              {SELF_WITHDRAW_TEXT.title}
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+      {canWithdraw ? <MemberSelfWithdrawDialog open={withdrawOpen} onOpenChange={setWithdrawOpen} /> : null}
     </>
   );
 }

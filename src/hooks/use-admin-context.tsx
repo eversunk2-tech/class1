@@ -28,6 +28,9 @@ import {
 
 export type AdminContextStatus = "loading" | "ready" | "missing" | "error";
 
+/** 교사 권한 범위(docs/privacy/spec.md 4.6): full = 모든 권한, class = 자기 학급 일만(구글로 인증한 선생님 기본값) */
+export type TeacherScope = "full" | "class";
+
 type Snapshot = {
   userId: string | null;
   status: AdminContextStatus;
@@ -38,6 +41,8 @@ type Snapshot = {
   visibleClasses: ClassInfo[];
   /** 교사 id → 담임 학급 id 목록(총괄만, 못 읽으면 null) */
   teacherClasses: Map<string, string[]> | null;
+  /** 내 권한 범위(my_admin_context().teacher_scope — 없으면 full) */
+  teacherScope: TeacherScope;
 };
 
 export type AdminContextValue = Snapshot & {
@@ -59,10 +64,16 @@ export type AdminContextValue = Snapshot & {
   scopeClassIds: string[] | null | undefined;
   /** 학급 고르기와 상관없는 "내 학급 전체" 범위(서버 집계와 나란히 쓰는 숫자용). 값의 뜻은 scopeClassIds와 같다. */
   allClassIds: string[] | null | undefined;
+  /**
+   * 학급 밖 일(학습게임 관리·신고 처리·블로그 글쓰기·함께 쓰는 칭찬 문구 고치기)을 할 수 있는가 — 화면 표시용.
+   * "자기 학급 일만" 선생님으로 **확인된 때만** false다. 아직 모르거나(읽는 중·오류) 학급 기능 전이면 true —
+   * 모든 권한 선생님 화면이 깜박이지 않게 하고, 실제 거부는 서버(RLS·RPC — is_full_admin())가 한다.
+   */
+  isFullAdmin: boolean;
 };
 
 function empty(userId: string | null, status: AdminContextStatus): Snapshot {
-  return { userId, status, isSuperAdmin: false, classes: [], visibleClasses: [], teacherClasses: null };
+  return { userId, status, isSuperAdmin: false, classes: [], visibleClasses: [], teacherClasses: null, teacherScope: "full" };
 }
 
 async function loadSnapshot(userId: string): Promise<Snapshot> {
@@ -76,7 +87,7 @@ async function loadSnapshot(userId: string): Promise<Snapshot> {
     fetchClassTeachers().catch(() => null),
   ]);
   if (!ctx.ok) return empty(userId, isMissingSchemaError(ctx.error) ? "missing" : "error");
-  const { isSuperAdmin, classes } = ctx.value;
+  const { isSuperAdmin, classes, teacherScope } = ctx.value;
   // 내 학급 이름은 my_admin_context 값을 우선한다(방금 바꾼 이름). classes 표를 못 읽었으면 내 학급만이라도 보인다.
   const merged = new Map<string, ClassInfo>();
   for (const c of visible ?? []) merged.set(c.id, c);
@@ -88,6 +99,8 @@ async function loadSnapshot(userId: string): Promise<Snapshot> {
     classes,
     visibleClasses: [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, "ko")),
     teacherClasses: isSuperAdmin ? teachers : null,
+    // 총괄은 언제나 모든 권한(서버 is_full_admin도 총괄을 막지 않는다 — 총괄은 teacher_scope 'full')
+    teacherScope: isSuperAdmin ? "full" : teacherScope,
   };
 }
 
@@ -183,6 +196,7 @@ export function AdminContextProvider({ children }: { children: ReactNode }) {
       setSelectedClassId,
       scopeClassIds,
       allClassIds,
+      isFullAdmin: !(snap.status === "ready" && snap.teacherScope === "class"),
     }),
     [snap, refresh, retry, patchClasses, classNameOf, validSelected, scopeClassIds, allClassIds],
   );
@@ -194,6 +208,11 @@ export function useAdminContext(): AdminContextValue {
   const ctx = useContext(AdminContext);
   if (!ctx) throw new Error("useAdminContext는 AdminContextProvider 안에서만 사용할 수 있습니다.");
   return ctx;
+}
+
+/** 대시보드 밖에서도 쓰일 수 있는 공용 부품용: 공급자가 없으면 null(그때는 예전처럼 동작한다). */
+export function useOptionalAdminContext(): AdminContextValue | null {
+  return useContext(AdminContext);
 }
 
 /**

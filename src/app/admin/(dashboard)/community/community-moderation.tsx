@@ -9,6 +9,7 @@ import {
   FlagIcon,
   Gamepad2Icon,
   Loader2Icon,
+  LockIcon,
   MessageSquareIcon,
   RotateCcwIcon,
   Trash2Icon,
@@ -34,6 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PRIVACY_ADMIN_EXTRA_TEXT } from "@/data/privacy-admin-text";
 import { useAdminContext } from "@/hooks/use-admin-context";
 import { useBoardAccess } from "@/hooks/use-board-access";
 import { boardLabel, teacherTitle, type Board } from "@/lib/boards";
@@ -48,6 +50,7 @@ import {
 } from "@/lib/community";
 import { adminDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
+import { fillMemberLabels, type LabelProfile } from "@/lib/member-labels";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +70,9 @@ type ReportRow = {
   target_title: string | null;
   target_body: string | null;
   target_author: { display_name: string | null; withdrawn_at: string | null } | null;
+  /** 신고한 사람·대상 글쓴이 id — 가린 이름(member_name_labels)을 채울 때 쓴다(docs/privacy/spec.md 4.11) */
+  reporter_id: string | null;
+  target_author_id: string | null;
   reason: ReportReason;
   detail: string;
   status: "open" | "resolved";
@@ -78,7 +84,7 @@ type ReportRow = {
 };
 
 const REPORT_COLUMNS =
-  "id,post_id,comment_id,reason,detail,status,created_at,resolved_at,target_kind,target_title,target_body," +
+  "id,post_id,comment_id,reason,detail,status,created_at,resolved_at,target_kind,target_title,target_body,reporter_id,target_author_id," +
   "profiles!community_reports_reporter_id_fkey(display_name,withdrawn_at)," +
   "target_author:profiles!community_reports_target_author_id_fkey(display_name,withdrawn_at)," +
   "community_posts!community_reports_post_id_fkey(id,kind,title,hidden,game_path)," +
@@ -95,12 +101,14 @@ type PostRow = {
   /** 자유게시판 글의 게시판 주인(담임교사별 게시판 — SQL 적용 전에는 읽지 않아 undefined) */
   board_owner?: string | null;
   created_at: string;
+  /** 글쓴이 id — 가린 이름(member_name_labels)을 채울 때 쓴다 */
+  author_id: string | null;
   profiles: { display_name: string | null; withdrawn_at: string | null } | null;
   community_reports: { count: number }[] | null;
 };
 
 const ADMIN_POST_COLUMNS =
-  "id,kind,title,hidden,game_path,created_at,profiles!community_posts_author_id_fkey(display_name,withdrawn_at)," +
+  "id,kind,title,hidden,game_path,created_at,author_id,profiles!community_posts_author_id_fkey(display_name,withdrawn_at)," +
   "community_reports!community_reports_post_id_fkey(count)";
 const ADMIN_POST_COLUMNS_WITH_BOARD = `${ADMIN_POST_COLUMNS},board_owner`;
 
@@ -108,6 +116,26 @@ const ADMIN_POST_COLUMNS_WITH_BOARD = `${ADMIN_POST_COLUMNS},board_owner`;
 type BoardFilter = "all" | "none" | string;
 
 const NO_BOARDS: Board[] = [];
+
+/** 이름만 쓰는 embed 모양(사진은 이 화면에서 보이지 않는다) */
+const nameOnly = (p: LabelProfile) => ({ display_name: p.display_name, withdrawn_at: p.withdrawn_at });
+
+/**
+ * 다른 학급 학생(총괄·다른 담임이 볼 때)은 profiles embed가 null로 온다 → 가린 이름("첫 글자 + ***")을 채운다
+ * (docs/privacy/spec.md 4.11 — member_name_labels, 못 받으면 그대로 "이름 없음"). 신고 = 신고한 사람 + 대상 글쓴이.
+ */
+function withReportLabels(rows: ReportRow[]): Promise<ReportRow[]> {
+  return fillMemberLabels(rows, [
+    { idOf: (r) => r.reporter_id, profileOf: (r) => r.profiles, apply: (r, p) => ({ ...r, profiles: nameOnly(p) }) },
+    { idOf: (r) => r.target_author_id, profileOf: (r) => r.target_author, apply: (r, p) => ({ ...r, target_author: nameOnly(p) }) },
+  ]);
+}
+
+function withPostLabels(rows: PostRow[]): Promise<PostRow[]> {
+  return fillMemberLabels(rows, [
+    { idOf: (r) => r.author_id, profileOf: (r) => r.profiles, apply: (r, p) => ({ ...r, profiles: nameOnly(p) }) },
+  ]);
+}
 
 type ClassTeacherRow = { class_id: string; teacher_id: string; created_at: string };
 
@@ -250,15 +278,24 @@ type Target = { postId: string; commentId: string | null; kind: CommunityKind; t
  * 자유게시판은 담임교사별(20260928010000): 담임은 자기 게시판(보조 담임은 그 학급 게시판도)과 학습게임 전부,
  * 총괄은 관리용으로 모든 게시판의 글·신고를 본다 — 서버(RLS·RPC)가 거른다. 총괄·게시판이 둘 이상인 교사에게는
  * 글·신고마다 "○○ 선생님 게시판" 이름표와 게시판 거르기를 보인다.
+ * "자기 학급 일만" 선생님(docs/privacy/spec.md 4.6 — 구글로 인증한 선생님)은 학습게임 숨기기·삭제·신고 처리를 할 수 없다
+ * (서버 is_full_admin()이 거부) → 학습게임 쪽 단추를 빼고 안내 한 줄. 자기 게시판 관리는 그대로.
  */
 export function CommunityModeration() {
   const [tab, setTab] = useState<"reports" | "posts">("reports");
+  const { isFullAdmin } = useAdminContext();
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="커뮤니티 관리"
         description="자유게시판·학습게임의 신고를 확인하고, 글·게임·댓글을 숨기거나 삭제합니다."
       />
+      {!isFullAdmin ? (
+        <p role="note" className="flex items-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          <LockIcon className="size-4 shrink-0" aria-hidden />
+          {PRIVACY_ADMIN_EXTRA_TEXT.communityClassOnly}
+        </p>
+      ) : null}
       <Tabs value={tab} onValueChange={(v) => setTab(v as "reports" | "posts")}>
         <TabsList>
           <TabsTrigger value="reports">
@@ -271,7 +308,7 @@ export function CommunityModeration() {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === "reports" ? <ReportsPanel /> : <PostsPanel />}
+      {tab === "reports" ? <ReportsPanel canManageGames={isFullAdmin} /> : <PostsPanel canManageGames={isFullAdmin} />}
     </div>
   );
 }
@@ -280,7 +317,7 @@ export function CommunityModeration() {
 // 신고 목록
 // ─────────────────────────────────────────────
 
-function ReportsPanel() {
+function ReportsPanel({ canManageGames }: { canManageGames: boolean }) {
   const [filter, setFilter] = useState<"open" | "resolved">("open");
   const [state, setState] = useState<Load<ReportRow>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -298,10 +335,14 @@ function ReportsPanel() {
       .eq("status", filter)
       .order("created_at", { ascending: false })
       .limit(200)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!active) return;
-        if (error) setState({ status: isSetupMissing(error) ? "setup" : "error" });
-        else setState({ status: "ready", rows: (data ?? []) as unknown as ReportRow[], hasMore: false });
+        if (error) {
+          setState({ status: isSetupMissing(error) ? "setup" : "error" });
+          return;
+        }
+        const rows = await withReportLabels((data ?? []) as unknown as ReportRow[]);
+        if (active) setState({ status: "ready", rows, hasMore: false });
       });
     return () => {
       active = false;
@@ -375,6 +416,8 @@ function ReportsPanel() {
             const kind: CommunityKind = post?.kind ?? (r.target_kind === "game" || r.target_post_kind === "game" ? "game" : "board");
             const isComment = r.target_kind === "comment" || !!r.comment_id;
             const targetHidden = isComment ? comment?.hidden : post?.hidden;
+            // 학습게임(글·댓글) 신고는 모든 권한이 있는 선생님만 처리한다(서버도 거부)
+            const actionsAllowed = kind !== "game" || canManageGames;
             // 어느 게시판 신고인지(총괄 · 게시판이 둘 이상인 교사). 학습게임은 이름표 없음.
             const boardText = !board.showLabels
               ? null
@@ -428,39 +471,41 @@ function ReportsPanel() {
                   ) : null}
                 </div>
                 {r.detail ? <p className="text-sm break-all whitespace-pre-wrap">“{r.detail}”</p> : null}
-                <div className="flex flex-wrap gap-2">
-                  {post && (!isComment || comment) ? (
-                    <>
-                      <Button variant="outline" size="sm" disabled={busy === r.id} onClick={() => void toggleTargetHidden(r)}>
-                        {targetHidden ? <EyeIcon /> : <EyeOffIcon />}
-                        {targetHidden ? "대상 다시 보이기" : "대상 숨기기"}
+                {actionsAllowed ? (
+                  <div className="flex flex-wrap gap-2">
+                    {post && (!isComment || comment) ? (
+                      <>
+                        <Button variant="outline" size="sm" disabled={busy === r.id} onClick={() => void toggleTargetHidden(r)}>
+                          {targetHidden ? <EyeIcon /> : <EyeOffIcon />}
+                          {targetHidden ? "대상 다시 보이기" : "대상 숨기기"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive"
+                          disabled={busy === r.id}
+                          onClick={() =>
+                            setDeleting({ postId: post.id, commentId: r.comment_id, kind, title: isComment ? "댓글" : post.title, gamePath: post.game_path })
+                          }
+                        >
+                          <Trash2Icon />
+                          대상 삭제
+                        </Button>
+                      </>
+                    ) : null}
+                    {r.status === "open" ? (
+                      <Button size="sm" disabled={busy === r.id} onClick={() => void setStatus(r, "resolved")}>
+                        {busy === r.id ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />}
+                        처리 완료
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-destructive"
-                        disabled={busy === r.id}
-                        onClick={() =>
-                          setDeleting({ postId: post.id, commentId: r.comment_id, kind, title: isComment ? "댓글" : post.title, gamePath: post.game_path })
-                        }
-                      >
-                        <Trash2Icon />
-                        대상 삭제
+                    ) : (
+                      <Button variant="ghost" size="sm" disabled={busy === r.id} onClick={() => void setStatus(r, "open")}>
+                        <RotateCcwIcon />
+                        다시 열기
                       </Button>
-                    </>
-                  ) : null}
-                  {r.status === "open" ? (
-                    <Button size="sm" disabled={busy === r.id} onClick={() => void setStatus(r, "resolved")}>
-                      {busy === r.id ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />}
-                      처리 완료
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" disabled={busy === r.id} onClick={() => void setStatus(r, "open")}>
-                      <RotateCcwIcon />
-                      다시 열기
-                    </Button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -476,7 +521,7 @@ function ReportsPanel() {
 // 글·게임 목록
 // ─────────────────────────────────────────────
 
-function PostsPanel() {
+function PostsPanel({ canManageGames }: { canManageGames: boolean }) {
   const [kind, setKind] = useState<CommunityKind | "all">("all");
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [state, setState] = useState<Load<PostRow>>({ status: "loading" });
@@ -506,13 +551,15 @@ function PostsPanel() {
   useEffect(() => {
     if (boardMode === "loading") return; // 게시판 SQL 적용 여부(읽을 열)를 알고 나서 읽는다
     let active = true;
-    query(0).then(({ data, error }) => {
+    query(0).then(async ({ data, error }) => {
       if (!active) return;
-      if (error) setState({ status: isSetupMissing(error) ? "setup" : "error" });
-      else {
-        const rows = (data ?? []) as unknown as PostRow[];
-        setState({ status: "ready", rows, hasMore: rows.length === PAGE });
+      if (error) {
+        setState({ status: isSetupMissing(error) ? "setup" : "error" });
+        return;
       }
+      const page = (data ?? []) as unknown as PostRow[];
+      const rows = await withPostLabels(page);
+      if (active) setState({ status: "ready", rows, hasMore: page.length === PAGE });
     });
     return () => {
       active = false;
@@ -525,13 +572,17 @@ function PostsPanel() {
     if (state.status !== "ready") return;
     setLoadingMore(true);
     const { data, error } = await query(state.rows.length);
+    if (error) {
+      setLoadingMore(false);
+      return toast.error("더 불러오지 못했습니다.");
+    }
+    const page = (data ?? []) as unknown as PostRow[];
+    const rows = await withPostLabels(page);
     setLoadingMore(false);
-    if (error) return toast.error("더 불러오지 못했습니다.");
-    const rows = (data ?? []) as unknown as PostRow[];
     setState((s) => {
       if (s.status !== "ready") return s;
       const known = new Set(s.rows.map((r) => r.id));
-      return { ...s, rows: [...s.rows, ...rows.filter((r) => !known.has(r.id))], hasMore: rows.length === PAGE };
+      return { ...s, rows: [...s.rows, ...rows.filter((r) => !known.has(r.id))], hasMore: page.length === PAGE };
     });
   }
 
@@ -634,21 +685,23 @@ function PostsPanel() {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="sm" disabled={busy === r.id} onClick={() => void toggleHidden(r)}>
-                    {busy === r.id ? <Loader2Icon className="animate-spin" /> : r.hidden ? <EyeIcon /> : <EyeOffIcon />}
-                    {r.hidden ? "보이기" : "숨기기"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => setDeleting({ postId: r.id, commentId: null, kind: r.kind, title: r.title, gamePath: r.game_path })}
-                  >
-                    <Trash2Icon />
-                    삭제
-                  </Button>
-                </div>
+                {r.kind !== "game" || canManageGames ? (
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="sm" disabled={busy === r.id} onClick={() => void toggleHidden(r)}>
+                      {busy === r.id ? <Loader2Icon className="animate-spin" /> : r.hidden ? <EyeIcon /> : <EyeOffIcon />}
+                      {r.hidden ? "보이기" : "숨기기"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => setDeleting({ postId: r.id, commentId: null, kind: r.kind, title: r.title, gamePath: r.game_path })}
+                    >
+                      <Trash2Icon />
+                      삭제
+                    </Button>
+                  </div>
+                ) : null}
               </li>
             );
           })}

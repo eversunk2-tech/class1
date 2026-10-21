@@ -3,6 +3,10 @@
 > Plan 단계 산출물. **구현하지 않음.** 이 문서는 승인용이며, 사용자가 10절의 남은 질문(10.3)을 확인하고 승인하면 Build 서브에이전트가 이 문서를 기준으로 작업한다. 화면에 들어갈 글의 **원문 초안**은 같은 폴더의 `privacy-policy.md`다(문장 단위로 사용자가 확인한다).
 > 조사 범위: `CLAUDE.md`·`docs/STATUS.md`, `docs/classes/spec.md`(개정 1~3), `docs/admin/oauth-delete/spec.md`(개정 1), `docs/community/teacher-boards/spec.md`(개정 1·2), `supabase/migrations/*.sql` 20개 전부(특히 `20260921000000`·`20260921020000`·`20260922040000`·`20260923000000`·`20260923010000`·`20260923030000`·`20260927000000`·`20260927010000`·`20260927030000`·`20260928000000`·`20260928010000`), `supabase/functions/*` 5개(`admin-create-member` 전체, `admin-purge-oauth-member`·`check-answer` 앞부분, `admin-reset-password` 권한 부분), `src/app/layout.tsx`·`src/hooks/use-session.tsx`·`src/lib/auth.ts`·`src/app/login/login-form.tsx`·`src/components/{login-gate,force-password-change-gate,profile-dialog,user-menu,site-footer}.tsx`·`src/components/admin/*`·`src/lib/{admin,classes,types,member-import}.ts`, `scripts/templates/class1-record.js`, 참고(읽기만) `selectio game/docs/privacy-policy.md`. **실 DB는 읽지도 쓰지도 않았다** — 모든 서술은 저장소의 SQL·코드 근거다. 확인하지 못한 것은 **"확인 필요"**로 표시했다. 개인정보(이메일·교사 인증 코드의 실제 값)는 이 문서 어디에도 적지 않았다(예시 코드는 `000000`).
 > **개정 1 (2026-10-20, 사용자가 10절 질문에 답함 — 이 개정이 아래 본문과 다르면 개정이 우선하며, 본문도 같이 고쳤다)**: ① AI 되짚기(Gemini)는 **끈다**(앱 `answer-check.js`가 `check-answer`를 부르지 않는 별도 변경 + Secret `GEMINI_API_KEY` 해제) → 처리방침·동의서에서 AI 문단을 모두 뺐다 ② 프로필(이름·사진) 읽기를 **로그인한 회원에게만**(SQL ③, 4.10) — 로그아웃 화면의 작성자는 "회원" ③ 기존 구글 회원에게도 [가입하지 않기(계정 삭제)] ④ 질문 3~7·10·11은 추천대로 확정 ⑤ 질문 8·12·13은 사용자 할 일(7절).
+> **개정 4 (2026-10-20, 사용자 결정 — 학생 아이디·이름 가리기, 설계 4.11)**: ① 학생의 **이름(별명)·사진은 같은 학급 학생과 그 학급 담임만** 온전히 보고, 그 밖의 로그인 회원(다른 학급 학생·선생님, **총괄**)에게는 **첫 글자 + `***`**(로그아웃 방문자는 그대로 '회원') — 사용자: "같은 소속 학급끼리는 이름(사실상 별명 개념)을 서로 볼 수 있도록(담임교사 포함) 하고, 학급 외 구성원과 총괄운영자는 ***으로" ② 학생의 **아이디는 그 학생의 담임만** 온전히 — 총괄의 회원 명단에서 다른 학급 학생은 아이디·이름 모두 첫 글자 + `***`, 감사 기록(계정 만들기·비밀번호 초기화·탈퇴)은 아예 읽지 못함 ③ **선생님 별명은 로그인한 모든 회원에게 그대로**(사용자 답 "선생님 별명은 모두에게") ④ **총괄은 가려진 줄에서도 비밀번호 초기화·탈퇴 처리·기록까지 삭제를 계속 할 수 있다**(사용자 답 "총괄도 계속 하기" — 이름 확인 칸에는 보이는 대로 `2***`) ⑤ 다른 학급 학생을 교사로 지정하지 못하게 막는다(지정하면 이름·아이디가 모두에게 보이게 되므로 — Claude 판단) ⑥ 4.10의 "남는 한계(로그인한 회원끼리는 다른 학급도 이름을 봄)"와 새 질문 N1은 이 개정으로 바뀐다.
+>
+> **개정 4 보충 (2026-10-20, 검토 R1·R2 + 사용자 답 — `fix-1-sql/ui-instructions.md`)**: ① **사이트는 프로필 사진 주소를 받지 않는다**(프로필 수정 창의 사진 칸 없앰 + ②에서 `profiles` 수정 권한을 `display_name`만으로, 구글 계정·학생의 기존 `avatar_url`을 비움) ② 별명을 아직 정하지 않은 기존 구글 관리자(총괄 포함)는 ②에서 이름이 `선생님`(확인 창에서 별명을 정하면 그 별명) ③ 감사 기록에 남은 구글 이메일·이름을 ②에서 가림(4.4 표의 "구글 계정은 이 로그에 들어오지 않는다"는 사실과 달랐음 — `admin-delete-member`에 가입 방식 확인이 없어 예전 탈퇴 처리 기록이 있을 수 있음) ④ **아이디 계정 판정 = 이메일이 `@class1.local`로 끝남**(`handle_new_user`·`sync_member_directory` — 가입 순간의 `app_metadata`에 기대지 않고, 실제 이메일로 스스로 가입한 계정은 구글처럼 인증 전·이메일 가림. 공개 설정 확인: `disable_signup:false`, `mailer_autoconfirm:false`) ⑤ 시행 뒤 문의 이메일 비우기 거부, 학급 정리가 지울 수 없는 학생을 건너뜀 ⑥ 프로필 수정 창의 칸 이름 '별명' + 확인 창과 같은 별명 규칙, 처리방침의 '[내 정보]' → 실제 메뉴 이름, 로그인 화면 "학생 계정은 담임 선생님이 미리 만들어 줍니다." ⑦ 4.1의 `class_cleanup_log` "총괄 읽기용 RPC로만 조회" → 읽는 RPC는 아직 없다(쓰기만 — 서비스 롤 함수가 기록, 화면에 보이지 않음).
+>
 > **개정 3 (2026-10-20, 사용자 결정)**: 보유 기간 = **종업식 뒤 그 학년도의 2월 28일까지**(전: 돌아오는 3월 31일) — 4.7-3 기한 계산(2월 알림 + 3월부터 기한 지남), 처리방침·쉬운 설명·창·관리자 문구 모두. 보호자 동의서는 사용자가 쓰던 '생성형 AI 학부모 사용 동의서' 양식에 맞춘 hwpx(`privacy-policy.md` 7절).
 >
 > **개정 2 (2026-10-20, 사용자 답 + 메인 에이전트가 확인한 사실 반영)**: ① Supabase 요금제는 **무료**(사용자) — 공식 가격표: 요청·DB 기록 1일, 로그인 감사 기록 1시간, **자동 백업·시점 복구 없음** → 삭제는 즉시·되돌릴 수 없고 데이터 손실 시 복구할 수 없다(R19), 일시 정지를 막는 `keep-supabase-awake` 예약 읽기가 의미 있다 ② 보호책임자는 "PSC" + 문의 이메일 — 법 제30조 ① 제6호의 "성명 … 전화번호 등 연락처"를 알고 사용자가 고른 것(R15) ③ 법 제28조의8·제21조 원문 확인 → 제5조 표에 이전받는 자의 **명칭과 연락처**를 적음 ④ 보유 기한 문구를 "학년도가 끝난 뒤 돌아오는 3월 31일까지(예: 2026학년도 학생은 2027년 3월 31일까지)"로 통일 ⑤ 총괄이 관리용으로 모든 자유게시판을 볼 수 있다는 사실을 처리방침·동의서에 더함 ⑥ N1~N3은 추천대로 확정(10.3).
@@ -413,7 +417,7 @@ create policy "profiles: 로그인한 회원 조회" on public.profiles for sele
 | 학습게임 글 상세 (`community-post-detail.tsx`) | 같은 쿼리 + 작성자 사진 | 같음 | 같은 `authorName()`, 사진 폴백은 첫 글자 |
 | 학습게임 댓글 (`community-comment-section.tsx`, `COMMENT_AUTHOR`) | `community_comments?select=…,profiles!community_comments_user_id_fkey(…)` | 같음 | 같은 `authorName()` |
 | 자유게시판 `/board/**` 목록·글·댓글, 홈 "최근 자유게시판" | 위와 같은 함수 | **원래 로그인 전용** | 없음 |
-| 검색 `/search/` | `searchCommunity` — 작성자 이름을 보여 주지 않음 | — | 없음 |
+| 검색 `/search/` | `searchCommunity` — ~~작성자 이름을 보여 주지 않음~~ **(바로잡음, 묶음 6: 글쓴이가 보인다)** | 다른 글과 같음 | `authorName()` 폴백 + 개정 4의 가린 이름 채우기(`member-labels.ts`) |
 | 홈 '선생님 글' (`class_notices`) | 작성자 이름 표시 없음(제목·본문만) | — | 없음 |
 | 게시판 주인 이름 (`useBoardOwnerName`) | `profiles?select=display_name&id=eq.<주인>` | 로그인 전용 화면 | 없음 |
 | 로그인한 사람의 화면(헤더 메뉴 `fetchProfile`, 프로필 수정, 관리자 화면 전부, 피드백 대화, 학습 현황) | `profiles` | 로그인 상태라 그대로 | 없음 (인증 전 구글만 본인 행 외에 못 읽음) |
@@ -423,7 +427,55 @@ DB 쪽 점검: 다른 표의 **정책 식**이 `profiles`를 직접 조회하면
 
 **화면 문구**: 작성자·댓글 작성자 이름을 읽을 수 없거나 없을 때 **"회원"**(로그아웃 방문자, 지워진 계정). 로그인한 사람에게 "탈퇴한 학생" 표시는 그대로. 학생에게는 쉬운 설명에서 "별명에 진짜 이름을 쓰지 마세요 — 이 사이트에 로그인한 다른 반 친구와 선생님도 볼 수 있어요"라고 알린다(`privacy-policy.md` 6절).
 
-**남는 한계(처리방침에 사실대로)**: 로그인한 모든 회원(다른 학급 학생·다른 학급 선생님 포함)은 서로의 `display_name`·`avatar_url`·`role`을 읽을 수 있다. 같은 학급·같은 게시판 참여자까지만 보이게 더 좁히는 일은 이번 작업이 아니다(새 질문 N1).
+**남는 한계(처리방침에 사실대로)** — **개정 4로 바뀜(4.11: 학생 이름은 같은 학급·담임만, 그 밖에는 가린 값)**: 로그인한 모든 회원(다른 학급 학생·다른 학급 선생님 포함)은 서로의 `display_name`·`avatar_url`·`role`을 읽을 수 있다. 같은 학급·같은 게시판 참여자까지만 보이게 더 좁히는 일은 이번 작업이 아니다(새 질문 N1).
+
+### 4.11 학생 아이디·이름 가리기 (개정 4 — 사용자 결정 2026-10-20)
+
+**규칙**
+
+| 무엇을 | 온전히 보는 사람 | 그 밖의 로그인 회원 | 로그아웃 |
+|---|---|---|---|
+| 학생 이름(별명 `profiles.display_name`)·사진(`avatar_url`) | 본인, **같은 학급 학생**(`class_id` 같음), **그 학급 담임**(`class_teachers` — 보조 담임 포함, 총괄이 그 학급 담임이면 총괄도) | 첫 글자 + `***`(예 `2***`, `김***`), 사진 없음 | '회원'(4.10 그대로) |
+| 학생 아이디(`member_directory.email`의 `@` 앞, 감사 기록의 `target_email`·`target_name`) | **그 학생의 담임만**(`teaches_student`) | 총괄: 회원 명단에서 첫 글자 + `***`, 감사 기록은 읽지 못함. 다른 담임·학생: 원래 못 봄 | 못 봄 |
+| 선생님 별명(role admin) | 로그인한 모든 회원(인증 전 구글 제외) | — | '회원' |
+| 학급 없는 학생(role user, `class_id` null — 담임 해제된 옛 교사, 인증 전 구글 등) | 본인 + 총괄(관리 책임자) | 첫 글자 + `***` | '회원' |
+
+- "학생" = `profiles.role = 'user'`(탈퇴 처리된 학생 포함). 탈퇴한 학생은 지금처럼 화면에서 "탈퇴한 학생"(관리자 화면 괄호 안 이름도 위 규칙대로 — 가려진 줄은 `탈퇴한 학생(2***)`).
+- 가린 글자: 앞뒤 공백을 뺀 첫 글자 + `***`. 비었으면 `***`. 아이디는 `@` 앞부분으로 같은 식(도메인 없이 `2***`).
+- 반을 옮긴 학생의 예전 게시판 글: 예전 반 친구에게는 이제 가려져 보인다(새 반 기준).
+- **서버 관리 화면(Supabase 대시보드)에는 아이디·이름이 그대로 있다** — 운영자(총괄)는 프로젝트 주인이라 기술적으로 볼 수 있다. 처리방침 제7조 '한계'에 사실대로 적는다.
+
+**왜 이렇게 만드나**: RLS는 행만 거르고 열을 사람마다 가릴 수 없다. 그래서 ① 학생의 `profiles` **행 자체**를 같은 학급·담임에게만 보이게 하고(가려진 사람에게는 embed가 `null`), ② 가린 이름은 `security definer` RPC가 따로 준다. 아이디는 ③ `member_directory`·감사 기록 3개의 **읽기 정책**을 담임 기준으로 좁히고, ④ 총괄에게는 다른 학급 학생 줄을 가린 값으로만 주는 RPC를 둔다. 열 권한을 거두는 방법은 쓰지 않는다 — 빠뜨린 곳 하나가 화면 전체를 `42501`로 깨뜨리기 때문(행을 거르면 이름만 '회원'/가린 값이 된다).
+
+**SQL — 이름표(계약)**
+
+| 이름 | 파일 | 하는 일 |
+|---|---|---|
+| `public.mask_label(p_text text) → text` | ① | `immutable`. `btrim` 뒤 비었으면 `'***'`, 아니면 `left(…,1) || '***'` |
+| `public.can_see_member_name(p_target uuid) → boolean` | ① | `security definer`·`stable`·PUBLIC 실행(③ 정책 안에서 불림). 참 = 본인이거나, (로그인했고 인증 전 구글이 아니고) 대상이 [role이 user가 아님] 또는 [학급 없음이고 내가 총괄] 또는 [내가 같은 학급 학생(role user, `class_id` 같음)] 또는 [내가 그 학급 담임(`class_teachers` + `is_admin()`)] |
+| `public.can_see_member_identity(p_target uuid) → boolean` | ① | `security definer`·`stable`·PUBLIC 실행(② 정책 안에서 불림). 참 = `teaches_student(p_target)` 또는 (`is_super_admin()`이고 대상 프로필이 있으며 [role이 user가 아님 또는 `class_id` null]). 프로필이 없는 대상(고아 기록)은 총괄에게도 거짓 |
+| `public.member_name_labels(p_ids uuid[]) → jsonb` | ① | `authenticated`만. 로그인 안 했거나 인증 전 구글이면 `[]`. 앞 1000개만. 있는 프로필마다 `{ id, display_name, avatar_url, withdrawn_at, masked }` — `can_see_member_name`이 참이면 원래 값(`masked:false`), 거짓이면 `display_name = mask_label(display_name)`·`avatar_url = null`·`masked:true` |
+| `public.admin_masked_member_rows(p_id uuid default null) → jsonb` | ① | `authenticated`만. **총괄이 아니면 `[]`**. 대상 = `member_directory` × `profiles`에서 role user·`class_id` 있음·`not teaches_student(id)`(`p_id`가 있으면 그 한 줄). 줄 모양은 회원 명단 표와 같게: `{ id, email: mask_label(split_part(email,'@',1)), provider, providers, signed_up_at, last_sign_in_at, updated_at, class_id, guardian_consent_at, guardian_consent_by, masked: true, profiles: { display_name: mask_label(display_name), avatar_url: null, role, withdrawn_at, must_change_password } }`, `signed_up_at desc, id` 순 |
+| `member_directory`·`password_reset_log`·`member_withdrawal_log`·`member_create_log` 읽기 정책 | ② | `using (public.can_see_member_identity(id 또는 target_id))`로 바꿈(옛 `…: 담임·총괄 조회` drop). 되돌리기는 `rollback-privacy-enforce.sql` |
+| `admin_must_change_password_ids()` | ② | 범위를 `can_see_member_identity`로(가린 줄의 표시는 `admin_masked_member_rows`가 줌) |
+| `admin_set_role(…)` | ② | 교사로 지정할 때 대상이 role user·`class_id` 있음·`not teaches_student(대상)`이면 거부: "다른 학급 학생은 교사로 지정할 수 없어요." |
+| `profiles` 읽기 정책 | ③ | 4.10의 새 정책 식을 `using (public.can_see_member_name(id))`로(본인·인증 전 구글 처리 포함). 끝 점검(허용 SELECT 정책 하나)은 그대로 |
+| `can_manage_member()` | 바꾸지 않음 | 계정 **관리 권한**(비밀번호 초기화·탈퇴·기록까지 삭제 — 총괄은 모든 반)은 그대로(사용자 답 ④). 보는 범위만 위 함수로 나눈다 |
+
+- ①에서 함수만 더하므로 ① 직후 사이트는 그대로다. ② 전에는 총괄이 표에서 모든 줄을 그대로 읽으므로 화면은 **표의 줄을 우선**하고 RPC의 가린 줄은 같은 id가 없을 때만 더한다(겹침 없음).
+- 다른 `security definer` 함수가 학생의 `display_name`·`email`·`target_name`·`target_email`을 총괄에게 돌려주는 곳이 있으면 같은 규칙으로 가린다 — Build가 모든 마이그레이션의 최신 정의를 찾아 보고한다.
+
+**Edge Function**: `admin-clear-students`(아직 배포 전 — 같은 파일 수정)의 학생 한 명 경로 — `confirmName`을 **호출자가 보는 이름**과 비교한다: 담임이면 지금처럼 원래 이름(`display_name`, 없으면 아이디), 담임이 아닌 총괄이면 `mask_label(원래 이름)`. 응답·로그·오류 문구에 학생 이름·아이디를 넣지 않는다. `admin-reset-password`·`admin-delete-member`는 바꾸지 않는다(응답에 이름·아이디가 없고, 탈퇴 확인 입력은 화면에서만 비교).
+
+**화면**
+- 새 `src/lib/member-labels.ts`: `member_name_labels` 래퍼(100개씩, RPC가 없거나 실패하면 빈 결과 — 화면을 막지 않음) + "embed가 `null`인 작성자에게 가린 이름을 채우는" 공용 함수. **로그인한 사람에게만** 부른다(로그아웃은 '회원' 그대로).
+- 작성자 이름을 보이는 곳 전부(자유게시판·학습게임 목록·글·댓글, 홈 미리보기, 블로그 댓글, 관리자 신고 관리·게시글 관리): embed가 `null`이면 위 함수로 채운다 → `2***`.
+- 회원 명단·회원 상세·개요 '최근 가입': 표 읽기 + `admin_masked_member_rows`(총괄) 합치기(같은 id면 표 줄). `MemberRow.masked?: true`. 가린 줄: 아이디·이름 가림, 사진 없음, 메뉴는 **비밀번호 초기화·탈퇴 처리·기록까지 삭제만**(교사 지정·권한·동의 기록 등은 숨김), 확인 입력은 보이는 대로(`2***`). 총괄이 가린 줄을 볼 때 목록 위 한 줄(원문 8-8).
+- 처리방침 글(`privacy-policy.ts`)은 원문 개정 4 문장으로 다시 옮긴다.
+
+**한계(처리방침에 사실대로)**: 서버 관리 화면에는 그대로 남음. 같은 반 친구는 서로의 별명을 온전히 본다(그래서 별명에 실명을 쓰지 말라는 안내는 그대로). 가린 이름은 첫 글자가 같으면 구별이 안 된다(아이디가 번호면 모두 `2***`).
+
+**시험**: (SQL — 읽어서 대조, 사용자용 `test-queries.sql`에 확인 쿼리) 학생 A(1반)·B(1반)·C(2반), 1반 담임 T1, 2반 담임 T2, 총괄 S(1반 담임 겸임 아님/겸임 두 경우). A가 B 이름 온전, C는 가림. T1은 A·B 온전·C 가림, 회원 명단에 A·B만(표)·C는 못 읽음. S는 표에서 교사·학급 없는 계정만, RPC로 A·B·C 가린 줄. S가 C 비밀번호 초기화·탈퇴·기록까지 삭제(`confirmName = 'C***'` 꼴) 가능. 로그아웃은 모두 '회원'. (화면 — 가짜 응답) 위 경우의 목록·글·댓글·회원 명단·확인 창.
 
 ---
 

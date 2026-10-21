@@ -30,6 +30,7 @@ import {
   authorName,
   COMMENT_COLUMNS,
   communityErrorMessage,
+  fetchCommunityComments,
   LIMITS,
   loginHrefHere,
   type CommunityComment,
@@ -39,15 +40,8 @@ import { formatDateTime } from "@/lib/format";
 import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
 
-async function fetchComments(postId: string): Promise<CommunityComment[]> {
-  const { data, error } = await supabase
-    .from("community_comments")
-    .select(COMMENT_COLUMNS)
-    .eq("post_id", postId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as unknown as CommunityComment[];
-}
+/** 댓글 목록 — 다른 학급 학생의 댓글은 가린 이름("첫 글자 + ***")으로 채운다(src/lib/community.ts, docs/privacy/spec.md 4.11). */
+const fetchComments = fetchCommunityComments;
 
 /**
  * 커뮤니티 댓글(CommentSection 패턴). 본문은 항상 텍스트로 렌더링한다(HTML 해석 없음).

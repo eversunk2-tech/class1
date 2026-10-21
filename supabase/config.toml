@@ -18,3 +18,12 @@ verify_jwt = true
 # 구글·깃허브 계정 완전 삭제(docs/admin/oauth-delete/) — 가장 파장이 큰 함수라 JWT 검증을 명시해 둔다(기본값도 true).
 [functions.admin-purge-oauth-member]
 verify_jwt = true
+
+# 개인정보 작업(docs/privacy/spec.md 5절, 2026-10-20) — 계정·기록을 지우는 함수라 JWT 검증을 명시해 둔다(기본값도 true).
+# 구글 회원이 자기 계정을 지움([가입하지 않기] / [회원 탈퇴])
+[functions.member-self-delete]
+verify_jwt = true
+
+# 담임·총괄의 학급 정리(학생 계정·기록 한꺼번에) · 학생 한 명 '기록까지 삭제'
+[functions.admin-clear-students]
+verify_jwt = true

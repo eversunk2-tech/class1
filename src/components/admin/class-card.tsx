@@ -1,9 +1,10 @@
 "use client";
 
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Loader2Icon, PencilIcon, PlusIcon, SchoolIcon, ShieldCheckIcon, UsersIcon } from "lucide-react";
+import { Loader2Icon, PencilIcon, PlusIcon, SchoolIcon, ShieldCheckIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
+import { ClassCleanupDialog, type ClassCleanupTarget } from "@/components/admin/class-cleanup-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ import {
   validateClassName,
   type AdminClass,
 } from "@/lib/classes";
+import { PRIVACY_ADMIN_TEXT } from "@/data/privacy-admin-text";
 import { formatCount } from "@/lib/format";
 import { menuColorClasses } from "@/lib/menu-colors";
 import { cn } from "@/lib/utils";
@@ -42,12 +44,21 @@ type DialogTarget = { mode: "create" } | { mode: "rename"; target: AdminClass };
 /**
  * "내 학급" 카드(관리자 개요·회원 관리 맨 위, docs/classes/spec.md 개정 1-2).
  * 담임교사는 여기서 학급을 개설(이름을 스스로 정함)하고 이름을 바꾼다. 학급 이름은 관리자 화면에서만 보인다.
+ * 학급마다 [학급 정리](학년도가 끝나면 학생 계정과 기록을 한꺼번에 지움 — docs/privacy/spec.md 4.7-3, privacy-policy.md 8-4).
+ * onCleaned: 학급 정리로 한 명이라도 지웠을 때(회원 목록을 다시 읽는 데 쓴다).
  */
-export function MyClassesCard({ className }: { className?: string }) {
+export function MyClassesCard({ className, onCleaned }: { className?: string; onCleaned?: () => void }) {
   const ctx = useAdminContext();
   const headingId = useId();
   const [target, setTarget] = useState<DialogTarget>({ mode: "create" });
   const [open, setOpen] = useState(false);
+  const [cleanupTarget, setCleanupTarget] = useState<ClassCleanupTarget | null>(null);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+
+  function openCleanup(c: AdminClass) {
+    setCleanupTarget({ classId: c.id, className: c.name });
+    setCleanupOpen(true);
+  }
 
   function openDialog(next: DialogTarget) {
     setTarget(next);
@@ -128,15 +139,26 @@ export function MyClassesCard({ className }: { className?: string }) {
                   <UsersIcon className="size-4" aria-hidden />
                   학생 {formatCount(c.studentCount)}명
                 </span>
-                <Button
-                  variant="ghost"
-                  className="h-11 px-3"
-                  onClick={() => openDialog({ mode: "rename", target: c })}
-                  aria-label={`${c.name} 이름 바꾸기`}
-                >
-                  <PencilIcon />
-                  이름 바꾸기
-                </Button>
+                <span className="flex flex-wrap items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    className="h-11 px-3"
+                    onClick={() => openDialog({ mode: "rename", target: c })}
+                    aria-label={`${c.name} 이름 바꾸기`}
+                  >
+                    <PencilIcon />
+                    이름 바꾸기
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-11 px-3 text-destructive hover:text-destructive"
+                    onClick={() => openCleanup(c)}
+                    aria-label={`${c.name} ${PRIVACY_ADMIN_TEXT.classCleanup.cardButton}`}
+                  >
+                    <Trash2Icon />
+                    {PRIVACY_ADMIN_TEXT.classCleanup.cardButton}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>
@@ -150,6 +172,15 @@ export function MyClassesCard({ className }: { className?: string }) {
       )}
 
       <ClassNameDialog target={target} open={open} onOpenChange={setOpen} />
+      <ClassCleanupDialog
+        target={cleanupTarget}
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        onChanged={() => {
+          void ctx.refresh();
+          onCleaned?.();
+        }}
+      />
     </section>
   );
 }

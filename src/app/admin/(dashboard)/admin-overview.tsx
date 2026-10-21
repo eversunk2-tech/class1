@@ -17,6 +17,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { MyClassesCard } from "@/components/admin/class-card";
+import { ClassRetentionCard } from "@/components/admin/class-controls";
 import { LoginRequiredCard } from "@/components/admin/login-required-card";
 import { MemberAvatar, ProviderBadges } from "@/components/admin/member-badges";
 import { StatTile } from "@/components/dashboard/stat-tile";
@@ -213,6 +214,9 @@ export function AdminOverview() {
       <AdminPageHeader title="관리자 대시보드" description={`${greeting} 오늘의 반 현황을 확인하세요.`} />
 
       <MyClassesCard />
+
+      {/* 학급 정리 기한이 지난 학생이 남은 학급(담임: 자기 학급, 총괄: 전체 — docs/privacy/spec.md 4.7-3). 없으면 아무것도 보이지 않는다. */}
+      <ClassRetentionCard />
 
       <LoginRequiredCard />
 

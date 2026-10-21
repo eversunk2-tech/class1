@@ -2,10 +2,15 @@
 // docs/admin/create-members/build-instructions.md + docs/classes/spec.md 개정 1(학급). 배포 방법은 같은 폴더의 README.md 참고.
 //
 // 요청:  POST { "rows": [{ "id": "60101", "password": "…", "role": "user" | "admin" }],
-//                "source"?: "single" | "bulk", "classId"?: "<학급 uuid>" }
+//                "source"?: "single" | "bulk", "classId"?: "<학급 uuid>", "guardianConsent"?: true }
 //        (Authorization: Bearer <호출자 access token> — supabase-js가 자동 첨부)
 //        classId: 학생 줄(role "user")을 넣을 학급. 호출자가 담임인 학급만 된다(총괄도 자기 학급만 — 개정 1-1).
 //                 보내지 않으면 호출자의 (보관 안 된) 학급이 하나일 때만 그 학급으로 넣고, 없거나 여럿이면 400.
+//        guardianConsent: 보호자 동의서를 받았다는 교사의 표시(docs/privacy/spec.md 4.8 — 결정 5). 학생 줄이 하나라도 있으면
+//                 반드시 true 여야 한다 — 아니면 계정을 하나도 만들기 전에 400 "보호자 동의서를 받았다는 표시가 필요해요."
+//                 교사 줄에는 필요 없다. 엑셀은 파일 하나에 체크 하나(모든 학생 줄에 적용). 만들어진 학생 계정마다
+//                 감사 로그에 p_guardian = true 를 넘겨 member_create_log.guardian_consent 와
+//                 member_directory.guardian_consent_at/by(누가·언제)를 함께 채운다(20261020000000_privacy_a_schema.sql 필요).
 // 응답:  200 { "results": [{ "index": 0, "id": "60101", "status": "created" | "exists" | "invalid" | "failed",
 //                            "message"?: "…", "warning"?: "…" }],
 //              "warning"?: "감사 로그를 남기지 못했습니다 …" }
@@ -14,7 +19,7 @@
 //
 // 보안 메모
 // - 서비스 롤 키는 이 함수 안에서만 쓰고 응답에 포함하지 않는다.
-// - **비밀번호는 응답·로그 어디에도 남기지 않는다.** console.error에도 아이디까지만 적는다(이메일·비밀번호 없음).
+// - **비밀번호는 응답·로그 어디에도 남기지 않는다.** console.error에는 줄 번호까지만 적는다(아이디·이메일·비밀번호 없음).
 //   (createUser 실패 메시지는 GoTrue가 만든 문구라 비밀번호를 담지 않는다. 그래도 길이만 검사하고 값은 찍지 않는다.)
 // - 호출자가 관리자인지 함수 안에서 확인한다(화면 가드를 믿지 않는다).
 // - 학급 권한(개정 1-1·1-4): 학생 줄은 호출자가 담임인 학급(class_teachers)에만, 교사 줄(role "admin")은 총괄
@@ -27,13 +32,19 @@
 //   profiles.class_id 가 바뀌면 DB 트리거(20260927000000)가 member_directory.class_id 에도 복사한다.
 // - 감사 로그(member_create_log)는 20260923030000_member_create_log.sql이 필요하다.
 //   **그 SQL을 실행하지 않아도 계정 생성은 그대로 동작한다** — 로그만 못 남기고 응답에 warning을 붙인다(review M1).
+//   (2026-10-20부터 학생 줄은 예외 — 아래 "보호자 동의 기록": 5-인자 함수가 없으면 학생 계정을 만들지 않는다.)
 // - 학급 SQL(20260927000000_classes_schema.sql)이 없으면 계정을 만들지 않고 "DB 설정 필요"로 거부한다(500).
+// - 보호자 동의 기록(docs/privacy/spec.md 4.8): 학생 줄을 만들 때는 5-인자 admin_log_member_create(…, p_guardian)가 있어야 한다
+//   (20261020000000_privacy_a_schema.sql — 옛 4-인자 함수는 그 SQL이 지운다). 없으면 동의 표시를 기록할 수 없으므로
+//   계정을 하나도 만들지 않고 "DB 설정 필요"로 거부한다(500). 교사 줄만 보낼 때는 확인하지 않는다(그때는 감사 로그만 못 남김).
+// - 로그(console.error)에는 실패 단계·줄 번호·오류 문구만 남긴다(아이디·이메일·비밀번호 없음 — 2026-10-20 개인정보 작업).
 //
 // 동작
-//   ① 호출자 확인(JWT) → ② 관리자·총괄 확인 → ③ 입력 검사(행별) → ③-2 교사 줄 권한 → ③-3 학생 줄 학급 확인 →
+//   ① 호출자 확인(JWT) → ② 관리자·총괄 확인 → ③ 입력 검사(행별) + 보호자 동의 표시 확인 → ③-2 교사 줄 권한 →
+//   ③-3 학생 줄 학급 확인 → ③-4 (학생 줄이 있으면) 보호자 동의 기록용 SQL 확인 →
 //   ④ 행마다 auth.admin.createUser({ email_confirm: true }) →
 //   ⑤ 트리거(handle_new_user)가 만든 profiles 행에 role + must_change_password = true + class_id 반영 →
-//   ⑥ 만들어진 계정 1개당 감사 로그 1행(admin_log_member_create RPC, 서비스 롤 전용).
+//   ⑥ 만들어진 계정 1개당 감사 로그 1행(admin_log_member_create RPC, 서비스 롤 전용 — 학생은 p_guardian = true).
 //   부분 실패를 허용한다: 성공한 행은 그대로 두고 실패 행만 사유와 함께 돌려준다.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -91,9 +102,9 @@ type RowResult = {
   warning?: string;
 };
 
+/** 아이디 → 로그인 이메일. 아이디 계정은 늘 {아이디}@class1.local 이다(아이디에 '@'는 validateRow 가 받지 않는다). */
 function toEmail(id: string): string {
-  const trimmed = id.trim();
-  return (trimmed.includes("@") ? trimmed : `${trimmed}@${LOGIN_EMAIL_DOMAIN}`).toLowerCase();
+  return `${id.trim()}@${LOGIN_EMAIL_DOMAIN}`.toLowerCase();
 }
 
 /** 한 행을 검사한다. 통과하면 null, 아니면 학생/교사가 무엇을 고쳐야 하는지 알려 주는 한국어 문구. */
@@ -104,12 +115,10 @@ function validateRow(raw: unknown): { row: RowInput; email: string } | string {
   if (typeof r.id !== "string") return "아이디가 없습니다.";
   const id = r.id.trim().toLowerCase();
   if (!id) return "아이디가 비어 있습니다.";
-  if (id.includes("@")) {
-    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(id)) return "이메일 형식이 올바르지 않습니다.";
-  } else {
-    if (id.length < ID_MIN || id.length > ID_MAX) return `아이디는 ${ID_MIN}~${ID_MAX}자로 적어 주세요.`;
-    if (!ID_RE.test(id)) return "아이디에는 영문 소문자·숫자와 . _ - 만 쓸 수 있습니다(한글·공백 불가).";
-  }
+  // 이메일 모양(@) 아이디는 받지 않는다(고침 2 — 검토 R1 N1): 개인정보 SQL ②는 "아이디 계정 = 이메일이 @class1.local"로 판정하므로
+  // 이메일 모양 아이디로 만든 계정은 구글처럼 '인증 전'으로 묶여 기록 저장이 막힌다. '@'는 아래 ID_RE 에서 걸린다(화면 member-import.ts 와 같음).
+  if (id.length < ID_MIN || id.length > ID_MAX) return `아이디는 ${ID_MIN}~${ID_MAX}자로 적어 주세요.`;
+  if (!ID_RE.test(id)) return "아이디에는 영문 소문자·숫자와 . _ - 만 쓸 수 있습니다(한글·공백 불가).";
 
   if (typeof r.password !== "string") return "비밀번호가 없습니다.";
   const password = r.password;
@@ -134,9 +143,35 @@ function isMissingLogSql(error: { code?: string; message?: string } | null): boo
     /(function|relation) .* does not exist/.test(m);
 }
 
+// 2026-10-20: 감사 로그 함수가 5-인자(p_guardian)로 바뀌어, 함수가 없다는 것은 개인정보 SQL ①이 아직 실행되지 않았다는 뜻이다.
 const MISSING_LOG_SQL_WARNING =
   "계정은 만들었지만 '누가 언제 만들었는지' 기록은 남지 않았습니다. " +
-  "Supabase SQL Editor에서 20260923030000_member_create_log.sql을 실행하면 다음부터 기록됩니다.";
+  "Supabase SQL Editor에서 20261020000000_privacy_a_schema.sql을 실행하면 다음부터 기록됩니다.";
+
+// ─────────────────────────────────────────────
+// 보호자 동의 표시 — docs/privacy/spec.md 4.8 (결정 5), 문구는 privacy-policy.md 8-1 "체크하지 않았을 때" 원문 그대로
+// ─────────────────────────────────────────────
+const GUARDIAN_REQUIRED_MESSAGE = "보호자 동의서를 받았다는 표시가 필요해요.";
+const MISSING_GUARDIAN_SQL_MESSAGE =
+  "보호자 동의 기록용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 " +
+  "20261020000000_privacy_a_schema.sql을 먼저 실행해 주세요. (계정을 만들지 않았습니다.)";
+const GUARDIAN_NOT_LOGGED_WARNING =
+  "계정은 만들었지만 보호자 동의 표시를 기록하지 못했습니다. 회원 목록에서 [동의서 받음으로 기록]을 눌러 주세요.";
+
+/** 로그에 넣는 오류 문구에서 id(uuid)·이메일 모양을 가린다(회원 정보를 남기지 않기). */
+const UUID_ANY_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const EMAIL_ANY_RE = /[^\s@"'<>()[\]]+@[^\s@"'<>()[\]]+/g;
+function scrub(text: unknown): string {
+  return String(text ?? "").replace(UUID_ANY_RE, "<id>").replace(EMAIL_ANY_RE, "<email>").slice(0, 300);
+}
+
+/** RPC 함수가 없어서 난 오류인지(새 SQL 미실행). */
+function isMissingFunction(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const m = (error.message ?? "").toLowerCase();
+  return code === "PGRST202" || code === "42883" || m.includes("could not find the function");
+}
 
 // ─────────────────────────────────────────────
 // 학급(반) — docs/classes/spec.md 개정 1-1·1-4
@@ -254,6 +289,16 @@ Deno.serve(async (req: Request) => {
     return json({ error: `한 번에 최대 ${MAX_ROWS}명까지 만들 수 있습니다. 나눠서 만들어 주세요.` }, 400, headers);
   }
 
+  // 보호자 동의 표시(spec 4.8): 학생 줄(role "user")이 하나라도 있으면 guardianConsent 가 정확히 true 여야 한다.
+  // 계정을 하나라도 만들기 전에 확인한다 — 아니면 아무 계정도 만들지 않는다(교사 줄도 함께).
+  const guardianConsent = (body as { guardianConsent?: unknown } | null)?.guardianConsent === true;
+  const hasStudentRow = rawRows.some(
+    (raw) => !!raw && typeof raw === "object" && (raw as { role?: unknown }).role === "user",
+  );
+  if (hasStudentRow && !guardianConsent) {
+    return json({ error: GUARDIAN_REQUIRED_MESSAGE, code: "guardian_consent_required" }, 400, headers);
+  }
+
   const results: RowResult[] = [];
   // 감사 로그 상태: 한 번 "SQL 미실행"이 확인되면 나머지 행에서는 시도하지 않는다(요청 낭비 방지).
   let logAvailable = true;
@@ -334,6 +379,21 @@ Deno.serve(async (req: Request) => {
       if (!activeClassIds.includes(wanted)) return json({ error: ARCHIVED_CLASS_MESSAGE }, 403, headers);
       classId = wanted;
     }
+
+    // ③-4 보호자 동의 기록용 SQL 확인(spec 4.8): 5-인자 감사 로그 함수가 없으면 동의 표시를 남길 수 없으므로
+    //      학생 계정을 만들지 않는다(아무 계정도 만들지 않음). 존재 확인용으로 일부러 빈 인자(null)를 넣어 "함수 없음"만 가려낸다
+    //      (함수는 'missing arguments'로 곧바로 끝나고 아무것도 쓰지 않는다 — target_id not null 이라 행이 생길 수도 없다).
+    //      그 밖의 오류는 함수가 있다는 뜻으로 보고 계속한다(행마다 실패하면 아래 ⑥이 warning 으로 알린다).
+    const probe = await admin.rpc("admin_log_member_create", {
+      p_target: null,
+      p_actor: null,
+      p_role: null,
+      p_source: null,
+      p_guardian: null,
+    });
+    if (probe.error && isMissingFunction(probe.error)) {
+      return json({ error: MISSING_GUARDIAN_SQL_MESSAGE }, 500, headers);
+    }
   }
 
   // ④~⑤ 한 행씩 만든다(부분 실패 허용). 순서를 지켜야 진행 표시가 자연스럽고, GoTrue 부하도 적다.
@@ -349,8 +409,8 @@ Deno.serve(async (req: Request) => {
       if (isEmailExistsError(createErr as { code?: string; message?: string; status?: number })) {
         results.push({ index, id: row.id, status: "exists", message: "이미 있는 아이디입니다." });
       } else {
-        // 아이디까지만 남긴다(비밀번호는 절대 로그에 남기지 않는다).
-        console.error(`admin-create-member: 생성 실패 [${row.id}]`, createErr.message);
+        // 줄 번호만 남긴다(아이디·이메일·비밀번호는 로그에 남기지 않는다).
+        console.error(`admin-create-member: 생성 실패 [${index + 1}번째 줄]`, scrub(createErr.message));
         results.push({ index, id: row.id, status: "failed", message: createErrorMessage(createErr) });
       }
       continue;
@@ -358,7 +418,7 @@ Deno.serve(async (req: Request) => {
 
     const newId = created?.user?.id;
     if (!newId) {
-      console.error(`admin-create-member: 생성 응답에 사용자 id가 없습니다 [${row.id}]`);
+      console.error(`admin-create-member: 생성 응답에 사용자 id가 없습니다 [${index + 1}번째 줄]`);
       results.push({ index, id: row.id, status: "failed", message: "계정을 만들었지만 응답을 확인하지 못했습니다." });
       continue;
     }
@@ -379,6 +439,9 @@ Deno.serve(async (req: Request) => {
 
     // ⑥ 감사 로그(만들어진 계정 1개당 1행). 실패해도 **계정 생성은 그대로 둔다**(review M1).
     //    profiles UPDATE가 실패했다면 실제 역할은 기본값 'user'이므로 그대로 기록한다(있는 그대로 남긴다).
+    //    학생 줄은 p_guardian = true(보호자 동의 표시 — 이 요청의 guardianConsent, spec 4.8), 교사 줄은 null(해당 없음).
+    //    5-인자 함수만 있으므로(옛 4-인자는 SQL ①이 지운다) 이름을 붙인 다섯 인자를 언제나 함께 보낸다.
+    let logged = false;
     if (logAvailable) {
       const loggedRole = profileUpdateErr ? "user" : row.role;
       const { error: logErr } = await admin.rpc("admin_log_member_create", {
@@ -386,35 +449,44 @@ Deno.serve(async (req: Request) => {
         p_actor: callerId,
         p_role: loggedRole,
         p_source: source,
+        p_guardian: row.role === "user" ? true : null,
       });
       if (logErr) {
-        // 비밀번호는 로그에 남기지 않는다(아이디까지만).
-        console.error(`admin-create-member: 감사 로그 실패 [${row.id}]`, logErr.message);
+        // 줄 번호만 남긴다(아이디·비밀번호는 로그에 남기지 않는다).
+        console.error(`admin-create-member: 감사 로그 실패 [${index + 1}번째 줄]`, scrub(logErr.message));
         if (isMissingLogSql(logErr)) {
           logAvailable = false;
           logWarning = MISSING_LOG_SQL_WARNING;
         } else if (!logWarning) {
-          logWarning = `계정은 만들었지만 생성 기록(감사 로그)을 남기지 못했습니다. (${logErr.message})`;
+          logWarning = `계정은 만들었지만 생성 기록(감사 로그)을 남기지 못했습니다. (${scrub(logErr.message)})`;
         }
+      } else {
+        logged = true;
       }
     }
+    // 학생 계정인데 감사 로그를 못 남겼으면 보호자 동의 표시도 남지 않았다 → 그 줄에 알린다(담임이 회원 목록에서 따로 기록).
+    const guardianWarning = row.role === "user" && !logged ? GUARDIAN_NOT_LOGGED_WARNING : null;
 
     if (profileUpdateErr) {
-      console.error(`admin-create-member: 프로필 설정 실패 [${row.id}]`, profileUpdateErr.message);
+      console.error(`admin-create-member: 프로필 설정 실패 [${index + 1}번째 줄]`, scrub(profileUpdateErr.message));
+      const profileWarning = row.role === "admin"
+        ? "계정은 만들었지만 교사(관리자) 지정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. 회원 관리에서 직접 지정해 주세요."
+        : "계정은 만들었지만 학급 배정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. " +
+          "이 학생이 회원 명단에 보이지 않으면 총괄 관리자에게 알려 주세요.";
       results.push({
         index,
         id: row.id,
         status: "created",
-        warning:
-          row.role === "admin"
-            ? "계정은 만들었지만 교사(관리자) 지정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. 회원 관리에서 직접 지정해 주세요."
-            : "계정은 만들었지만 학급 배정과 '첫 로그인 시 비밀번호 변경' 설정에 실패했습니다. " +
-              "이 학생이 회원 명단에 보이지 않으면 총괄 관리자에게 알려 주세요.",
+        warning: guardianWarning ? `${profileWarning} ${guardianWarning}` : profileWarning,
       });
       continue;
     }
 
-    results.push({ index, id: row.id, status: "created" });
+    results.push(
+      guardianWarning
+        ? { index, id: row.id, status: "created", warning: guardianWarning }
+        : { index, id: row.id, status: "created" },
+    );
   }
 
   results.sort((a, b) => a.index - b.index);

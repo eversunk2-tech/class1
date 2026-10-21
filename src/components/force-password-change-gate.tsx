@@ -4,8 +4,11 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
 
-/** 강제 비밀번호 변경 중에도 머무를 수 있는 경로(basePath 제외, trailingSlash 기준) */
-const ALLOWED_PATHS = ["/reset-password/", "/login/"];
+/**
+ * 강제 비밀번호 변경 중에도 머무를 수 있는 경로(basePath 제외, trailingSlash 기준).
+ * 개인정보 처리방침은 누구나 언제든 읽을 수 있어야 한다(docs/privacy/spec.md 3.10).
+ */
+const ALLOWED_PATHS = ["/reset-password/", "/login/", "/privacy/"];
 
 /**
  * 관리자가 비밀번호를 초기화한 계정(profiles.must_change_password = true)은

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { AuthCardShell, authCardClass, authInputClass } from "@/components/auth-card-shell";
@@ -13,6 +14,7 @@ import { useSession } from "@/hooks/use-session";
 import { authErrorMessage, signInWithId, signInWithOAuth, type OAuthProvider } from "@/lib/auth";
 import { goAfterLogin, nextFromLocation, rememberedLoginNext, rememberLoginNext } from "@/lib/login-redirect";
 import { outlinePillClass, primaryPillClass } from "@/lib/pill";
+import { PRIVACY_EXTRA_TEXT, usePolicyEffective } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 
 type Pending = null | "password" | OAuthProvider;
@@ -44,6 +46,8 @@ export function LoginForm() {
     typeof window === "undefined" ? null : (nextFromLocation() ?? rememberedLoginNext()),
   );
   const viaPassword = useRef(false);
+  // 개인정보 처리방침이 시행된 뒤에만 구글 안내 한 줄과 처리방침 링크를 보인다(docs/privacy/spec.md 6절)
+  const policyEffective = usePolicyEffective();
 
   // 이미 로그인했거나 OAuth 리다이렉트로 세션이 생기면 돌아갈 곳(없으면 메인)으로 이동
   useEffect(() => {
@@ -107,7 +111,7 @@ export function LoginForm() {
       <Card className={authCardClass}>
         <CardHeader className="justify-items-center gap-2 text-center">
           <CardTitle className="text-3xl font-normal">로그인</CardTitle>
-          <CardDescription className="break-keep">계정은 관리자가 미리 발급합니다. 별도의 회원가입은 없습니다.</CardDescription>
+          <CardDescription className="break-keep">학생 계정은 담임 선생님이 미리 만들어 줍니다.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -166,7 +170,33 @@ export function LoginForm() {
               {pending === "google" ? <Loader2Icon className="animate-spin" /> : <GoogleIcon />}
               Google로 로그인
             </Button>
+            {policyEffective ? (
+              <p className="text-center text-xs text-muted-foreground break-keep">{PRIVACY_EXTRA_TEXT.loginGoogleHint}</p>
+            ) : null}
           </div>
+
+          {policyEffective ? (
+            <nav
+              aria-label={PRIVACY_EXTRA_TEXT.policyLinkLabel}
+              className="-mt-2 flex flex-wrap items-center justify-center gap-x-1 text-sm"
+            >
+              <Link
+                href="/privacy/"
+                className="inline-flex min-h-11 items-center px-1.5 font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {PRIVACY_EXTRA_TEXT.policyLinkLabel}
+              </Link>
+              <span aria-hidden className="text-muted-foreground">
+                ·
+              </span>
+              <Link
+                href="/privacy/#easy"
+                className="inline-flex min-h-11 items-center px-1.5 font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {PRIVACY_EXTRA_TEXT.easyLinkLabel}
+              </Link>
+            </nav>
+          ) : null}
         </CardContent>
       </Card>
     </AuthCardShell>

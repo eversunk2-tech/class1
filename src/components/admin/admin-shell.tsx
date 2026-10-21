@@ -3,7 +3,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FlagIcon, GraduationCapIcon, LayoutDashboardIcon, NewspaperIcon, ShieldCheckIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import {
+  FlagIcon,
+  GraduationCapIcon,
+  LayoutDashboardIcon,
+  LockKeyholeIcon,
+  NewspaperIcon,
+  ShieldCheckIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { UnreadCount } from "@/components/learning/learning-ui";
 import type { MenuColor } from "@/data/menu";
 import { useAdminContext } from "@/hooks/use-admin-context";
@@ -18,6 +27,8 @@ export type AdminNavItem = {
   href: string;
   icon: LucideIcon;
   color: MenuColor;
+  /** 총괄에게만 보이는 메뉴(개인정보 설정 — docs/privacy/spec.md 6절) */
+  superOnly?: boolean;
 };
 
 /** 관리자 대시보드 메뉴. 존재하는 화면만 넣는다. */
@@ -28,6 +39,8 @@ export const adminNavItems: AdminNavItem[] = [
   { id: "members", label: "회원 관리", href: "/admin/members/", icon: UsersIcon, color: "games" },
   { id: "learning", label: "학습 현황", href: "/admin/learning/", icon: GraduationCapIcon, color: "board" },
   { id: "community", label: "커뮤니티", href: "/admin/community/", icon: FlagIcon, color: "games" },
+  // 교사 인증 코드·문의 이메일·인증 현황(privacy-policy.md 8-7) — 총괄만
+  { id: "privacy", label: "개인정보 설정", href: "/admin/privacy/", icon: LockKeyholeIcon, color: "home", superOnly: true },
 ];
 
 /** usePathname()은 basePath가 빠진 경로를 준다. 개요(/admin/)는 정확히 일치할 때만 활성. */
@@ -62,7 +75,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </p>
         <nav aria-label="관리자 메뉴">
           <ul className="relative -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:flex-col lg:overflow-visible lg:py-0">
-            {adminNavItems.map((item) => {
+            {adminNavItems.filter((item) => !item.superOnly || superAdmin).map((item) => {
               const active = isActive(item, pathname);
               const colors = menuColorClasses[item.color];
               const Icon = item.icon;

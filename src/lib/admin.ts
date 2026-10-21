@@ -1,7 +1,7 @@
 import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError, type User } from "@supabase/supabase-js";
 import { LOGIN_EMAIL_DOMAIN } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { fetchAllPages } from "@/lib/paging";
+import { chunk, fetchAllPages } from "@/lib/paging";
 import { MEMBER_ROW_COLUMNS, MEMBER_ROW_COLUMNS_WITH_CLASS, type MemberRow, type Role } from "@/lib/types";
 
 /**
@@ -67,9 +67,123 @@ async function withClassColumns<T>(run: (columns: string) => Promise<T>): Promis
   }
 }
 
-/** 전체 회원(한 번에 전부 가져와 클라이언트에서 검색/정렬). 1000명이 넘어도 페이지로 나눠 모두 받는다. */
+// ─────────────────────────────────────────────
+// 가린 줄 — 총괄에게 보이는 다른 학급 학생(docs/privacy/spec.md 4.11, 개정 4)
+//   학생 아이디는 그 학생의 담임만 온전히 본다. 총괄은 표(member_directory)에서 다른 학급 학생 줄을 읽지 못하고(SQL ②),
+//   RPC admin_masked_member_rows가 아이디·별명을 "첫 글자 + ***"로 가린 줄을 준다(사진 없음, 총괄이 아니면 []).
+//   ② 전에는 표에 모든 줄이 있어 RPC 줄과 겹친다 → **같은 id면 표 줄이 이긴다**. RPC가 없으면(SQL ① 전) 표만.
+// ─────────────────────────────────────────────
+
+function strOrNull(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function parseMaskedRows(data: unknown): MemberRow[] {
+  let raw: unknown = data;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = null;
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  const out: MemberRow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    if (typeof r.id !== "string") continue;
+    const prof = r.profiles && typeof r.profiles === "object" ? (r.profiles as Record<string, unknown>) : {};
+    const email = strOrNull(r.email)?.trim() || "***";
+    // 가린 별명이 비었으면(원래 별명이 빈 계정 — 서버 mask_label은 '***') 가린 아이디로 보인다:
+    // '기록까지 삭제'의 이름 확인은 "원래 이름(비었으면 아이디)의 첫 글자 + ***"와 비교하기 때문(spec 4.11 Edge Function).
+    const shownName = strOrNull(prof.display_name)?.trim();
+    const consentAt = strOrNull(r.guardian_consent_at);
+    out.push({
+      id: r.id,
+      email,
+      provider: strOrNull(r.provider),
+      providers: Array.isArray(r.providers) ? r.providers.filter((v): v is string => typeof v === "string") : [],
+      signed_up_at: strOrNull(r.signed_up_at) ?? "",
+      last_sign_in_at: strOrNull(r.last_sign_in_at),
+      updated_at: strOrNull(r.updated_at) ?? "",
+      class_id: strOrNull(r.class_id),
+      masked: true,
+      masked_consent: consentAt ? { at: consentAt, by: strOrNull(r.guardian_consent_by), byName: null } : null,
+      profiles: {
+        display_name: shownName && shownName !== "***" ? shownName : email,
+        avatar_url: null,
+        role: prof.role === "admin" ? "admin" : "user",
+        withdrawn_at: strOrNull(prof.withdrawn_at),
+        must_change_password: typeof prof.must_change_password === "boolean" ? prof.must_change_password : undefined,
+      },
+    });
+  }
+  return out;
+}
+
+/** 가린 줄의 동의 표시를 한 선생님 이름(선생님 별명은 로그인한 모든 회원이 읽는다). 못 읽으면 이름 없이 둔다. */
+async function withConsentTeacherNames(rows: MemberRow[]): Promise<MemberRow[]> {
+  const ids = [...new Set(rows.map((r) => r.masked_consent?.by).filter((v): v is string => !!v))];
+  if (!ids.length) return rows;
+  const names = new Map<string, string>();
+  try {
+    for (const part of chunk(ids, 100)) {
+      const { data, error } = await supabase.from("profiles").select("id,display_name").in("id", part);
+      if (error) break;
+      for (const p of (data ?? []) as { id: string; display_name: string | null }[]) {
+        if (p.display_name?.trim()) names.set(p.id, p.display_name.trim());
+      }
+    }
+  } catch {
+    // 이름은 보조 정보 — 못 읽어도 "선생님이 표시했어요."로 보인다
+  }
+  if (!names.size) return rows;
+  return rows.map((r) =>
+    r.masked_consent?.by && names.has(r.masked_consent.by)
+      ? { ...r, masked_consent: { ...r.masked_consent, byName: names.get(r.masked_consent.by) ?? null } }
+      : r,
+  );
+}
+
+/**
+ * admin_masked_member_rows(p_id) — 총괄에게만 다른 학급 학생 줄(가린 값). 총괄이 아니면 서버가 [].
+ * 함수가 없으면(SQL ① 전) [], 그 밖에 실패해도 [](콘솔 오류만) — 회원 목록을 막지 않는다(표 줄은 그대로 보인다).
+ */
+export async function fetchMaskedMemberRows(id?: string): Promise<MemberRow[]> {
+  try {
+    const { data, error } = await supabase.rpc("admin_masked_member_rows", id ? { p_id: id } : {});
+    if (error) {
+      if (!isMissingSchemaError(error)) console.error("[admin] admin_masked_member_rows 실패:", error.code ?? "", error.message ?? "");
+      return [];
+    }
+    return await withConsentTeacherNames(parseMaskedRows(data));
+  } catch (e) {
+    console.error("[admin] admin_masked_member_rows 실패:", e instanceof Error ? e.message : "");
+    return [];
+  }
+}
+
+function timeOf(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** 표 줄 + 가린 줄(같은 id면 표 줄). 가린 줄을 더했으면 표와 같은 순서(가입일 최근 순, 같으면 id)로 다시 줄 세운다. */
+function mergeMaskedRows(rows: MemberRow[], masked: MemberRow[]): MemberRow[] {
+  if (!masked.length) return rows;
+  const seen = new Set(rows.map((r) => r.id));
+  const extra = masked.filter((m) => !seen.has(m.id));
+  if (!extra.length) return rows;
+  return [...rows, ...extra].sort((a, b) => timeOf(b.signed_up_at) - timeOf(a.signed_up_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * 전체 회원(한 번에 전부 가져와 클라이언트에서 검색/정렬). 1000명이 넘어도 페이지로 나눠 모두 받는다.
+ * 총괄에게는 다른 학급 학생의 가린 줄(admin_masked_member_rows)을 합친다.
+ */
 export async function fetchMembers(): Promise<MemberRow[]> {
-  const [rows, ids] = await Promise.all([
+  const [rows, ids, masked] = await Promise.all([
     withClassColumns((columns) =>
       fetchAllPages<MemberRow>((from, to) =>
         supabase
@@ -81,13 +195,15 @@ export async function fetchMembers(): Promise<MemberRow[]> {
       ),
     ),
     fetchMustChangeIds(),
+    fetchMaskedMemberRows(),
   ]);
-  return withFlags(rows, ids);
+  // 비밀번호 변경 대기 표시는 표 줄에만 RPC로 채운다(가린 줄은 admin_masked_member_rows가 함께 준다)
+  return mergeMaskedRows(withFlags(rows, ids), masked);
 }
 
-/** 최근 가입 회원 n명 */
+/** 최근 가입 회원 n명(총괄은 가린 줄 포함) */
 export async function fetchRecentMembers(limit: number): Promise<MemberRow[]> {
-  const [rows, ids] = await Promise.all([
+  const [rows, ids, masked] = await Promise.all([
     withClassColumns(async (columns) => {
       const res = await supabase
         .from("member_directory")
@@ -98,11 +214,15 @@ export async function fetchRecentMembers(limit: number): Promise<MemberRow[]> {
       return (res.data ?? []) as unknown as MemberRow[];
     }),
     fetchMustChangeIds(),
+    fetchMaskedMemberRows(),
   ]);
-  return withFlags(rows, ids);
+  return mergeMaskedRows(withFlags(rows, ids), masked).slice(0, limit);
 }
 
-/** 회원 1명. 없으면 null(담임에게 다른 학급 학생은 RLS로 "없음"이 된다). */
+/**
+ * 회원 1명. 없으면 null(담임에게 다른 학급 학생은 RLS로 "없음"이 된다).
+ * 표에 없으면 총괄에게는 가린 줄(admin_masked_member_rows(p_id))을 찾아 준다.
+ */
 export async function fetchMember(id: string): Promise<MemberRow | null> {
   const [row, ids] = await Promise.all([
     withClassColumns(async (columns) => {
@@ -112,7 +232,9 @@ export async function fetchMember(id: string): Promise<MemberRow | null> {
     }),
     fetchMustChangeIds(),
   ]);
-  return row ? withFlags([row], ids)[0] : null;
+  if (row) return withFlags([row], ids)[0];
+  const masked = await fetchMaskedMemberRows(id);
+  return masked.find((m) => m.id === id) ?? null;
 }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

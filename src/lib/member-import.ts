@@ -1,6 +1,6 @@
 /**
  * 회원 추가(한 명 / 엑셀 일괄)의 검사 규칙과 Edge Function 호출.
- * 설계: docs/admin/create-members/build-instructions.md
+ * 설계: docs/admin/create-members/build-instructions.md, 보호자 동의 표시: docs/privacy/spec.md 4.8
  *
  * ⚠ 검사 규칙은 `supabase/functions/admin-create-member/index.ts`와 **똑같이** 유지한다.
  *   화면 검사는 편의일 뿐이고, 진짜 보증은 Edge Function이 한다(관리자 확인도 그쪽에서).
@@ -25,7 +25,6 @@ export const CHUNK_SIZE = 20;
 export const MAX_IMPORT_ROWS = 200;
 
 const ID_RE = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/;
-const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
 export const ROLE_LABELS: Record<DraftRole, string> = { user: "학생", admin: "교사" };
 
@@ -46,9 +45,8 @@ export function validateLoginId(rawId: string): string | null {
   const id = normalizeLoginId(rawId);
   if (!id) return "아이디가 비어 있습니다.";
   if (/\s/.test(id)) return "아이디에 공백을 넣을 수 없습니다.";
-  if (id.includes("@")) {
-    return EMAIL_RE.test(id) ? null : "이메일 형식이 올바르지 않습니다.";
-  }
+  // 아이디 계정은 늘 {아이디}@class1.local(개인정보 SQL ②의 판정 — spec 개정 4 보충). 이메일 모양(@) 아이디는 받지 않는다:
+  // 그런 계정은 ② 뒤 구글처럼 '인증 전'으로 묶여 기록 저장이 막힌다(검토 R1 N1). '@'는 아래 ID_RE에서 걸린다.
   if (id.length < ID_MIN || id.length > ID_MAX) return `아이디는 ${ID_MIN}~${ID_MAX}자로 적어 주세요.`;
   if (!ID_RE.test(id)) return "아이디에는 영문·숫자와 . _ - 만 쓸 수 있습니다(한글·공백 불가).";
   return null;
@@ -257,9 +255,17 @@ async function invokeCreate(
   rows: { id: string; password: string; role: DraftRole }[],
   source: CreateSource,
   classId: string | null,
+  guardianConsent: boolean,
 ): Promise<InvokeResult> {
   // classId: 학생 줄을 넣을 학급(호출자가 담임인 학급만 — Edge Function이 확인한다). 교사 줄에는 쓰이지 않는다.
-  const requestBody = classId ? { rows, source, classId } : { rows, source };
+  // guardianConsent: 학생 줄이 있으면 필수(docs/privacy/spec.md 4.8 — 없으면 함수가 하나도 만들지 않고 400).
+  //   교사가 "보호자 동의서를 받았다"고 체크했을 때만 true를 보낸다. 누가·언제 체크했는지는 함수가 member_create_log에 남긴다.
+  const requestBody = {
+    rows,
+    source,
+    ...(classId ? { classId } : {}),
+    ...(guardianConsent ? { guardianConsent: true } : {}),
+  };
   const { data, error } = await supabase.functions.invoke("admin-create-member", { body: requestBody });
   if (error) {
     if (error instanceof FunctionsHttpError) {
@@ -321,11 +327,17 @@ export async function createMembers(
     source: CreateSource;
     /** 학생 줄을 넣을 학급 id(docs/classes/spec.md 개정 1-4 요청 필드 classId). 학급 기능 전이거나 교사만 만들 때는 비움. */
     classId?: string | null;
+    /**
+     * 보호자 동의서를 받았다는 표시(docs/privacy/spec.md 4.8 — 회원 추가의 필수 체크, 엑셀은 파일 하나에 체크 하나).
+     * 학생 줄이 있는데 false면 Edge Function이 계정을 하나도 만들지 않는다(화면이 먼저 막는다).
+     */
+    guardianConsent?: boolean;
     onProgress?: (done: number, total: number) => void;
   },
 ): Promise<CreateRunResult> {
   const { source, onProgress } = options;
   const classId = options.classId ?? null;
+  const guardianConsent = options.guardianConsent === true;
   const targets = drafts.filter((d) => !d.error && d.role);
   const outcomes: CreateOutcome[] = [];
   const notices = new Set<string>();
@@ -339,6 +351,7 @@ export async function createMembers(
         chunk.map((d) => ({ id: d.id, password: d.password, role: d.role as DraftRole })),
         source,
         classId,
+        guardianConsent,
       );
       if (warning) notices.add(warning);
       const byIndex = new Map(results.map((r) => [r.index, r]));
@@ -363,6 +376,11 @@ export async function createMembers(
     onProgress?.(done, targets.length);
   }
   return { outcomes, notices: [...notices] };
+}
+
+/** 학생 줄이 하나라도 있는가 — 있으면 보호자 동의 체크가 필수다(docs/privacy/spec.md 4.8). */
+export function needsGuardianConsent(drafts: Pick<MemberDraft, "role" | "error">[]): boolean {
+  return drafts.some((d) => !d.error && d.role === "user");
 }
 
 /** 요약 문구용 집계 */

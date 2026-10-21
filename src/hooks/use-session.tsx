@@ -6,13 +6,16 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { isMissingSchemaError } from "@/lib/admin";
+import { LOGIN_EMAIL_DOMAIN } from "@/lib/auth";
 import { clearScienceLocalData } from "@/lib/local-data";
+import { fetchMemberGate, type MemberGate } from "@/lib/privacy";
 import { PROFILE_COLUMNS, type Profile } from "@/lib/types";
 
 /**
@@ -37,6 +40,13 @@ type SessionState = {
   mustChangePassword: boolean | null;
   /** 프로필을 다시 읽는다. 성공하면 새 프로필, 실패하면 null(이전 값은 유지). */
   refreshProfile: () => Promise<Profile | null>;
+  /**
+   * 개인정보 확인 창 상태(my_member_gate() — docs/privacy/spec.md 3절). null = 아직 모름(로그인 전·읽는 중·실패).
+   * 함수가 없으면(SQL ① 전) `ready: false`인 ok. 창(`PrivacyGate`)은 안내일 뿐이고 실제 막기는 서버가 한다.
+   */
+  gate: MemberGate | null;
+  /** 창 상태를 다시 읽는다. 성공하면 새 값, 실패하면 null(이전 값은 유지). */
+  refreshGate: () => Promise<MemberGate | null>;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -89,12 +99,17 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 const RETRY_DELAYS = [2000, 5000, 15000, 30000, 60000];
 
 type ProfileState = { userId: string | null; profile: Profile | null; status: ProfileStatus };
+type GateBox = { userId: string | null; gate: MemberGate | null; status: ProfileStatus };
+
+const needsGate = (g: MemberGate | null | undefined) => g?.state === "need_code" || g?.state === "need_ack";
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profileState, setProfileState] = useState<ProfileState>({ userId: null, profile: null, status: "idle" });
   const [retry, setRetry] = useState(0);
+  const [gateBox, setGateBox] = useState<GateBox>({ userId: null, gate: null, status: "idle" });
+  const [gateRetry, setGateRetry] = useState(0);
 
   const userId = session?.user.id ?? null;
 
@@ -131,6 +146,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setProfileState({ userId, profile: null, status: userId ? "loading" : "idle" });
     setRetry(0);
   }
+  if (gateBox.userId !== userId) {
+    setGateBox({ userId, gate: null, status: userId ? "loading" : "idle" });
+    setGateRetry(0);
+  }
 
   useEffect(() => {
     if (!userId) return;
@@ -162,6 +181,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("focus", onFocus);
   }, [failed]);
 
+  // 개인정보 확인 창 상태(my_member_gate). 실패하면 이전 값을 두고(처음이면 모름 = 창 없음) 잠시 뒤 다시 읽는다.
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    fetchMemberGate().then(
+      (gate) => {
+        if (active) setGateBox({ userId, gate, status: "ready" });
+      },
+      () => {
+        if (!active) return;
+        setGateBox((s) => (s.userId === userId ? { ...s, status: "error" } : s));
+        timer = setTimeout(
+          () => setGateRetry((n) => n + 1),
+          RETRY_DELAYS[Math.min(gateRetry, RETRY_DELAYS.length - 1)],
+        );
+      },
+    );
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [userId, gateRetry]);
+
   const refreshProfile = useCallback(async (): Promise<Profile | null> => {
     if (!userId) return null;
     try {
@@ -173,6 +216,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return null;
     }
   }, [userId]);
+
+  // refreshGate가 "방금까지 창이 떠 있었는지"를 알 수 있게 마지막 값을 둔다.
+  const gateRef = useRef<MemberGate | null>(null);
+  useEffect(() => {
+    gateRef.current = gateBox.userId === userId ? gateBox.gate : null;
+  }, [gateBox, userId]);
+
+  // 탭 복귀(visibilitychange)와 창 초점(focus)이 거의 함께 와도 한 번만 읽는다.
+  const gateInflight = useRef<Promise<MemberGate | null> | null>(null);
+
+  const refreshGate = useCallback((): Promise<MemberGate | null> => {
+    if (!userId) return Promise.resolve(null);
+    if (gateInflight.current) return gateInflight.current;
+    const run = (async () => {
+      try {
+        const next = await fetchMemberGate();
+        const wasPending = needsGate(gateRef.current);
+        setGateBox((s) => (s.userId === userId ? { userId, gate: next, status: "ready" } : s));
+        // 다른 탭에서 인증을 마쳐 창이 풀렸으면 역할(교사)도 바뀌었을 수 있다 → 프로필도 다시 읽는다.
+        if (wasPending && !needsGate(next)) void refreshProfile();
+        return next;
+      } catch {
+        return null;
+      } finally {
+        gateInflight.current = null;
+      }
+    })();
+    gateInflight.current = run;
+    return run;
+  }, [userId, refreshProfile]);
+
+  // 창이 떠 있어야 하는 동안(인증·확인 전), 탭이 다시 보이거나 창에 초점이 오면 서버 상태를 다시 읽는다(spec 3.5 —
+  // 다른 탭에서 인증을 마쳤으면 이 탭의 창을 닫는다). 읽기에 실패한 상태에서도 같은 때 다시 시도한다.
+  const gateWatch = needsGate(gateBox.gate) || gateBox.status === "error";
+  useEffect(() => {
+    if (!gateWatch) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshGate();
+    };
+    const onFocus = () => void refreshGate();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [gateWatch, refreshGate]);
 
   const value = useMemo<SessionState>(() => {
     const profile = profileState.userId === userId ? profileState.profile : null;
@@ -188,8 +278,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 한 번이라도 성공적으로 읽은 값이 있으면 그 값, 아니면 판단 불가(null)
       mustChangePassword: !userId ? false : profile && typeof must === "boolean" ? must : status === "ready" ? false : null,
       refreshProfile,
+      gate: gateBox.userId === userId ? gateBox.gate : null,
+      refreshGate,
     };
-  }, [loading, session, profileState, userId, refreshProfile]);
+  }, [loading, session, profileState, userId, refreshProfile, gateBox, refreshGate]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -200,7 +292,12 @@ export function useSession(): SessionState {
   return ctx;
 }
 
-/** 표시용 이름: display_name → 이메일 앞부분 → '사용자' */
+/**
+ * 표시용 이름: display_name → 아이디(사전 발급 계정의 이메일 앞부분) → '사용자'.
+ * 구글 계정의 이메일은 화면에 쓰지 않는다(docs/privacy/spec.md 결정 12 — 공용 PC 화면에 보이지 않게).
+ */
 export function displayNameOf(profile: Profile | null, user: User | null): string {
-  return profile?.display_name || user?.email?.split("@")[0] || "사용자";
+  const email = user?.email ?? "";
+  const loginId = email.toLowerCase().endsWith(`@${LOGIN_EMAIL_DOMAIN}`) ? email.split("@")[0] : "";
+  return profile?.display_name || loginId || "사용자";
 }

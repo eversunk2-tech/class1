@@ -95,6 +95,14 @@ export type MemberRow = MemberDirectory & {
    * 학급 이름은 관리자 화면에서만 보여 준다(학생 화면에는 소속 정보를 보이지 않음 — 개정 1).
    */
   class_id?: string | null;
+  /**
+   * 가린 줄(docs/privacy/spec.md 4.11 — 총괄에게 보이는 다른 학급 학생, RPC admin_masked_member_rows):
+   * 아이디(email 자리 — `@` 앞의 첫 글자 + `***`)·별명(profiles.display_name)이 가린 값이고 사진은 없다.
+   * 표(member_directory)에서 읽은 줄은 undefined. 가린 줄에서는 비밀번호 초기화·탈퇴 처리·기록까지 삭제만 보인다.
+   */
+  masked?: boolean;
+  /** 가린 줄에만: 보호자 동의 표시(RPC가 함께 준다 — 표에서 읽은 줄의 동의 표시는 useMemberPrivacyInfo가 따로 읽는다). */
+  masked_consent?: { at: string; by: string | null; byName: string | null } | null;
 };
 
 /** must_change_password는 컬럼 권한으로 막혀 있어(20260922000000) embed하지 않는다 → admin.ts가 RPC로 채운다.

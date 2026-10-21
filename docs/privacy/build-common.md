@@ -1,6 +1,7 @@
 # 구현 공통 지침 — 개인정보 처리방침 · 구글 교사 인증 · 보호자 동의 (2026-10-20)
 
 > 모든 구현 담당(묶음 1~4)이 먼저 읽는다. 묶음별 지침: `build-1-sql-instructions.md`, `build-2-functions-instructions.md`, `build-3-public-ui-instructions.md`, `build-4-admin-ui-instructions.md`.
+> **2차(2026-10-20, spec 개정 3·4 — 보유 기한 2월 28일, 학생 아이디·이름 가리기)**: 묶음 5 `build-5-sql-instructions.md`(SQL·`admin-clear-students`, 스크래치 `privacy-b5/`), 묶음 6 `build-6-ui-instructions.md`(화면, Chrome 포트 9483, 스크래치 `privacy-b6/`). 기준 문서의 우선순위는 아래 그대로이고, spec 머리말 개정 4와 4.11이 그 앞의 본문보다 우선한다.
 
 ## 기준 문서(이 순서로 우선)
 1. `docs/privacy/spec.md` — 설계(머리말의 개정 1·2와 1.1 결정표가 본문보다 우선). **함수·RPC·표·열 이름은 spec 4.1·4.2·10.2의 이름표가 계약이다** — 다른 묶음이 같은 이름을 쓰므로 바꾸지 않는다. 바꿔야 하면 바꾸지 말고 보고서에 적는다.

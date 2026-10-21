@@ -22,6 +22,7 @@ import {
   loginHrefHere,
   POST_SUMMARY_COLUMNS,
   POST_SUMMARY_COLUMNS_WITH_BOARD,
+  withAuthorLabels,
   type CommunityKind,
   type CommunityPostSummary,
 } from "@/lib/community";
@@ -100,7 +101,8 @@ async function searchCommunity(kind: CommunityKind, q: string, offset: number, b
     .order("id", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
   if (error) throw error;
-  return (data ?? []) as unknown as CommunityPostSummary[];
+  // 다른 학급 학생의 글은 가린 작성자 이름("첫 글자 + ***")으로(docs/privacy/spec.md 4.11)
+  return withAuthorLabels((data ?? []) as unknown as CommunityPostSummary[]);
 }
 
 export function SearchView() {

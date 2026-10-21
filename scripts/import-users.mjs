@@ -27,7 +27,9 @@
  *   -h, --help              도움말
  *
  * 동작
- *   - 아이디에 @ 가 없으면 {아이디}@class1.local 로 바꿔 이메일로 사용한다(로그인 화면과 같은 규칙).
+ *   - 아이디는 {아이디}@class1.local 로 바꿔 이메일로 사용한다(로그인 화면 · admin-create-member 와 같은 규칙).
+ *     아이디는 영문 소문자·숫자와 . _ - 만(2~30자, 대문자는 소문자로) — 이메일 모양(@가 든) 아이디는 받지 않는다
+ *     (2026-10-21 고침 2: 개인정보 SQL ②가 @class1.local 이 아닌 계정을 구글처럼 '인증 전'으로 묶는다 — 검토 R1 N1).
  *   - email_confirm: true 로 생성하고, name 열 값은 user_metadata.full_name 에 넣는다
  *     (handle_new_user 트리거가 profiles.display_name 으로 복사).
  *   - 이름이 50자(profiles.display_name 제한)를 넘으면 앞 50자만 쓰고 경고를 출력한다.
@@ -44,6 +46,10 @@ import { inflateRawSync } from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
 
 const LOGIN_EMAIL_DOMAIN = "class1.local"; // src/lib/auth.ts 의 LOGIN_EMAIL_DOMAIN 과 같아야 한다.
+// 아이디 규칙 — supabase/functions/admin-create-member/index.ts · src/lib/member-import.ts 와 같다(소문자로 바꾼 뒤 검사).
+const ID_RE = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/;
+const ID_MIN = 2;
+const ID_MAX = 30;
 const MIN_PASSWORD_LENGTH = 6; // Supabase Auth 기본 최소 길이
 
 function printHelp() {
@@ -261,8 +267,15 @@ function readEnvFile(path) {
 }
 
 function toEmail(id) {
-  const trimmed = id.trim();
-  return (trimmed.includes("@") ? trimmed : `${trimmed}@${LOGIN_EMAIL_DOMAIN}`).toLowerCase();
+  return `${id.trim()}@${LOGIN_EMAIL_DOMAIN}`.toLowerCase();
+}
+
+/** 아이디 검사(통과하면 null). '@'가 든 아이디는 ID_RE 에서 걸린다 — admin-create-member 와 같은 문구. */
+function idError(rawId) {
+  const id = rawId.trim().toLowerCase();
+  if (id.length < ID_MIN || id.length > ID_MAX) return `아이디는 ${ID_MIN}~${ID_MAX}자로 적어 주세요.`;
+  if (!ID_RE.test(id)) return "아이디에는 영문 소문자·숫자와 . _ - 만 쓸 수 있습니다(한글·공백 불가).";
+  return null;
 }
 
 // ─────────────────────────────────────────────
@@ -325,6 +338,8 @@ table.slice(1).forEach((cells, i) => {
     truncated.push(line);
   }
   if (!id) return invalid.push({ line, reason: "아이디가 비어 있음" });
+  const badId = idError(id);
+  if (badId) return invalid.push({ line, reason: badId });
   const email = toEmail(id);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return invalid.push({ line, reason: `이메일 형식이 아님(${email})` });
   if (password.length < MIN_PASSWORD_LENGTH) {

@@ -41,13 +41,19 @@ function AlertDialogOverlay({
 function AlertDialogContent({
   className,
   size = "default",
+  forceOverlay = false,
   ...props
 }: AlertDialogPrimitive.Popup.Props & {
   size?: "default" | "sm"
+  /**
+   * 다른 창(Dialog) 안에서 겹쳐 여는 확인 창이면 true — Base UI는 겹친 창의 막(Backdrop)을 그리지 않아
+   * 뒤 창의 단추가 눌린다(docs/privacy/review-ui.md M1). true면 막을 그려 뒤 창을 덮는다.
+   */
+  forceOverlay?: boolean
 }) {
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      <AlertDialogOverlay forceRender={forceOverlay} />
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         data-size={size}

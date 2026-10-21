@@ -5,21 +5,38 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
+  ClockIcon,
+  EraserIcon,
+  EyeOffIcon,
+  FileCheck2Icon,
   KeyRoundIcon,
   LockKeyholeIcon,
   ShieldCheckIcon,
+  ShieldHalfIcon,
   ShieldOffIcon,
+  ShieldPlusIcon,
   Trash2Icon,
   UserMinusIcon,
 } from "lucide-react";
-import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { GuardianConsentDialog, type GuardianConsentTarget } from "@/components/admin/guardian-consent-dialog";
+import {
+  GuardianConsentStatus,
+  isPendingMember,
+  isPendingOverdue,
+  MemberAvatar,
+  pendingHintOf,
+  ProviderBadges,
+  RoleBadge,
+} from "@/components/admin/member-badges";
+import { MemberEraseDialog } from "@/components/admin/member-erase-dialog";
 import { MemberPurgeDialog } from "@/components/admin/member-purge-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
-import { RoleChangeDialog } from "@/components/admin/role-change-dialog";
+import { RoleChangeDialog, TeacherScopeDialog } from "@/components/admin/role-change-dialog";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PRIVACY_ADMIN_TEXT } from "@/data/privacy-admin-text";
 import { adminPermissions, useAdminContext } from "@/hooks/use-admin-context";
 import { useSession } from "@/hooks/use-session";
 import {
@@ -39,6 +56,13 @@ import {
   UUID_RE,
   withdrawBlockReason,
 } from "@/lib/admin";
+import {
+  consentByMe,
+  isConsentSubject,
+  privacyMenuOf,
+  useMemberPrivacyInfo,
+  type TeacherScope,
+} from "@/lib/admin-privacy";
 import { formatDateTime } from "@/lib/format";
 import type { MemberRow, Role } from "@/lib/types";
 import { MemberLearning } from "./member-learning";
@@ -65,10 +89,17 @@ function BackLink() {
  */
 export function MemberDetail({ id }: { id: string }) {
   const router = useRouter();
-  const { user } = useSession();
+  const { user, profile } = useSession();
   const ctx = useAdminContext();
   const perms = adminPermissions(ctx);
   const validId = UUID_RE.test(id);
+  // 개인정보 표시: 인증 상태·권한 범위(총괄만), 보호자 동의 기록(학급 기능 뒤)
+  const privacy = useMemberPrivacyInfo(perms.superAdmin, ctx.status === "ready");
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [scopeNext, setScopeNext] = useState<TeacherScope>("full");
+  const [consentTarget, setConsentTarget] = useState<GuardianConsentTarget | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [eraseOpen, setEraseOpen] = useState(false);
   const [state, setState] = useState<State>(validId ? { status: "loading" } : { status: "not-found" });
   const [resetOpen, setResetOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -102,7 +133,8 @@ export function MemberDetail({ id }: { id: string }) {
   }
 
   // 탈퇴한 회원이면 "언제·누가" 처리했는지 감사 로그에서 최근 1건을 읽는다(표가 없으면 조용히 건너뛴다).
-  const withdrawn = state.status === "ready" && isWithdrawnMember(state.member);
+  // 가린 줄(다른 학급 학생 — 총괄)은 감사 기록을 읽을 수 없어(SQL ②, docs/privacy/spec.md 4.11) 부르지 않는다 — 탈퇴 시각만 보인다.
+  const withdrawn = state.status === "ready" && isWithdrawnMember(state.member) && !state.member.masked;
   useEffect(() => {
     if (!withdrawn) return;
     let active = true;
@@ -171,6 +203,22 @@ export function MemberDetail({ id }: { id: string }) {
     : member.class_id
       ? (ctx.classNameOf(member.class_id) ?? "다른 학급")
       : "없음 — 어느 담임 화면에도 보이지 않아요";
+  // 개인정보(spec 4.7·4.8, 문구 8-2·8-3·8-5)
+  const flag = privacy.flags?.get(member.id);
+  const pending = isPendingMember(member, flag);
+  const pendingOverdue = isPendingOverdue(member, flag);
+  // 가린 줄(다른 학급 학생 — 총괄, spec 4.11): 아이디·별명은 가린 값, 메뉴는 비밀번호 초기화·탈퇴 처리·기록까지 삭제만,
+  // 동의 표시는 RPC가 함께 준 값(표에서 읽지 못한다)
+  const masked = member.masked === true;
+  const baseMenu = privacyMenuOf(member, ctx, privacy, user?.id ?? null);
+  const menu = masked ? { ...baseMenu, consent: false, scope: null } : baseMenu;
+  const consent = masked ? (member.masked_consent ?? null) : (privacy.consents?.get(member.id) ?? null);
+  const showConsent = classMode && (masked || privacy.consents !== null) && isConsentSubject(member);
+  const scopeHint = isAdmin && flag
+    ? flag.teacherScope === "class"
+      ? PRIVACY_ADMIN_TEXT.googleTeacher.classTeacherHint
+      : PRIVACY_ADMIN_TEXT.googleTeacher.fullTeacherHint
+    : null;
   // 학습 기록을 볼 수 있는 학생인가: 내가 담임인 학급의 학생만(총괄 예외 없음). 학급 기능 전·정보를 못 읽었으면 예전처럼 보여 준다.
   const inMyClass = !!member.class_id && ctx.classes.some((c) => c.id === member.class_id);
   const learningHidden = classMode && !inMyClass;
@@ -186,6 +234,8 @@ export function MemberDetail({ id }: { id: string }) {
         ? { ...m, profiles: { ...m.profiles, role }, ...(role === "admin" && m.class_id !== undefined ? { class_id: null } : {}) }
         : m,
     );
+    // 담임 지정·해제 때 서버가 권한 범위를 'full'로 둔다 — 표시를 다시 읽는다.
+    privacy.reload();
   }
 
   return (
@@ -207,8 +257,15 @@ export function MemberDetail({ id }: { id: string }) {
               {isWithdrawn ? ` · 탈퇴 전 이름: ${realName}` : ""}
             </p>
           </div>
-          <RoleBadge member={member} />
+          <RoleBadge member={member} flag={flag} />
         </div>
+
+        {masked ? (
+          <p role="note" className="flex items-start gap-2 rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
+            <EyeOffIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>{PRIVACY_ADMIN_TEXT.maskedRows.notice}</span>
+          </p>
+        ) : null}
 
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
           <Field label="아이디/이메일">{member.email || "—"}</Field>
@@ -219,8 +276,16 @@ export function MemberDetail({ id }: { id: string }) {
           <Field label="마지막 로그인">
             {member.last_sign_in_at ? formatDateTime(member.last_sign_in_at) : "로그인 기록 없음"}
           </Field>
-          <Field label="역할">{isAdmin ? "교사(관리자)" : "학생(일반 회원)"}</Field>
+          <Field label="역할">
+            {isAdmin ? "교사(관리자)" : pending ? PRIVACY_ADMIN_TEXT.googleTeacher.pending : "학생(일반 회원)"}
+            {scopeHint ? <span className="block text-xs text-muted-foreground">{scopeHint}</span> : null}
+          </Field>
           {classMode ? <Field label="학급">{classText}</Field> : null}
+          {showConsent ? (
+            <Field label={PRIVACY_ADMIN_TEXT.consentColumn.header}>
+              <GuardianConsentStatus consent={consent} canRecord={menu.consent} withHint />
+            </Field>
+          ) : null}
           <Field label="비밀번호">
             {isWithdrawn
               ? "없음(계정 삭제됨)"
@@ -237,6 +302,19 @@ export function MemberDetail({ id }: { id: string }) {
             </Field>
           ) : null}
         </dl>
+
+        {pending ? (
+          <div
+            className="flex flex-col gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100"
+            role="note"
+          >
+            <p className="flex items-start gap-2">
+              <ClockIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>{pendingHintOf(flag, member.signed_up_at)}</span>
+            </p>
+            {pendingOverdue ? <p className="pl-6 font-medium">{PRIVACY_ADMIN_TEXT.googleTeacher.over30Hint}</p> : null}
+          </div>
+        ) : null}
 
         {isWithdrawn ? (
           <p className="rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground" role="note">
@@ -262,7 +340,7 @@ export function MemberDetail({ id }: { id: string }) {
             </Button>
           )}
           {/* 담임교사 지정/해제는 총괄만(admin_set_role — 개정 1-2). 담임에게는 버튼을 보이지 않는다. */}
-          {!perms.canChangeRole ? null : isAdmin && isSelf ? (
+          {!perms.canChangeRole || masked ? null : isAdmin && isSelf ? (
             <Button variant="outline" disabled title="자기 자신의 담임교사 지정은 해제할 수 없습니다.">
               <ShieldOffIcon />
               담임 해제(본인 불가)
@@ -278,6 +356,32 @@ export function MemberDetail({ id }: { id: string }) {
               {isAdmin ? "담임 해제" : "담임교사로 지정"}
             </Button>
           )}
+          {/* 교사 권한 넓히기·줄이기(총괄만 — 8-3) */}
+          {menu.scope ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setScopeNext(menu.scope === "class" ? "full" : "class");
+                setScopeOpen(true);
+              }}
+            >
+              {menu.scope === "class" ? <ShieldPlusIcon /> : <ShieldHalfIcon />}
+              {menu.scope === "class" ? PRIVACY_ADMIN_TEXT.googleTeacher.widenMenu : PRIVACY_ADMIN_TEXT.googleTeacher.narrowMenu}
+            </Button>
+          ) : null}
+          {/* 보호자 동의서를 받았다고 기록(그 학생의 담임만 — 8-2) */}
+          {menu.consent ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConsentTarget({ kind: "student", studentId: member.id, name });
+                setConsentOpen(true);
+              }}
+            >
+              <FileCheck2Icon />
+              {PRIVACY_ADMIN_TEXT.consentColumn.recordButton}
+            </Button>
+          ) : null}
           {purgeMode ? (
             purgeBlock ? (
               <div className="flex flex-col gap-1">
@@ -307,6 +411,13 @@ export function MemberDetail({ id }: { id: string }) {
               탈퇴 처리
             </Button>
           )}
+          {/* 보호자·학생이 삭제를 요구할 때(8-5): 계정과 모든 기록 — 그 학생의 담임 또는 총괄 */}
+          {menu.erase ? (
+            <Button variant="destructive" onClick={() => setEraseOpen(true)}>
+              <EraserIcon />
+              {PRIVACY_ADMIN_TEXT.studentErase.menu}
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -364,6 +475,29 @@ export function MemberDetail({ id }: { id: string }) {
       />
 
       <RoleChangeDialog target={member} open={roleOpen} onOpenChange={setRoleOpen} onChanged={onRoleChanged} />
+
+      <TeacherScopeDialog
+        target={member}
+        next={scopeNext}
+        open={scopeOpen}
+        onOpenChange={setScopeOpen}
+        onChanged={(userId, scope) => privacy.patchFlag(userId, { teacherScope: scope })}
+      />
+
+      <GuardianConsentDialog
+        target={consentTarget}
+        open={consentOpen}
+        onOpenChange={setConsentOpen}
+        onRecorded={({ studentIds }) => privacy.patchConsent(studentIds, consentByMe(user?.id ?? null, profile?.display_name))}
+      />
+
+      <MemberEraseDialog
+        target={member}
+        open={eraseOpen}
+        onOpenChange={setEraseOpen}
+        // 다 지웠으면 이 회원의 상세 화면은 더 볼 것이 없다 → 회원 목록으로
+        onErased={() => router.push("/admin/members/")}
+      />
     </div>
   );
 }

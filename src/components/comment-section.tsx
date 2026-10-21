@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/use-session";
 import { isWithdrawnProfile, profileDisplayName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
+import { fillProfiles } from "@/lib/member-labels";
 import { primaryPillClass } from "@/lib/pill";
 import { dangerSolidClass } from "@/lib/danger-button";
 import { supabase } from "@/lib/supabase";
@@ -40,7 +41,8 @@ async function fetchComments(postId: string): Promise<CommentWithAuthor[]> {
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as unknown as CommentWithAuthor[];
+  // 다른 학급 학생의 댓글은 profiles가 null로 온다 → 가린 이름("첫 글자 + ***")을 채운다(로그인한 사람만, docs/privacy/spec.md 4.11)
+  return fillProfiles((data ?? []) as unknown as CommentWithAuthor[], (c) => c.user_id);
 }
 
 export function CommentSection({ postId, published }: { postId: string; published: boolean }) {
@@ -145,7 +147,8 @@ export function CommentSection({ postId, published }: { postId: string; publishe
       ) : (
         <ul className="flex flex-col gap-5">
           {comments.map((c) => {
-            const name = profileDisplayName(c.profiles, "익명");
+            // 이름을 읽을 수 없으면(로그아웃 방문자 — 프로필은 로그인한 회원만, 지워진 계정) "회원"(docs/privacy/spec.md 4.10)
+            const name = profileDisplayName(c.profiles, "회원");
             const canDelete = !!user && (user.id === c.user_id || isAdmin);
             return (
               <li key={c.id} className="flex gap-3">

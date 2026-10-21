@@ -1,12 +1,13 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type Ref } from "react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
+  FileSignatureIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
   SchoolIcon,
@@ -26,10 +27,12 @@ import {
 import { adminTabPanelClass } from "@/components/admin/admin-styles";
 import { NO_CLASS_MESSAGE } from "@/components/admin/class-card";
 import { ClassSelectField } from "@/components/admin/class-controls";
+import { RichText } from "@/components/admin/member-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PRIVACY_ADMIN_TEXT } from "@/data/privacy-admin-text";
 import { adminPermissions, useAdminContext, type AdminContextValue } from "@/hooks/use-admin-context";
 import { AdminActionError } from "@/lib/admin";
 import { withBasePath } from "@/lib/base-path";
@@ -40,6 +43,7 @@ import {
   createMembers,
   MAX_IMPORT_ROWS,
   MIN_PASSWORD_LENGTH,
+  needsGuardianConsent,
   normalizeLoginId,
   roleLabel,
   summarize,
@@ -57,6 +61,8 @@ import { cn } from "@/lib/utils";
  * 탭 두 개: "한 명 만들기" / "엑셀로 여러 명".
  * - 학생은 **내 학급 중에서** 고른 학급에 등록된다(학급이 하나면 자동). 엑셀은 파일 하나 = 학급 하나.
  * - 역할 '교사'는 총괄에게만 보인다(교사 계정은 학급 없이 만들어진다).
+ * - 학생 계정을 만들 때는 **보호자 동의서를 받았다는 체크가 필수**다(docs/privacy/spec.md 4.8, 문구 privacy-policy.md 8-1).
+ *   한 명은 그 학생, 엑셀은 파일 하나에 체크 하나(파일의 모든 학생). 체크하지 않으면 함수를 부르지 않는다(함수도 400으로 거부).
  *
  * ⚠ 비밀번호는 이 컴포넌트 state에만 두고 **어디에도 저장하지 않는다**(localStorage·로그·미리보기 표 모두 금지).
  *   미리보기에는 길이만 보여 주고, 모달이 완전히 닫히면 state에서도 지운다.
@@ -181,6 +187,82 @@ function ClassArea({
 }
 
 // ─────────────────────────────────────────────
+// 보호자 동의 확인(두 탭 공용 — 학생 역할일 때만 보인다)
+// ─────────────────────────────────────────────
+
+/** 보호자 동의서 양식(한글 파일). 교사 대시보드에서만 링크한다(docs/privacy/spec.md 결정 5). */
+const GUARDIAN_CONSENT_FORM_PATH = "/templates/guardian-consent.hwpx";
+
+function GuardianConsentField({
+  kind,
+  checked,
+  onChange,
+  showRequired,
+  disabled,
+  inputRef,
+}: {
+  kind: "single" | "file";
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  /** 체크하지 않고 만들기를 눌렀을 때 → "보호자 동의서를 받았다는 표시가 필요해요." */
+  showRequired: boolean;
+  disabled?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
+}) {
+  const fieldId = useId();
+  const helpId = `${fieldId}-help`;
+  const errorId = `${fieldId}-error`;
+  const text = PRIVACY_ADMIN_TEXT.consent;
+  const linkToken = `[${text.helpLinkLabel}]`;
+  const [before, after] = text.help.split(linkToken);
+  const missing = showRequired && !checked;
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 rounded-xl border p-3",
+        missing ? "border-destructive/50 bg-destructive/5" : "border-primary/25 bg-primary/5",
+      )}
+    >
+      <label htmlFor={fieldId} className="flex min-h-11 cursor-pointer items-start gap-2.5 text-sm leading-6">
+        <input
+          ref={inputRef}
+          id={fieldId}
+          type="checkbox"
+          className="mt-1 size-5 shrink-0 accent-primary"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          disabled={disabled}
+          // 브라우저 기본 검사 창 대신 아래 안내 글로 알린다(required 속성은 쓰지 않음)
+          aria-required="true"
+          aria-invalid={missing || undefined}
+          aria-describedby={missing ? `${errorId} ${helpId}` : helpId}
+        />
+        <span className="min-w-0">
+          <RichText text={kind === "single" ? text.singleLabel : text.fileLabel} />
+        </span>
+      </label>
+      {missing ? (
+        <p id={errorId} role="alert" className="text-sm font-medium text-destructive">
+          {text.required}
+        </p>
+      ) : null}
+      <p id={helpId} className="text-xs leading-5 text-muted-foreground">
+        <FileSignatureIcon className="mr-1 inline size-3.5 -translate-y-px" aria-hidden />
+        {before}
+        <a
+          href={withBasePath(GUARDIAN_CONSENT_FORM_PATH)}
+          download="보호자-동의서-양식.hwpx"
+          className="font-medium text-foreground underline underline-offset-3 outline-none hover:text-primary focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {text.helpLinkLabel}
+        </a>
+        {after}
+      </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // 한 명 만들기
 // ─────────────────────────────────────────────
 function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: () => void }) {
@@ -196,10 +278,15 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [consentTried, setConsentTried] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
   const working = useRef(false);
 
   // 교사 역할은 총괄만(학급 기능 전에는 예전처럼 누구나). 권한이 없으면 언제나 학생.
   const effectiveRole: DraftRole = perms.canCreateTeacher ? role : "user";
+  // 학생 계정이면 보호자 동의 체크가 필수(교사 계정에는 없음)
+  const needsConsent = effectiveRole === "user";
   const classId = effectiveClassId(ctx.classes, pickedClassId);
   const needsClass = !perms.legacy && effectiveRole === "user";
   const contextReady = perms.legacy || ctx.status === "ready";
@@ -210,6 +297,11 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!ready || working.current) return;
+    if (needsConsent && !consent) {
+      setConsentTried(true);
+      consentRef.current?.focus();
+      return;
+    }
     working.current = true;
     setBusy(true);
     setError(null);
@@ -230,6 +322,7 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
       const { outcomes, notices } = await createMembers([draft], {
         source: "single",
         classId: needsClass ? classId : null,
+        guardianConsent: needsConsent && consent,
       });
       const [outcome] = outcomes;
       if (outcome?.status === "created") {
@@ -249,8 +342,13 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         return;
       }
       setError(outcome?.message ?? "계정을 만들지 못했습니다.");
+      // 만들지 못했으면 동의 체크를 비운다 — 다시 확인하고 체크해야 만들 수 있다(검토 R2 L5)
+      setConsent(false);
+      setConsentTried(false);
     } catch (err) {
       setError(err instanceof AdminActionError ? err.message : "계정을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setConsent(false);
+      setConsentTried(false);
     } finally {
       working.current = false;
       setBusy(false);
@@ -264,7 +362,14 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         <Input
           id={idFieldId}
           value={id}
-          onChange={(e) => setId(e.target.value)}
+          onChange={(e) => {
+            // 보호자 동의 체크는 "이 학생"에 대한 표시 — 아이디를 바꾸면 다시 체크해야 만들 수 있다(검토 R2 L5)
+            if (e.target.value !== id) {
+              setConsent(false);
+              setConsentTried(false);
+            }
+            setId(e.target.value);
+          }}
           disabled={busy}
           autoComplete="off"
           autoCapitalize="none"
@@ -345,6 +450,17 @@ function SingleForm({ onCreated, onClose }: { onCreated?: () => void; onClose: (
         />
       ) : null}
 
+      {needsConsent ? (
+        <GuardianConsentField
+          kind="single"
+          checked={consent}
+          onChange={setConsent}
+          showRequired={consentTried}
+          disabled={busy}
+          inputRef={consentRef}
+        />
+      ) : null}
+
       {error ? (
         <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm" role="alert">
           {error}
@@ -384,6 +500,10 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<FilePhase>({ kind: "idle" });
   const [pickedClassId, setPickedClassId] = useState("");
+  // 보호자 동의: 파일 하나에 체크 하나(파일의 모든 학생 — docs/privacy/spec.md 4.8)
+  const [consent, setConsent] = useState(false);
+  const [consentTried, setConsentTried] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
   const working = useRef(false);
 
   // 담임에게는 "교사" 줄을 고쳐야 할 줄로 보여 준다(교사 계정은 총괄만 — 서버도 거부한다).
@@ -404,6 +524,9 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
   async function onPick(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // 동의 체크는 "이 파일에 있는 학생"에 대한 표시 — 다른 파일을 고르면 다시 체크해야 만들 수 있다(검토 R2 M2)
+    setConsent(false);
+    setConsentTried(false);
     setFileName(file.name);
     setError(null);
     setNotice(null);
@@ -432,6 +555,12 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
 
   async function run(rows: MemberDraft[]) {
     if (!rows.length || working.current) return;
+    const needsConsent = needsGuardianConsent(rows);
+    if (needsConsent && !consent) {
+      setConsentTried(true);
+      consentRef.current?.focus();
+      return;
+    }
     working.current = true;
     setError(null);
     setPhase({ kind: "working", done: 0, total: rows.length });
@@ -439,6 +568,7 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
       const { outcomes, notices } = await createMembers(rows, {
         source: "bulk",
         classId: perms.legacy ? null : classId || null,
+        guardianConsent: needsConsent && consent,
         onProgress: (done, total) => setPhase({ kind: "working", done, total }),
       });
       const { created, failed } = summarize(outcomes);
@@ -542,6 +672,16 @@ function FileForm({ onCreated }: { onCreated?: () => void }) {
               ) : null}
             </p>
           ) : null}
+          {studentCount > 0 ? (
+            <GuardianConsentField
+              kind="file"
+              checked={consent}
+              onChange={setConsent}
+              showRequired={consentTried}
+              disabled={busy}
+              inputRef={consentRef}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -630,6 +770,7 @@ function SpecGuide({ allowTeacher, classMode }: { allowTeacher: boolean; classMo
           size="sm"
           variant="outline"
           render={<a href={withBasePath("/templates/members-template.xlsx")} download="회원추가-서식.xlsx" />}
+          nativeButton={false}
         >
           <FileSpreadsheetIcon />
           서식 내려받기 (.xlsx)

@@ -1,10 +1,20 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
-import { SchoolIcon } from "lucide-react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
+import { BellIcon, CalendarClockIcon, SchoolIcon, Trash2Icon } from "lucide-react";
+import { adminSurfaceClass } from "@/components/admin/admin-styles";
+import { ClassCleanupDialog, type ClassCleanupTarget } from "@/components/admin/class-cleanup-dialog";
 import { ListSkeleton, NativeSelect } from "@/components/learning/learning-ui";
 import { ErrorState } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { PRIVACY_ADMIN_EXTRA_TEXT as EXTRA, PRIVACY_ADMIN_TEXT as T, fillText } from "@/data/privacy-admin-text";
 import { useAdminContext } from "@/hooks/use-admin-context";
+import {
+  fetchClassRetentionStatus,
+  PrivacyMissingError,
+  type RetentionClass,
+  type RetentionStatus,
+} from "@/lib/admin-privacy";
 import type { AdminClass } from "@/lib/classes";
 import { cn } from "@/lib/utils";
 
@@ -145,4 +155,162 @@ export function ClassScopeGate({ children }: { children: ReactNode }) {
     return <ErrorState message="학급 정보를 불러오지 못해 학생 목록을 보여 줄 수 없습니다." onRetry={ctx.retry} />;
   }
   return <>{children}</>;
+}
+
+type RetentionState =
+  | { status: "loading" }
+  | { status: "missing" }
+  | { status: "error" }
+  | { status: "ready"; data: RetentionStatus };
+
+/**
+ * 학급 정리 기한 카드(docs/privacy/spec.md 4.7-3 개정 3, 문구 privacy-policy.md 8-7 "학급 정리 기한"·"2월 알림").
+ * - 학급 정리 기한: 기한(종업식 뒤 그 학년도의 2월 28일)이 지났는데 남은 학생이 있는 학급.
+ * - 2월 알림: 2월 한 달 동안, 이번 학년도 학생이 남아 있는 학급(2월 28일까지 정리).
+ * 담임은 자기 학급, 총괄은 전체(admin_class_retention_status가 거른다). 자동으로 지우지 않는다(사용자 결정 9) —
+ * [학급 정리 열기]로 확인 창을 연다.
+ * - 개요(variant "overview"): 보일 것이 없거나·읽는 중·SQL ① 전·못 읽음이면 아무것도 그리지 않는다(화면을 어지럽히지 않게).
+ * - 개인정보 설정(variant "settings"): 읽는 중·못 읽음도 보인다.
+ */
+export function ClassRetentionCard({
+  variant = "overview",
+  className,
+}: {
+  variant?: "overview" | "settings";
+  className?: string;
+}) {
+  const ctx = useAdminContext();
+  const [state, setState] = useState<RetentionState>({ status: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  const [target, setTarget] = useState<ClassCleanupTarget | null>(null);
+  const [open, setOpen] = useState(false);
+  const ready = ctx.status === "ready";
+
+  useEffect(() => {
+    if (!ready) return;
+    let active = true;
+    fetchClassRetentionStatus().then(
+      (data) => {
+        if (active) setState({ status: "ready", data });
+      },
+      (e: unknown) => {
+        if (active) setState({ status: e instanceof PrivacyMissingError ? "missing" : "error" });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [ready, attempt]);
+
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
+
+  if (state.status === "loading") {
+    return variant === "settings" ? <ListSkeleton rows={1} label={T.settings.retentionHeading} /> : null;
+  }
+  if (state.status === "missing") return null; // 준비 전 안내는 개인정보 설정 화면 위쪽에서 한 번만
+  if (state.status === "error") {
+    return variant === "settings" ? <ErrorState message={EXTRA.overviewError} onRetry={reload} /> : null;
+  }
+  const { data } = state;
+  if (!data.classes.length && !data.februaryClasses.length) return null;
+
+  function openCleanup(c: RetentionClass) {
+    setTarget({ classId: c.classId, className: c.className });
+    setOpen(true);
+  }
+
+  return (
+    <div className={cn("flex flex-col gap-4", className)}>
+      {data.classes.length ? (
+        <RetentionBlock
+          tone="overdue"
+          heading={T.settings.retentionHeading}
+          body={fillText(T.settings.retentionBody, { n: data.overdueStudents })}
+          classes={data.classes}
+          onOpen={openCleanup}
+        />
+      ) : null}
+      {data.februaryClasses.length ? (
+        <RetentionBlock
+          tone="february"
+          heading={T.settings.februaryHeading}
+          body={fillText(T.settings.februaryBody, { n: data.februaryStudents })}
+          classes={data.februaryClasses}
+          onOpen={openCleanup}
+        />
+      ) : null}
+      <ClassCleanupDialog
+        target={target}
+        open={open}
+        onOpenChange={setOpen}
+        onChanged={() => {
+          reload();
+          void ctx.refresh();
+        }}
+      />
+    </div>
+  );
+}
+
+function RetentionBlock({
+  tone,
+  heading,
+  body,
+  classes,
+  onOpen,
+}: {
+  tone: "overdue" | "february";
+  heading: string;
+  body: string;
+  classes: RetentionClass[];
+  onOpen: (c: RetentionClass) => void;
+}) {
+  const headingId = useId();
+  const overdue = tone === "overdue";
+  return (
+    <section
+      aria-labelledby={headingId}
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl p-4 sm:p-5",
+        adminSurfaceClass,
+        overdue ? "ring-destructive/35" : "ring-amber-400/60 dark:ring-amber-400/40",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-xl",
+            overdue ? "bg-destructive/10 text-destructive" : "bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200",
+          )}
+          aria-hidden
+        >
+          {overdue ? <CalendarClockIcon className="size-5" /> : <BellIcon className="size-5" />}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 id={headingId} className="font-heading text-lg leading-tight font-normal">
+            {heading}
+          </h2>
+          <p className="text-sm">{body}</p>
+        </div>
+      </div>
+      <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10">
+        {classes.map((c) => (
+          <li key={c.classId} className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium" title={c.className}>
+              {fillText(T.settings.retentionClass, { "학급 이름": c.className, n: c.students })}
+            </span>
+            <Button
+              variant="outline"
+              className="h-11 px-3 text-destructive hover:text-destructive"
+              onClick={() => onOpen(c)}
+              aria-label={`${c.className} ${T.settings.retentionOpen}`}
+            >
+              <Trash2Icon />
+              {T.settings.retentionOpen}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }

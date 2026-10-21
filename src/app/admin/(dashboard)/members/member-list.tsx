@@ -8,10 +8,15 @@ import {
   ArrowUpDownIcon,
   ArrowUpIcon,
   EllipsisVerticalIcon,
+  EraserIcon,
+  EyeOffIcon,
+  FileCheck2Icon,
   KeyRoundIcon,
   SearchIcon,
   ShieldCheckIcon,
+  ShieldHalfIcon,
   ShieldOffIcon,
+  ShieldPlusIcon,
   Trash2Icon,
   UserMinusIcon,
   UserPlusIcon,
@@ -20,12 +25,14 @@ import {
 import { AdminPageHeader } from "@/components/admin/admin-shell";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { MyClassesCard, NO_CLASS_MESSAGE } from "@/components/admin/class-card";
-import { MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
+import { GuardianConsentDialog, type GuardianConsentTarget } from "@/components/admin/guardian-consent-dialog";
+import { GuardianConsentStatus, MemberAvatar, ProviderBadges, RoleBadge } from "@/components/admin/member-badges";
 import { MemberCreateDialog } from "@/components/admin/member-create-dialog";
+import { MemberEraseDialog } from "@/components/admin/member-erase-dialog";
 import { MemberPurgeDialog } from "@/components/admin/member-purge-dialog";
 import { MemberWithdrawDialog } from "@/components/admin/member-withdraw-dialog";
 import { PasswordResetDialog } from "@/components/admin/password-reset-dialog";
-import { RoleChangeDialog } from "@/components/admin/role-change-dialog";
+import { RoleChangeDialog, TeacherScopeDialog } from "@/components/admin/role-change-dialog";
 import { NativeSelect } from "@/components/learning/learning-ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -38,6 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PRIVACY_ADMIN_EXTRA_TEXT, PRIVACY_ADMIN_TEXT, fillText } from "@/data/privacy-admin-text";
 import { adminPermissions, useAdminContext, type AdminContextValue } from "@/hooks/use-admin-context";
 import { useSession } from "@/hooks/use-session";
 import {
@@ -55,6 +63,15 @@ import {
   withdrawBlockReason,
   type PurgeAccess,
 } from "@/lib/admin";
+import {
+  consentByMe,
+  isConsentSubject,
+  privacyMenuOf,
+  useMemberPrivacyInfo,
+  type GuardianConsent,
+  type MemberPrivacyInfo,
+  type TeacherScope,
+} from "@/lib/admin-privacy";
 import { formatCount, formatDateTime } from "@/lib/format";
 import type { MemberRow, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -85,6 +102,13 @@ const CLASS_COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "class", label: "학급" },
   ...BASE_COLUMNS.slice(2),
 ];
+
+/**
+ * 보호자 동의 칸이 있을 때(학급 기능 뒤) 표가 상자 안에 들어오도록 덜 급한 칸을 좁은 목록에서 숨긴다
+ * (숨긴 값은 회원 상세·카드 목록에 그대로 있다): 가입 방식은 목록 폭 64rem(1024px) 이상, 가입일은 56rem(896px) 이상에서만.
+ */
+const PROVIDER_CELL_WITH_CONSENT = "hidden @5xl:table-cell";
+const SIGNED_UP_CELL_WITH_CONSENT = "hidden @4xl:table-cell";
 
 const collator = new Intl.Collator("ko");
 
@@ -117,6 +141,20 @@ function classLabelOf(row: MemberRow, ctx: AdminContextValue): { text: string; m
   return { text: ctx.classNameOf(row.class_id) ?? "다른 학급", muted: false };
 }
 
+/**
+ * 보호자 동의 표시: 표에서 읽은 줄은 useMemberPrivacyInfo(member_directory), 가린 줄은 RPC가 함께 준 값
+ * (가린 줄은 SQL ② 뒤 총괄이 표에서 읽지 못한다 — docs/privacy/spec.md 4.11).
+ */
+function consentOf(row: MemberRow, consents: ReadonlyMap<string, GuardianConsent> | null): GuardianConsent | null {
+  return row.masked ? (row.masked_consent ?? null) : (consents?.get(row.id) ?? null);
+}
+
+/** 가린 줄(다른 학급 학생 — 총괄)의 메뉴는 비밀번호 초기화·탈퇴 처리·기록까지 삭제만(사용자 결정, spec 4.11). */
+function menuOf(row: MemberRow, ctx: AdminContextValue, privacy: MemberPrivacyInfo, myId: string | null) {
+  const menu = privacyMenuOf(row, ctx, privacy, myId);
+  return row.masked ? { ...menu, consent: false, scope: null } : menu;
+}
+
 function compare(a: MemberRow, b: MemberRow, key: SortKey, ctx: AdminContextValue): number {
   switch (key) {
     case "name":
@@ -144,11 +182,14 @@ function matches(row: MemberRow, q: string, classText: string | null): boolean {
 
 export function MemberList() {
   const router = useRouter();
-  const { user } = useSession();
+  const { user, profile } = useSession();
   const ctx = useAdminContext();
   const perms = adminPermissions(ctx);
   const myId = user?.id ?? null;
   const classMode = ctx.status === "ready";
+  // 개인정보 표시: 구글 계정 인증 상태·교사 권한 범위(총괄만), 보호자 동의 기록(학급 기능 뒤 — 담임·총괄)
+  const privacy = useMemberPrivacyInfo(perms.superAdmin, classMode);
+  const showConsent = classMode && privacy.consents !== null;
   const [state, setState] = useState<State>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [classFilter, setClassFilter] = useState<string>(FILTER_ALL);
@@ -162,6 +203,12 @@ export function MemberList() {
   const [roleTarget, setRoleTarget] = useState<MemberRow | null>(null);
   const [roleOpen, setRoleOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [scopeTarget, setScopeTarget] = useState<{ row: MemberRow; next: TeacherScope } | null>(null);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [consentTarget, setConsentTarget] = useState<GuardianConsentTarget | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [eraseTarget, setEraseTarget] = useState<MemberRow | null>(null);
+  const [eraseOpen, setEraseOpen] = useState(false);
 
   const load = useCallback(async (): Promise<State> => {
     try {
@@ -270,6 +317,29 @@ export function MemberList() {
         ? { ...r, profiles: { ...r.profiles, role }, ...(role === "admin" && r.class_id !== undefined ? { class_id: null } : {}) }
         : r,
     );
+    // 담임 지정·해제 때 서버가 권한 범위를 'full'로 둔다(spec 3.6) — 인증 전 표시·범위를 다시 읽는다.
+    privacy.reload();
+  }
+
+  function openScope(row: MemberRow, next: TeacherScope) {
+    setScopeTarget({ row, next });
+    setScopeOpen(true);
+  }
+
+  function openConsent(row: MemberRow) {
+    setConsentTarget({ kind: "student", studentId: row.id, name: memberName(row) });
+    setConsentOpen(true);
+  }
+
+  function openErase(row: MemberRow) {
+    setEraseTarget(row);
+    setEraseOpen(true);
+  }
+
+  /** 기록까지 삭제 뒤: 그 행을 빼고 조용히 다시 읽는다. */
+  function refreshAfterErase(userId: string) {
+    refreshAfterPurge(userId, true);
+    privacy.reload();
   }
 
   const detailHref = (row: MemberRow) => `/admin/members/?id=${row.id}`;
@@ -297,9 +367,36 @@ export function MemberList() {
   // 학급 기능 SQL 전(예전 방식)에는 완전 삭제를 쓸 수 없어(총괄 없음) 예전 '탈퇴 처리'를 그대로 둔다.
   const purgeAccess = purgeAccessFrom(ctx);
   const purgeEnabled = !perms.legacy;
-  const columns = classMode ? CLASS_COLUMNS : BASE_COLUMNS;
+  const columns = (classMode ? CLASS_COLUMNS : BASE_COLUMNS).map((col) =>
+    !showConsent
+      ? col
+      : col.key === "provider"
+        ? { ...col, className: PROVIDER_CELL_WITH_CONSENT }
+        : col.key === "signed_up_at"
+          ? { ...col, className: SIGNED_UP_CELL_WITH_CONSENT }
+          : col,
+  );
   const filterName =
     activeFilter === FILTER_NONE ? "학급 없음" : filterOptions.find((c) => c.id === activeFilter)?.name ?? null;
+
+  // [이 학급 모두 동의서 받음으로 기록]: 내 학급마다 기록 없는 학생 수(탈퇴한 학생·구글 계정 제외). 학급을 골랐으면 그 학급만.
+  const consentMissingByClass = useMemo(() => {
+    if (!showConsent || state.status !== "ready" || !privacy.consents) return [];
+    const consents = privacy.consents;
+    return ctx.classes
+      .filter((c) => activeFilter === FILTER_ALL || activeFilter === c.id)
+      .map((c) => ({
+        classId: c.id,
+        className: c.name,
+        count: state.rows.filter(
+          (r) => r.class_id === c.id && !r.masked && isConsentSubject(r) && !isWithdrawnMember(r) && !consents.has(r.id),
+        ).length,
+      }))
+      .filter((c) => c.count > 0);
+  }, [showConsent, state, privacy.consents, ctx.classes, activeFilter]);
+
+  // 가린 줄(다른 학급 학생 — 총괄)이 있으면 목록 위에 안내 한 줄(원문 8-8)
+  const hasMasked = state.status === "ready" && state.rows.some((r) => r.masked);
 
   const description =
     state.status !== "ready"
@@ -337,7 +434,12 @@ export function MemberList() {
         }
       />
 
-      <MyClassesCard />
+      <MyClassesCard
+        onCleaned={() => {
+          void reload();
+          privacy.reload();
+        }}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full max-w-sm">
@@ -380,6 +482,43 @@ export function MemberList() {
           </label>
         ) : null}
       </div>
+
+      {consentMissingByClass.length ? (
+        <ul className="flex flex-wrap gap-2" aria-label={PRIVACY_ADMIN_TEXT.consentColumn.header}>
+          {consentMissingByClass.map((c) => (
+            <li
+              key={c.classId}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-sm"
+            >
+              <span className="flex items-center gap-1.5">
+                <FileCheck2Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="font-medium">{c.className}</span>
+                <span className="text-muted-foreground">
+                  · {PRIVACY_ADMIN_TEXT.consentColumn.none} {fillText(PRIVACY_ADMIN_EXTRA_TEXT.countUnit, { n: c.count })}
+                </span>
+              </span>
+              <Button
+                variant="outline"
+                className="h-11 px-3"
+                onClick={() => {
+                  setConsentTarget({ kind: "class", classId: c.classId, className: c.className, count: c.count });
+                  setConsentOpen(true);
+                }}
+                aria-label={`${c.className} — ${PRIVACY_ADMIN_TEXT.consentColumn.classButton}`}
+              >
+                {PRIVACY_ADMIN_TEXT.consentColumn.classButton}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {hasMasked ? (
+        <p role="note" className="flex items-start gap-2 rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
+          <EyeOffIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{PRIVACY_ADMIN_TEXT.maskedRows.notice}</span>
+        </p>
+      ) : null}
 
       {state.status === "loading" ? (
         <div className="flex flex-col gap-2" aria-busy="true" aria-label="회원 목록을 불러오는 중">
@@ -474,6 +613,11 @@ export function MemberList() {
                         </th>
                       );
                     })}
+                    {showConsent ? (
+                      <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+                        {PRIVACY_ADMIN_TEXT.consentColumn.header}
+                      </th>
+                    ) : null}
                     <th
                       scope="col"
                       // 머리글 줄(bg-muted/40)과 같은 색을 불투명하게 합성해 칠한다
@@ -516,19 +660,28 @@ export function MemberList() {
                             {cls.text}
                           </td>
                         ) : null}
-                        <td className="hidden px-3 py-2.5 @4xl:table-cell">
+                        <td className={cn("px-3 py-2.5", showConsent ? PROVIDER_CELL_WITH_CONSENT : "hidden @4xl:table-cell")}>
                           <ProviderBadges member={row} />
                         </td>
                         {/* 날짜 칸은 날짜와 시각 사이에서만 줄을 바꾼다(글자는 그대로) → 1280~1440 화면에서도 표가 상자 안에 다 들어온다 */}
-                        <td className="px-3 py-2.5 text-muted-foreground">
+                        <td className={cn("px-3 py-2.5 text-muted-foreground", showConsent && SIGNED_UP_CELL_WITH_CONSENT)}>
                           <DateTimeText iso={row.signed_up_at} />
                         </td>
                         <td className="px-3 py-2.5 text-muted-foreground">
                           {row.last_sign_in_at ? <DateTimeText iso={row.last_sign_in_at} /> : "로그인 기록 없음"}
                         </td>
                         <td className="px-3 py-2.5">
-                          <RoleBadge member={row} />
+                          <RoleBadge member={row} flag={privacy.flags?.get(row.id)} />
                         </td>
+                        {showConsent ? (
+                          <td className="px-3 py-2.5">
+                            {isConsentSubject(row) ? (
+                              <GuardianConsentStatus consent={consentOf(row, privacy.consents)} canRecord={menuOf(row, ctx, privacy, myId).consent} />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        ) : null}
                         <td
                           className={cn(
                             "px-3 py-2.5 text-right",
@@ -540,13 +693,17 @@ export function MemberList() {
                           <MemberActions
                             row={row}
                             myId={myId}
-                            canChangeRole={perms.canChangeRole && classMode}
+                            canChangeRole={perms.canChangeRole && classMode && !row.masked}
                             purgeMode={purgeEnabled && isOAuthOnlyMember(row)}
                             purgeAccess={purgeAccess}
+                            privacyMenu={menuOf(row, ctx, privacy, myId)}
                             onReset={() => openReset(row)}
                             onWithdraw={() => openWithdraw(row)}
                             onPurge={() => openPurge(row)}
                             onRole={() => openRole(row)}
+                            onScope={(next) => openScope(row, next)}
+                            onConsent={() => openConsent(row)}
+                            onErase={() => openErase(row)}
                           />
                         </td>
                       </tr>
@@ -594,7 +751,7 @@ export function MemberList() {
                             {cls && !cls.muted ? ` · ${cls.text}` : ""}
                           </span>
                         </span>
-                        <RoleBadge member={row} />
+                        <RoleBadge member={row} flag={privacy.flags?.get(row.id)} />
                       </Link>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <ProviderBadges member={row} />
@@ -603,18 +760,28 @@ export function MemberList() {
                         <span>
                           최근 로그인 {row.last_sign_in_at ? formatDateTime(row.last_sign_in_at) : "없음"}
                         </span>
+                        {showConsent && isConsentSubject(row) ? (
+                          <span className="flex items-center gap-1">
+                            <span>{PRIVACY_ADMIN_TEXT.consentColumn.header}:</span>
+                            <GuardianConsentStatus consent={consentOf(row, privacy.consents)} canRecord={menuOf(row, ctx, privacy, myId).consent} compact />
+                          </span>
+                        ) : null}
                       </div>
                       <div className="flex justify-end">
                         <MemberActions
                           row={row}
                           myId={myId}
-                          canChangeRole={perms.canChangeRole && classMode}
+                          canChangeRole={perms.canChangeRole && classMode && !row.masked}
                           purgeMode={purgeEnabled && isOAuthOnlyMember(row)}
                           purgeAccess={purgeAccess}
+                          privacyMenu={menuOf(row, ctx, privacy, myId)}
                           onReset={() => openReset(row)}
                           onWithdraw={() => openWithdraw(row)}
                           onPurge={() => openPurge(row)}
                           onRole={() => openRole(row)}
+                          onScope={(next) => openScope(row, next)}
+                          onConsent={() => openConsent(row)}
+                          onErase={() => openErase(row)}
                         />
                       </div>
                     </li>
@@ -649,6 +816,23 @@ export function MemberList() {
         onPartial={(userId) => refreshAfterPurge(userId, false)}
       />
       <RoleChangeDialog target={roleTarget} open={roleOpen} onOpenChange={setRoleOpen} onChanged={markRole} />
+      <TeacherScopeDialog
+        target={scopeTarget?.row ?? null}
+        next={scopeTarget?.next ?? "full"}
+        open={scopeOpen}
+        onOpenChange={setScopeOpen}
+        onChanged={(userId, scope) => privacy.patchFlag(userId, { teacherScope: scope })}
+      />
+      <GuardianConsentDialog
+        target={consentTarget}
+        open={consentOpen}
+        onOpenChange={setConsentOpen}
+        onRecorded={({ studentIds, classId }) => {
+          if (studentIds.length) privacy.patchConsent(studentIds, consentByMe(myId, profile?.display_name));
+          if (classId) privacy.reload();
+        }}
+      />
+      <MemberEraseDialog target={eraseTarget} open={eraseOpen} onOpenChange={setEraseOpen} onErased={refreshAfterErase} />
     </div>
   );
 }
@@ -672,20 +856,29 @@ function MemberActions({
   canChangeRole,
   purgeMode,
   purgeAccess,
+  privacyMenu,
   onReset,
   onWithdraw,
   onPurge,
   onRole,
+  onScope,
+  onConsent,
+  onErase,
 }: {
   row: MemberRow;
   myId: string | null;
   canChangeRole: boolean;
   purgeMode: boolean;
   purgeAccess: PurgeAccess;
+  /** 개인정보 메뉴(할 수 없는 항목은 넣지 않는다 — privacyMenuOf) */
+  privacyMenu: { consent: boolean; erase: boolean; scope: TeacherScope | null };
   onReset: () => void;
   onWithdraw: () => void;
   onPurge: () => void;
   onRole: () => void;
+  onScope: (next: TeacherScope) => void;
+  onConsent: () => void;
+  onErase: () => void;
 }) {
   const name = memberName(row);
   const resetBlock = passwordResetBlockReason(row, myId);
@@ -717,6 +910,24 @@ function MemberActions({
                 {isTeacher ? <ShieldOffIcon /> : <ShieldCheckIcon />}
                 {isTeacher ? "담임 해제" : "담임교사로 지정"}
                 {roleBlock ? <span className="ml-auto text-xs text-muted-foreground">{roleBlock}</span> : null}
+              </DropdownMenuItem>
+              {privacyMenu.scope ? (
+                <DropdownMenuItem
+                  onClick={() => onScope(privacyMenu.scope === "class" ? "full" : "class")}
+                  aria-label={`${name} ${privacyMenu.scope === "class" ? PRIVACY_ADMIN_TEXT.googleTeacher.widenMenu : PRIVACY_ADMIN_TEXT.googleTeacher.narrowMenu}`}
+                >
+                  {privacyMenu.scope === "class" ? <ShieldPlusIcon /> : <ShieldHalfIcon />}
+                  {privacyMenu.scope === "class" ? PRIVACY_ADMIN_TEXT.googleTeacher.widenMenu : PRIVACY_ADMIN_TEXT.googleTeacher.narrowMenu}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {privacyMenu.consent ? (
+            <>
+              <DropdownMenuItem onClick={onConsent} aria-label={`${name} ${PRIVACY_ADMIN_TEXT.consentColumn.recordButton}`}>
+                <FileCheck2Icon />
+                {PRIVACY_ADMIN_TEXT.consentColumn.recordButton}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -756,6 +967,17 @@ function MemberActions({
               {withdrawBlock ? <span className="ml-auto text-xs text-muted-foreground">{withdrawBlock.short}</span> : null}
             </DropdownMenuItem>
           )}
+          {/* 보호자·학생이 삭제를 요구할 때: 계정과 모든 기록(탈퇴한 학생으로도 남지 않음 — 8-5) */}
+          {privacyMenu.erase ? (
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={onErase}
+              aria-label={`${name} ${PRIVACY_ADMIN_TEXT.studentErase.menu}`}
+            >
+              <EraserIcon />
+              {PRIVACY_ADMIN_TEXT.studentErase.menu}
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </span>

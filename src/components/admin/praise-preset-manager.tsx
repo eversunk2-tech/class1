@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { LockIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/learning/confirm-dialog";
 import { AsyncView } from "@/components/learning/learning-ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { PRIVACY_ADMIN_EXTRA_TEXT } from "@/data/privacy-admin-text";
+import { useOptionalAdminContext } from "@/hooks/use-admin-context";
 import { useAsyncData } from "@/hooks/use-async-data";
 import {
   createPraisePreset,
@@ -81,9 +83,13 @@ function PresetEditor({
 
 /**
  * 칭찬 문구 추가 · 수정 · 삭제(관리자). praise_presets 테이블이 없으면 기본 문구를 읽기 전용으로 보여 준다.
+ * "자기 학급 일만" 선생님(구글로 인증한 선생님 — docs/privacy/spec.md 4.6)은 함께 쓰는 문구를 고칠 수 없다(서버 is_full_admin()이
+ * 거부) → 읽기 전용으로 보여 주고 안내 한 줄. 문구를 골라 칭찬 보내기는 그대로 할 수 있다.
  * onChanged: 목록이 바뀔 때마다(다른 화면의 문구 버튼 갱신용)
  */
 export function PraisePresetManager({ onChanged }: { onChanged?: (presets: PraisePreset[]) => void }) {
+  const adminCtx = useOptionalAdminContext();
+  const classOnly = adminCtx ? !adminCtx.isFullAdmin : false;
   const load = useCallback(() => fetchPraisePresets(), []);
   const { state, reload, setData } = useAsyncData(load);
   const [editing, setEditing] = useState<string | "new" | null>(null);
@@ -138,6 +144,12 @@ export function PraisePresetManager({ onChanged }: { onChanged?: (presets: Prais
       {({ presets, missing }) => (
         <div className="flex flex-col gap-3">
           {missing ? <PraiseMissingNotice /> : null}
+          {classOnly && !missing ? (
+            <p role="note" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <LockIcon className="size-3.5 shrink-0" aria-hidden />
+              {PRIVACY_ADMIN_EXTRA_TEXT.praiseClassOnly}
+            </p>
+          ) : null}
           {presets.length ? (
             <ol className="flex flex-col gap-2" aria-label="칭찬 문구 목록">
               {presets.map((p, i) => (
@@ -154,7 +166,7 @@ export function PraisePresetManager({ onChanged }: { onChanged?: (presets: Prais
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 w-5 shrink-0 text-xs text-muted-foreground tabular-nums">{i + 1}.</span>
                       <p className="min-w-0 flex-1 text-sm break-words whitespace-pre-wrap">{p.body}</p>
-                      {!missing ? (
+                      {!missing && !classOnly ? (
                         <span className="flex shrink-0 gap-1">
                           <Button
                             type="button"
@@ -185,10 +197,11 @@ export function PraisePresetManager({ onChanged }: { onChanged?: (presets: Prais
             </ol>
           ) : (
             <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-              저장된 칭찬 문구가 없어요. 아래에서 추가해 보세요.
+              {/* "아래에서 추가해 보세요."는 추가 칸이 있을 때만(자기 학급 일만 선생님 — 읽기 전용, 검토 R2 L8) */}
+              저장된 칭찬 문구가 없어요.{!missing && !classOnly ? " 아래에서 추가해 보세요." : ""}
             </p>
           )}
-          {!missing ? (
+          {!missing && !classOnly ? (
             editing === "new" ? (
               <div className="rounded-xl px-3 py-2.5 ring-1 ring-primary/40">
                 <PresetEditor

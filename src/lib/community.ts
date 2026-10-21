@@ -1,5 +1,6 @@
 import { isMissingSchemaError, profileDisplayName } from "@/lib/admin";
 import { BASE_PATH } from "@/lib/base-path";
+import { fillProfiles } from "@/lib/member-labels";
 import { supabase } from "@/lib/supabase";
 import { AUTHOR_PROFILE_COLUMNS, type Profile } from "@/lib/types";
 
@@ -109,9 +110,12 @@ export function loginHrefHere(): string {
   return loginHref(path + window.location.search);
 }
 
-/** 글·댓글 작성자 이름. 탈퇴한 회원이면 "탈퇴한 학생"(profileDisplayName). */
+/**
+ * 글·댓글 작성자 이름. 탈퇴한 회원이면 "탈퇴한 학생"(profileDisplayName).
+ * 이름을 읽을 수 없으면(로그아웃 방문자 — 프로필은 로그인한 회원만 읽는다, 지워진 계정) "회원"(docs/privacy/spec.md 4.10).
+ */
 export function authorName(p: { profiles: Pick<Profile, "display_name" | "withdrawn_at"> | null }): string {
-  return profileDisplayName(p.profiles, "익명");
+  return profileDisplayName(p.profiles, "회원");
 }
 
 export function embeddedCount(list: { count: number }[] | null | undefined): number {
@@ -193,7 +197,16 @@ export async function fetchCommunityPosts(kind: CommunityKind, offset: number, s
     .order("id", { ascending: false })
     .range(offset, offset + size - 1);
   if (error) throw error;
-  return (data ?? []) as unknown as CommunityPostSummary[];
+  return withAuthorLabels((data ?? []) as unknown as CommunityPostSummary[]);
+}
+
+/**
+ * 글 목록에 가린 작성자 이름을 채운다(docs/privacy/spec.md 4.11 — 다른 학급 학생의 글은 profiles embed가 null로 온다 →
+ * member_name_labels로 "첫 글자 + ***"). 로그인한 사람에게만 부르고, 못 받으면 그대로(이름은 '회원').
+ * 검색처럼 이 모듈 밖에서 글을 읽는 곳도 이 함수를 쓴다.
+ */
+export function withAuthorLabels<T extends Pick<CommunityPost, "author_id" | "profiles">>(posts: readonly T[]): Promise<T[]> {
+  return fillProfiles(posts, (p) => p.author_id);
 }
 
 /**
@@ -205,7 +218,21 @@ export async function fetchCommunityPost(id: string, { withBoard = false }: { wi
   let res = await read(withBoard ? POST_COLUMNS_WITH_BOARD : POST_COLUMNS);
   if (res.error && withBoard && isMissingSchemaError(res.error)) res = await read(POST_COLUMNS);
   if (res.error) throw res.error;
-  return (res.data as unknown as CommunityPost | null) ?? null;
+  const post = (res.data as unknown as CommunityPost | null) ?? null;
+  if (!post) return null;
+  const [filled] = await withAuthorLabels([post]);
+  return filled ?? post;
+}
+
+/** 글의 댓글(오래된 순) + 가린 작성자 이름 채우기(위 withAuthorLabels와 같은 규칙). */
+export async function fetchCommunityComments(postId: string): Promise<CommunityComment[]> {
+  const { data, error } = await supabase
+    .from("community_comments")
+    .select(COMMENT_COLUMNS)
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return fillProfiles((data ?? []) as unknown as CommunityComment[], (c) => c.user_id);
 }
 
 export async function countCommunityPosts(kind: CommunityKind, boardOwners?: BoardOwnersFilter): Promise<number> {

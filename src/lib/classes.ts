@@ -20,8 +20,12 @@ export const CLASS_NAME_RECOMMENDED = 20;
 /** my_admin_context()가 돌려주는 "내가 담임인 학급" 한 개 */
 export type AdminClass = { id: string; name: string; studentCount: number };
 
-/** my_admin_context() 결과 */
-export type AdminContextData = { isSuperAdmin: boolean; classes: AdminClass[] };
+/**
+ * my_admin_context() 결과.
+ * teacherScope: 교사 권한 범위(docs/privacy/spec.md 4.2·4.6 — 'class' = 구글로 인증한 선생님의 "자기 학급 일만").
+ * 함수가 아직 teacher_scope를 돌려주지 않으면(개인정보 SQL 전) 'full' — 지금까지와 같다.
+ */
+export type AdminContextData = { isSuperAdmin: boolean; classes: AdminClass[]; teacherScope: "full" | "class" };
 
 /** classes 표에서 읽을 수 있는 학급(총괄: 모든 학급, 담임: 자기 학급 — RLS) */
 export type ClassInfo = { id: string; name: string; archivedAt: string | null };
@@ -62,7 +66,11 @@ function parseAdminContext(data: unknown): AdminContextData {
     }
   }
   if (Array.isArray(raw)) raw = raw[0];
-  const obj = (raw && typeof raw === "object" ? raw : {}) as { is_super_admin?: unknown; classes?: unknown };
+  const obj = (raw && typeof raw === "object" ? raw : {}) as {
+    is_super_admin?: unknown;
+    classes?: unknown;
+    teacher_scope?: unknown;
+  };
   const list = Array.isArray(obj.classes) ? obj.classes : [];
   const classes: AdminClass[] = list
     .map((c) => (c && typeof c === "object" ? (c as { id?: unknown; name?: unknown; student_count?: unknown }) : null))
@@ -73,7 +81,7 @@ function parseAdminContext(data: unknown): AdminContextData {
       studentCount: toNumber(c.student_count),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  return { isSuperAdmin: obj.is_super_admin === true, classes };
+  return { isSuperAdmin: obj.is_super_admin === true, classes, teacherScope: obj.teacher_scope === "class" ? "class" : "full" };
 }
 
 /**
