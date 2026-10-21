@@ -82,6 +82,7 @@
 * **사이트는 프로필 사진 주소를 받지 않는다**(2026-10-20 사용자 결정 — 프로필 수정 창은 '별명' 칸만, SQL ② 뒤 `profiles` 수정 권한은 `display_name`만). 별명 규칙(2~20자, `@`·`http`·`www.` 불가, 예약어)은 확인 창과 프로필 수정 창이 같은 검사를 쓴다(서버 검사는 확인 창 RPC에만).
 * **아이디 계정 = 이메일이 `@class1.local`로 끝나는 계정**(SQL ②의 `handle_new_user`·`sync_member_directory` — 그 밖의 이메일·구글 가입은 모두 '인증 전'으로 시작하고 이메일을 가린다). 회원 추가가 쓰는 도메인(`LOGIN_EMAIL_DOMAIN`)을 바꾸면 SQL도 함께 고친다.
 * **개인정보 SQL ②(`20261020010000_privacy_b_enforce.sql`)를 실행한 뒤에는 그보다 앞선 마이그레이션을 다시 실행하지 않는다**(옛 정책·함수가 되살아나 권한이 넓어짐 — 되돌리기는 `docs/privacy/rollback-profiles-members-only.sql` → `rollback-privacy-enforce.sql` 순서로만).
+* **서버 저장은 원래 값 그대로**(2026-10-21 사용자 결정 "지금대로 두기" — selectio game식 아이디 암호화는 하지 않음): 학생 아이디·별명·기록·구글 이메일은 사이트 화면에서만 가리고, 서버 관리 화면(Supabase)에는 남는다고 처리방침에 적는다. "서버에서도 운영자가 알 수 없다"고 쓸 수 있는 것은 비밀번호뿐이다.
 * 처리방침 시행 전에는 `/privacy/`가 "준비 중"만 보인다(시행 시각 = SQL ③ 실행, `site_settings.policy_effective_at`). 화면 상수 `POLICY_VERSION`과 DB `site_settings.privacy_version`이 같아야 한다.
 
 ## 한글(hwpx) 파일
