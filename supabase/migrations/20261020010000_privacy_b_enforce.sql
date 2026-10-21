@@ -22,6 +22,7 @@
 --   · 맨 앞 점검: ①이 안 됐거나, 총괄이 없거나, 교사 인증 코드·문의 이메일이 아직 없으면(④ 화면 입력 전) 오류를 내고
 --     아무것도 바꾸지 않는다(관리자 잠김 · 아무도 인증할 수 없는 창 · 빈 문의 이메일 방지).
 --     고침 2(N1): 이메일 모양 아이디(@class1.local 이 아닌데 이메일·비밀번호 로그인이 있는) 계정이 있어도 멈춘다(아래 실행 전 확인 E)).
+--     고침 3(10-21): 단 교사(관리자) 계정은 멈추지 않고 알림만 — 구글 관리자처럼 다룬다(확인 창 한 번 · 명단 이메일 가림). 학생 등 role user 만 멈춘다.
 --   · 맨 끝 점검: 학급 밖 표(spec 4.6)에 is_admin() 만 쓰는 허용 정책이 남거나, 제한 정책 19개 · 좁힌 정책 20개 · 함수 본문 ·
 --     가린 이메일·이름 · (개정 4) 회원 명단 · 감사 기록 3개의 읽기 정책이 설계와 다르면 오류를 내고 전부 되돌린다.
 --     성공하면 "✔ ② …" 알림이 나온다.
@@ -90,8 +91,8 @@
 --            where position('@' in coalesce(target_email, '')) > 0 and lower(target_email) not like '%@class1.local') as 탈퇴기록,
 --          (select count(*) from public.member_create_log
 --            where position('@' in coalesce(target_email, '')) > 0 and lower(target_email) not like '%@class1.local') as 생성기록;
---   -- E) (고침 2 — N1) 이메일 모양 아이디(또는 이메일로 스스로 가입한) 계정 수 — 0 이어야 이 파일이 실행된다(맨 앞 점검과 같은 셈).
---   --    결과 줄이 없으면 0. 줄이 있으면 이 파일을 Run 하지 말고 그 수를 알려 주세요(역할별 수만 — 이메일은 보지 않는다).
+--   -- E) (고침 2 — N1, 고침 3) 이메일 모양 아이디(또는 이메일로 스스로 가입한) 계정 수 — role 이 admin 이 아닌 줄(학생 등)이 0 이어야
+--   --    이 파일이 실행된다(맨 앞 점검과 같은 셈). admin 줄은 멈추지 않고 구글 관리자처럼 다룬다(역할별 수만 — 이메일은 보지 않는다).
 --   select p.role, count(*) as 이메일모양_계정
 --   from auth.users u left join public.profiles p on p.id = u.id
 --   where lower(coalesce(u.email, '')) not like '%@class1.local'
@@ -161,6 +162,7 @@ declare
   v_class_oauth int;
   v_unknown     int;
   v_email_like  int;
+  v_email_admin int;
 begin
   if to_regclass('public.member_verification') is null
      or to_regclass('public.member_verification_attempts') is null
@@ -213,16 +215,32 @@ begin
   -- 연결된 방식 · 로그인 수단(auth.identities)에 'email')이 있는 계정. 이 파일의 판정(아이디 계정 = @class1.local)으로는 구글처럼
   -- '인증 전'으로 묶여 기록 저장이 막히므로, 하나라도 있으면 멈춘다(그때 따로 고친다). 이미 member_verification 줄이 있는 계정
   -- (② 뒤 스스로 가입한 실제 이메일 계정 — 이미 '인증 전'으로 다룸)은 세지 않아 ②를 다시 실행해도 막히지 않는다.
-  -- 총괄이 실제 이메일 + 비밀번호로 로그인하는 계정이어도 여기서 센다.
+  -- 고침 3(2026-10-21): 교사(관리자, role admin) 계정은 세지 않는다 — 실제 이메일로 로그인하는 총괄·교사는 구글 관리자처럼
+  -- 다뤄도 막히는 것이 없다(인증 전 제한은 role user 만, 코드 없는 확인 창 한 번 · 명단의 이메일 가림 · 별명 정하기 전 이름 '선생님',
+  -- 로그인 방법은 그대로). 막히는 것은 학생 등 role user 계정뿐이라 그때만 멈추고, 교사 계정 수는 아래에서 알림으로 보인다.
   select count(*) into v_email_like
   from auth.users u
   where lower(coalesce(u.email, '')) not like '%@class1.local'
+    and coalesce((select p.role from public.profiles p where p.id = u.id), 'user') <> 'admin'
     and (
       coalesce(u.raw_app_meta_data ->> 'provider', '') = 'email'
       or (jsonb_typeof(u.raw_app_meta_data -> 'providers') = 'array' and (u.raw_app_meta_data -> 'providers') ? 'email')
       or exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email')
     )
     and not exists (select 1 from public.member_verification v where v.user_id = u.id);
+  select count(*) into v_email_admin
+  from auth.users u
+  where lower(coalesce(u.email, '')) not like '%@class1.local'
+    and coalesce((select p.role from public.profiles p where p.id = u.id), 'user') = 'admin'
+    and (
+      coalesce(u.raw_app_meta_data ->> 'provider', '') = 'email'
+      or (jsonb_typeof(u.raw_app_meta_data -> 'providers') = 'array' and (u.raw_app_meta_data -> 'providers') ? 'email')
+      or exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email')
+    )
+    and not exists (select 1 from public.member_verification v where v.user_id = u.id);
+  if v_email_admin > 0 then
+    raise notice '실제 이메일로 로그인하는 교사(관리자) 계정 %개는 구글 관리자처럼 다룹니다: 회원 명단의 이메일은 첫 글자만, 다음 접속 때 코드 없는 확인 창 한 번(별명을 정하기 전 이름은 ''선생님''), 로그인 방법은 그대로입니다.', v_email_admin;
+  end if;
   if v_email_like > 0 then
     raise exception '이메일 모양 아이디(또는 이메일로 스스로 가입한) 계정이 %개 있어 멈췄습니다. 이대로 ②를 실행하면 이 계정이 구글처럼 ''인증 전''으로 묶여 기록 저장이 막힙니다. 이 메시지를 알려 주세요(아무것도 바뀌지 않았습니다).', v_email_like;
   end if;
