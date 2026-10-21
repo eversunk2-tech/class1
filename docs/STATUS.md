@@ -4,7 +4,7 @@
 >
 > **새 세션 시작 문구**: "CLAUDE.md와 docs/STATUS.md를 읽고, 지금 적용 중인 규칙과 남은 작업을 요약해줘"
 >
-> **지금 상태 한 줄 요약**(2026-10-21): **개인정보 처리방침·구글 가입 교사 인증 코드·보호자 동의·학생 아이디/별명 가리기 — 배포 진행 중**(10-21): 배포 순서 1 SQL ① 사용자 실행 성공(Claude 공개 키 확인: 새 설정 칸 읽힘·새 RPC는 비로그인 거부·게시판 글 0), 2 화면 push `0cc5dff`(Actions·`github-pages`·`vercel[bot]` 성공, 두 사이트 로그인 화면 새 문장·`/privacy/`·`/admin/privacy/`·동의서 파일 200) → **다음: 사용자 함수 3개 배포(3단계)**. 10-20 배포: AI(Gemini) 학생 답 판정 끄기 `52b5b7c`. 마지막으로 올린 커밋 `e94b053`. 사용자에게 부탁: Gemini 키 지우기(대시보드·AI Studio), 학교 개인정보 담당 확인, 부엉이반 보호자 동의서.
+> **지금 상태 한 줄 요약**(2026-10-21): **개인정보 처리방침·구글 가입 교사 인증 코드·보호자 동의·학생 아이디/별명 가리기 — 배포 진행 중**(10-21): 배포 순서 1 SQL ① 사용자 실행 성공(Claude 공개 키 확인: 새 설정 칸 읽힘·새 RPC는 비로그인 거부·게시판 글 0), 2 화면 push `0cc5dff`(Actions·`github-pages`·`vercel[bot]` 성공, 두 사이트 로그인 화면 새 문장·`/privacy/`·`/admin/privacy/`·동의서 파일 200) 3 함수 3개 사용자 배포(10-21 — Claude 확인: 세 함수 모두 두 사이트 허용·다른 주소 거부·토큰 없이 401·공개 키로 부르면 함수 자신의 "로그인이 만료" 응답, 없는 함수는 404. 사용자가 키체인 창 때문에 막힌 줄 알았으나 배포는 됨), 사용자가 Secret `GEMINI_API_KEY`도 지움(`npx supabase secrets unset` 성공) → **다음: 총괄이 개인정보 설정에서 코드·문의 이메일 입력(4단계)**. 10-20 배포: AI(Gemini) 학생 답 판정 끄기 `52b5b7c`. 마지막으로 올린 커밋 `e94b053`. 사용자에게 부탁: Gemini 키 지우기(대시보드·AI Studio), 학교 개인정보 담당 확인, 부엉이반 보호자 동의서.
 
 ## 배포
 * 사이트: https://eversunk2-tech.github.io/class1/ (저장소 `eversunk2-tech/class1`, main에 push하면 GitHub Actions로 배포, 약 1~2분)
@@ -170,7 +170,7 @@
 * **배포 순서**(10-21 정리 — spec 7절과 달리 **화면 push를 함수 배포보다 먼저**: 지금 배포된 `admin-create-member`는 새 화면이 보내는 `guardianConsent`를 무시해 학생 만들기가 그대로 되지만, 새 함수를 먼저 올리면 예전 화면의 학생 만들기가 거부된다):
   1. ✅(10-21) 사용자: **SQL ①** `20261020000000_privacy_a_schema.sql`(SQL Editor 전체 Run → 머리말 확인 쿼리). 맨 끝 자체 시험(가린 글자·날짜)이 틀리면 파일 전체가 되돌려지니 그 메시지를 알려 준다.
   2. ✅(10-21 `0cc5dff`) Claude: **push**(사용자 '이대로 배포' 뒤) → Actions·두 사이트 확인. 이때부터 로그인 화면 새 문장, 프로필 수정 창 '별명'만, 관리자 '개인정보 설정'(총괄)·회원 추가 보호자 동의 체크·학급 정리가 보인다. 처리방침 링크는 ③ 전이라 아직 없다.
-  3. 사용자: **함수 3개 배포** `npx supabase functions deploy admin-create-member` / `member-self-delete` / `admin-clear-students`(`--no-verify-jwt` 금지, 키체인에서 막히면 `npx supabase login`부터).
+  3. ✅(10-21) 사용자: **함수 3개 배포** `npx supabase functions deploy admin-create-member` / `member-self-delete` / `admin-clear-students`(`--no-verify-jwt` 금지, 키체인에서 막히면 `npx supabase login`부터).
   4. 총괄: 관리자 → **개인정보 설정**에서 교사 인증 코드 6자리·문의 이메일 입력(값은 채팅·저장소에 적지 않음).
   5. 사용자: `docs/privacy/test-queries.sql` 2-2)(= ② 머리말 E)로 **이메일 모양 아이디·이메일 가입 계정 수 확인**(0이어야 ②가 돈다 — 총괄이 실제 이메일+비밀번호로 로그인하는 계정이면 여기서 걸리니 알려 줌) → **SQL ②** → **곧바로 SQL ③**(③ 실행 = 처리방침 시행, ②와 ③ 사이에 구글 로그인 시험 금지).
   6. 확인: 총괄이 다시 들어와 코드 없는 확인 창에서 별명 정하기(그 전까지 이름은 `선생님`), 시험용 구글 계정으로 새 가입 창·코드, 학생 계정 로그인·기록 저장, 로그아웃 화면 글쓴이 '회원' — Claude는 공개 키 읽기로 확인.
@@ -209,7 +209,7 @@
 * 법령 원문(10-20 국가법령정보센터 — 처음엔 접속 장애, 다시 받음. 본문은 `https://www.law.go.kr/LSW/lsInfoP.do?lsId=011357`에서 `lsiSeq`를 읽고 `lsInfoR.do?lsiSeq=…&chrClsCd=010202&urlMode=lsInfoP&efYd=…&ancYnChk=0`으로 받는다): 개인정보 보호법 [시행 2026. 9. 11.] [법률 제21445호] 제15조 ①·②(수집 근거, 동의받을 때 알릴 4가지), 제21조(파기), 제22조의2 ①·③(만 14세 미만 — 법정대리인 동의·확인, 아동에게는 쉬운 말), 제26조 ②(위탁 업무·수탁자 공개), 제28조의8 ①·②(국외 이전 — 별도 동의 또는 계약 이행 위탁·보관이면 처리방침 공개), 제30조(처리방침 항목·공개 — 2026 개정 없음), 제31조(보호책임자 — 2026. 3. 10. 개정). 시행령 [대통령령 제36671호] 제17조의2 ① 제4호(서면 동의서에 서명날인 후 제출) → 종이 동의서가 이에 해당.
 
 **10-20에 끝난 것**
-1. **AI(Gemini) 학생 답 판정 끄기** `52b5b7c`(사용자 "끄기" → "이대로 배포"): 공통 틀 두 개 `answer-check.js`에 `AI_CHECK = false`(머리말에 까닭), 23개 사본 동기화(`diff -r` 일치), headless로 23개 앱 확인(정상 답은 넘어가고 `check-answer` 호출 0, 확실한 무의미는 그대로 막힘 — 고치기 전 판은 호출 1번·AI 카드), 비교 사진 → push `e94b053`까지, Actions·`github-pages`·`vercel[bot]` 성공, 두 사이트 파일 해시 같음. **남은 것: Secret `GEMINI_API_KEY` 지우기(사용자)** — `npx supabase secrets unset`이 Mac 키체인('로그인' 키체인 암호) 창에서 막혀, 대시보드 Edge Function Secrets 화면 또는 Google AI Studio API 키 화면에서 지우도록 안내함(결과 아직 모름). 앱이 이미 부르지 않으므로 급하지 않음.
+1. **AI(Gemini) 학생 답 판정 끄기** `52b5b7c`(사용자 "끄기" → "이대로 배포"): 공통 틀 두 개 `answer-check.js`에 `AI_CHECK = false`(머리말에 까닭), 23개 사본 동기화(`diff -r` 일치), headless로 23개 앱 확인(정상 답은 넘어가고 `check-answer` 호출 0, 확실한 무의미는 그대로 막힘 — 고치기 전 판은 호출 1번·AI 카드), 비교 사진 → push `e94b053`까지, Actions·`github-pages`·`vercel[bot]` 성공, 두 사이트 파일 해시 같음. **Secret `GEMINI_API_KEY`는 10-21 사용자가 지움**(`npx supabase secrets unset GEMINI_API_KEY` 성공) — `npx supabase secrets unset`이 Mac 키체인('로그인' 키체인 암호) 창에서 막혀, 대시보드 Edge Function Secrets 화면 또는 Google AI Studio API 키 화면에서 지우도록 안내함(결과 아직 모름). 앱이 이미 부르지 않으므로 급하지 않음.
 2. 개인정보 계획: 사용자 결정 → Plan(sonnet) 설계·원문 → Claude 검토·공식 자료 대조(법령 원문, Gemini 약관, Supabase 요금·세션·비밀번호 문서, 이전받는 회사 4곳의 이름·연락처, 침해 구제 기관 번호) → 개정 1~3 → 사용자 승인.
 3. 보호자 동의서 hwpx 세 번 만듦: 가정통신문 스킬판(사용자가 다른 스킬로 다시) → 노트북LM 기본과정 원고 스타일판 → **최종: 사용자 예전 양식판**(hwpx 스킬 레퍼런스 복원 — 29칸 글만 바꿈, validate·page_guard·content_guard 통과, 미리보기의 옛 모습 지움). 사용자 화면이 전체 화면이라 Claude는 한글 창을 보지 못함 — 사용자에게 열어 확인 부탁.
 
