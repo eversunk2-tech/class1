@@ -204,41 +204,49 @@ export function ClassRetentionCard({
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-  if (state.status === "loading") {
-    return variant === "settings" ? <ListSkeleton rows={1} label={T.settings.retentionHeading} /> : null;
-  }
-  if (state.status === "missing") return null; // 준비 전 안내는 개인정보 설정 화면 위쪽에서 한 번만
-  if (state.status === "error") {
-    return variant === "settings" ? <ErrorState message={EXTRA.overviewError} onRetry={reload} /> : null;
-  }
-  const { data } = state;
-  if (!data.classes.length && !data.februaryClasses.length) return null;
-
   function openCleanup(c: RetentionClass) {
     setTarget({ classId: c.classId, className: c.className });
     setOpen(true);
   }
 
+  // 확인 창은 목록이 비어도 같은 자리에 그대로 둔다(<>{내용}{창}</> — 내용만 바뀐다) — 정리를 마쳐 그 학급이 목록에서
+  // 빠져도(다시 읽기) 창의 "정리했어요"와 [이어서 학급 삭제]·학급 삭제 창이 사라지거나 처음부터 다시 그려지지 않게(2026-10-22).
+  let content: ReactNode = null;
+  if (state.status === "loading") {
+    content = variant === "settings" ? <ListSkeleton rows={1} label={T.settings.retentionHeading} /> : null;
+  } else if (state.status === "missing") {
+    content = null; // 준비 전 안내는 개인정보 설정 화면 위쪽에서 한 번만
+  } else if (state.status === "error") {
+    content = variant === "settings" ? <ErrorState message={EXTRA.overviewError} onRetry={reload} /> : null;
+  } else if (state.data.classes.length || state.data.februaryClasses.length) {
+    const { data } = state;
+    content = (
+      <div className={cn("flex flex-col gap-4", className)}>
+        {data.classes.length ? (
+          <RetentionBlock
+            tone="overdue"
+            heading={T.settings.retentionHeading}
+            body={fillText(T.settings.retentionBody, { n: data.overdueStudents })}
+            classes={data.classes}
+            onOpen={openCleanup}
+          />
+        ) : null}
+        {data.februaryClasses.length ? (
+          <RetentionBlock
+            tone="february"
+            heading={T.settings.februaryHeading}
+            body={fillText(T.settings.februaryBody, { n: data.februaryStudents })}
+            classes={data.februaryClasses}
+            onOpen={openCleanup}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
-      {data.classes.length ? (
-        <RetentionBlock
-          tone="overdue"
-          heading={T.settings.retentionHeading}
-          body={fillText(T.settings.retentionBody, { n: data.overdueStudents })}
-          classes={data.classes}
-          onOpen={openCleanup}
-        />
-      ) : null}
-      {data.februaryClasses.length ? (
-        <RetentionBlock
-          tone="february"
-          heading={T.settings.februaryHeading}
-          body={fillText(T.settings.februaryBody, { n: data.februaryStudents })}
-          classes={data.februaryClasses}
-          onOpen={openCleanup}
-        />
-      ) : null}
+    <>
+      {content}
       <ClassCleanupDialog
         target={target}
         open={open}
@@ -247,8 +255,9 @@ export function ClassRetentionCard({
           reload();
           void ctx.refresh();
         }}
+        onDeleted={reload}
       />
-    </div>
+    </>
   );
 }
 

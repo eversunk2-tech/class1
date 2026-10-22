@@ -164,12 +164,20 @@ export function AdminContextProvider({ children }: { children: ReactNode }) {
       if (s.status !== "ready") return s;
       const classes = update(s.classes).sort((a, b) => a.name.localeCompare(b.name, "ko"));
       const byId = new Map(classes.map((c) => [c.id, c]));
-      const visible = s.visibleClasses.map((v) => {
-        const mine = byId.get(v.id);
-        return mine ? { ...v, name: mine.name } : v;
-      });
+      // 목록에서 빠진 내 학급 = 지운 학급(학급 삭제 — 2026-10-22): 이름표·담임 표시에서도 뺀다(다시 읽기 전까지)
+      const removed = new Set(s.classes.filter((c) => !byId.has(c.id)).map((c) => c.id));
+      const visible = s.visibleClasses
+        .filter((v) => !removed.has(v.id))
+        .map((v) => {
+          const mine = byId.get(v.id);
+          return mine ? { ...v, name: mine.name } : v;
+        });
       for (const c of classes) if (!visible.some((v) => v.id === c.id)) visible.push({ id: c.id, name: c.name, archivedAt: null });
-      return { ...s, classes, visibleClasses: visible.sort((a, b) => a.name.localeCompare(b.name, "ko")) };
+      let teacherClasses = s.teacherClasses;
+      if (removed.size && teacherClasses) {
+        teacherClasses = new Map([...teacherClasses].map(([t, ids]) => [t, ids.filter((id) => !removed.has(id))] as const));
+      }
+      return { ...s, classes, visibleClasses: visible.sort((a, b) => a.name.localeCompare(b.name, "ko")), teacherClasses };
     });
   }, []);
 

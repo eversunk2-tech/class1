@@ -85,6 +85,26 @@ export const PRIVACY_ADMIN_TEXT = {
     empty: "지울 학생이 없어요.",
   },
 
+  // ── 8-9. 학급 삭제 (2026-10-22 사용자 승인 — docs/classes/delete-class/spec.md) ──
+  // 아래 넷째 묶음(studentsLeft·noPermission·nameMismatch)은 서버(admin_delete_class — 20261022000000_class_delete.sql)가
+  // 같은 글자로 거부한다. 화면은 서버 문구를 그대로 보이고, 미리보기에서 학생이 남았으면 studentsLeft를 미리 보인다.
+  classDelete: {
+    cardButton: "학급 삭제",
+    /** 학생이 남아 있어 [학급 삭제]가 꺼졌을 때의 설명 */
+    blockedHint: "학생이 남아 있어요. 먼저 [학급 정리]를 해 주세요.",
+    /** 학급 정리를 마친 창의 단추 */
+    continueButton: "이어서 학급 삭제",
+    title: "학급 삭제 — '{학급 이름}'",
+    body: "이 학급을 목록에서 완전히 지웁니다. 이 학급의 과제 {n}개와 선생님 글 {m}개도 함께 지워져요. **되돌릴 수 없어요.**",
+    typeName: "학급 이름을 그대로 입력해 주세요.",
+    ok: "학급 삭제",
+    cancel: "취소",
+    done: "'{학급 이름}' 학급을 삭제했어요.",
+    studentsLeft: "학생 계정이 {n}명 남아 있어요. 먼저 [학급 정리]로 학생 계정과 기록을 지운 뒤 학급을 삭제해 주세요.",
+    noPermission: "이 학급의 담임 선생님이나 총괄 선생님만 학급을 삭제할 수 있어요.",
+    nameMismatch: "학급 이름이 맞지 않아요. 학급 이름을 그대로 입력해 주세요.",
+  },
+
   // ── 8-5. 학생 한 명 '기록까지 삭제' ──
   studentErase: {
     menu: "기록까지 삭제",
@@ -185,6 +205,12 @@ export const PRIVACY_ADMIN_EXTRA_TEXT = {
   communityClassOnly: "학습게임 관리와 학습게임 신고 처리는 모든 권한이 있는 선생님만 할 수 있어요.",
   blogClassOnly: "블로그 글쓰기는 모든 권한이 있는 선생님만 할 수 있어요.",
   countUnit: "{n}명",
+  // ── 학급 삭제(2026-10-22 — docs/classes/delete-class/build-report.md에 문장 그대로 적음) ──
+  /** 확인 창의 미리보기(과제·선생님 글 수)를 읽지 못했을 때 */
+  classDeletePreviewError: "학급 정보를 불러오지 못했습니다.",
+  /** 단추가 보인 뒤 DB 함수가 사라진 드문 경우(SQL을 되돌림 등) — 보통은 단추가 숨어 보이지 않는다 */
+  classDeleteMissing:
+    "학급 삭제 기능용 DB 설정이 아직 적용되지 않았습니다. Supabase SQL Editor에서 20261022000000_class_delete.sql을 실행해 주세요.",
 } as const;
 
 /** `{이름}` 같은 자리를 채운다. 값이 없는 자리는 그대로 둔다. */

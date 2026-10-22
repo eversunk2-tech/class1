@@ -1,10 +1,11 @@
 "use client";
 
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Loader2Icon, PencilIcon, PlusIcon, SchoolIcon, ShieldCheckIcon, Trash2Icon, UsersIcon } from "lucide-react";
+import { CircleXIcon, Loader2Icon, PencilIcon, PlusIcon, SchoolIcon, ShieldCheckIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { adminSurfaceClass } from "@/components/admin/admin-styles";
 import { ClassCleanupDialog, type ClassCleanupTarget } from "@/components/admin/class-cleanup-dialog";
+import { ClassDeleteDialog, useClassDeleteAvailable, type ClassDeleteTarget } from "@/components/admin/class-delete-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,8 +45,10 @@ type DialogTarget = { mode: "create" } | { mode: "rename"; target: AdminClass };
 /**
  * "내 학급" 카드(관리자 개요·회원 관리 맨 위, docs/classes/spec.md 개정 1-2).
  * 담임교사는 여기서 학급을 개설(이름을 스스로 정함)하고 이름을 바꾼다. 학급 이름은 관리자 화면에서만 보인다.
- * 학급마다 [학급 정리](학년도가 끝나면 학생 계정과 기록을 한꺼번에 지움 — docs/privacy/spec.md 4.7-3, privacy-policy.md 8-4).
- * onCleaned: 학급 정리로 한 명이라도 지웠을 때(회원 목록을 다시 읽는 데 쓴다).
+ * 학급마다 [학급 정리](학년도가 끝나면 학생 계정과 기록을 한꺼번에 지움 — docs/privacy/spec.md 4.7-3, privacy-policy.md 8-4)와
+ * [학급 삭제](학생이 없는 학급을 과제·선생님 글과 함께 목록에서 지움 — docs/classes/delete-class/spec.md, privacy-policy.md 8-9).
+ * [학급 삭제]는 학급 삭제 SQL(20261022000000_class_delete.sql)이 있을 때만 보이고, 학생이 남은 학급에서는 꺼진 채 까닭을 보인다.
+ * onCleaned: 학급 정리로 한 명이라도 지웠거나 학급을 삭제했을 때(회원 목록을 다시 읽는 데 쓴다).
  */
 export function MyClassesCard({ className, onCleaned }: { className?: string; onCleaned?: () => void }) {
   const ctx = useAdminContext();
@@ -54,6 +57,18 @@ export function MyClassesCard({ className, onCleaned }: { className?: string; on
   const [open, setOpen] = useState(false);
   const [cleanupTarget, setCleanupTarget] = useState<ClassCleanupTarget | null>(null);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ClassDeleteTarget | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  // 학급을 지우면 누른 단추가 목록에서 사라지므로 초점을 '학급 개설' 단추로 옮긴다
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const blockedHintId = useId();
+  // 학급 삭제 SQL이 있는가(모르는 동안·없으면 단추를 숨긴다) — 내 학급 하나로 한 번 알아본다
+  const deleteAvailable = useClassDeleteAvailable(ctx.status === "ready" ? ctx.classes[0]?.id : null);
+
+  function openDelete(c: AdminClass) {
+    setDeleteTarget({ classId: c.id, className: c.name });
+    setDeleteOpen(true);
+  }
 
   function openCleanup(c: AdminClass) {
     setCleanupTarget({ classId: c.id, className: c.name });
@@ -100,7 +115,12 @@ export function MyClassesCard({ className, onCleaned }: { className?: string; on
           </h2>
           <p className="text-sm text-muted-foreground">학급 이름은 관리자 화면에서만 보여요. 학생 화면에는 나오지 않아요.</p>
         </div>
-        <Button className="h-11 px-4" onClick={() => openDialog({ mode: "create" })} disabled={ctx.status !== "ready"}>
+        <Button
+          ref={createButtonRef}
+          className="h-11 px-4"
+          onClick={() => openDialog({ mode: "create" })}
+          disabled={ctx.status !== "ready"}
+        >
           <PlusIcon />
           학급 개설
         </Button>
@@ -130,37 +150,63 @@ export function MyClassesCard({ className, onCleaned }: { className?: string; on
       ) : (
         <>
           <ul className="flex flex-col divide-y rounded-xl ring-1 ring-foreground/10" aria-label="내 학급 목록">
-            {ctx.classes.map((c) => (
-              <li key={c.id} className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate font-medium" title={c.name}>
-                  {c.name}
-                </span>
-                <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                  <UsersIcon className="size-4" aria-hidden />
-                  학생 {formatCount(c.studentCount)}명
-                </span>
-                <span className="flex flex-wrap items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    className="h-11 px-3"
-                    onClick={() => openDialog({ mode: "rename", target: c })}
-                    aria-label={`${c.name} 이름 바꾸기`}
-                  >
-                    <PencilIcon />
-                    이름 바꾸기
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-11 px-3 text-destructive hover:text-destructive"
-                    onClick={() => openCleanup(c)}
-                    aria-label={`${c.name} ${PRIVACY_ADMIN_TEXT.classCleanup.cardButton}`}
-                  >
-                    <Trash2Icon />
-                    {PRIVACY_ADMIN_TEXT.classCleanup.cardButton}
-                  </Button>
-                </span>
-              </li>
-            ))}
+            {ctx.classes.map((c) => {
+              // 학생(탈퇴 처리되지 않은 학생 수)이 남았으면 [학급 삭제]를 끄고 까닭을 보인다.
+              // 탈퇴 처리된 학생만 남은 학급은 켜지고, 확인 창의 미리보기(탈퇴 처리 포함)가 같은 까닭으로 막는다.
+              const deleteBlocked = c.studentCount > 0;
+              const hintId = `${blockedHintId}-${c.id}`;
+              return (
+                <li key={c.id} className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                  {/* 이름 칸이 단추에 밀려 사라지지 않게 최소 너비를 두고, 좁으면 단추 묶음이 다음 줄(오른쪽)로 내려간다 */}
+                  <span className="min-w-[min(100%,8rem)] flex-1 truncate font-medium" title={c.name}>
+                    {c.name}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                    <UsersIcon className="size-4" aria-hidden />
+                    학생 {formatCount(c.studentCount)}명
+                  </span>
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      className="h-11 px-3"
+                      onClick={() => openDialog({ mode: "rename", target: c })}
+                      aria-label={`${c.name} 이름 바꾸기`}
+                    >
+                      <PencilIcon />
+                      이름 바꾸기
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="h-11 px-3 text-destructive hover:text-destructive"
+                      onClick={() => openCleanup(c)}
+                      aria-label={`${c.name} ${PRIVACY_ADMIN_TEXT.classCleanup.cardButton}`}
+                    >
+                      <Trash2Icon />
+                      {PRIVACY_ADMIN_TEXT.classCleanup.cardButton}
+                    </Button>
+                    {deleteAvailable ? (
+                      <Button
+                        variant="ghost"
+                        className="h-11 px-3 text-destructive hover:text-destructive aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent"
+                        disabled={deleteBlocked}
+                        focusableWhenDisabled
+                        onClick={() => openDelete(c)}
+                        aria-label={`${c.name} ${PRIVACY_ADMIN_TEXT.classDelete.cardButton}`}
+                        aria-describedby={deleteBlocked ? hintId : undefined}
+                      >
+                        <CircleXIcon />
+                        {PRIVACY_ADMIN_TEXT.classDelete.cardButton}
+                      </Button>
+                    ) : null}
+                  </span>
+                  {deleteAvailable && deleteBlocked ? (
+                    <p id={hintId} className="basis-full text-right text-xs text-muted-foreground">
+                      {PRIVACY_ADMIN_TEXT.classDelete.blockedHint}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
           {superAdmin ? (
             <p className="text-xs text-muted-foreground">
@@ -180,6 +226,15 @@ export function MyClassesCard({ className, onCleaned }: { className?: string; on
           void ctx.refresh();
           onCleaned?.();
         }}
+        onDeleted={() => onCleaned?.()}
+        finalFocusRef={createButtonRef}
+      />
+      <ClassDeleteDialog
+        target={deleteTarget}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => onCleaned?.()}
+        finalFocusRef={createButtonRef}
       />
     </section>
   );
