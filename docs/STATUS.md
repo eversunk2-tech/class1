@@ -159,6 +159,13 @@
 
 ## 남은 작업·메모
 
+### ▶ 학급 삭제 (2026-10-22~23 — 사용자 요청 "학급 정리 후에 학급 삭제(목록에서 완전 삭제)도 가능하도록")
+* 설계 `docs/classes/delete-class/spec.md`(사용자 승인: 권한 = 그 학급 담임과 총괄, 과제·선생님 글은 학급과 함께 지우기, 화면 글 그대로 — 원문 `docs/privacy/privacy-policy.md` 8-9), 지침 `build-instructions.md`·`review-instructions.md`, 보고 `build-report.md`, 검토 `review.md`(배포해도 됨 — 높음·중간 0, 낮음 7·정보 4). Claude가 L4(띄어쓰기 없는 긴 학급 이름이면 학급 정리·삭제 창이 옆으로 넘침 — 기존 문제)를 `[overflow-wrap:anywhere]`로 고치고 검토 시험 다시 돌림(넘침 0, t1~t5·r3 통과). 새 문장 2개 사용자 승인(`new-sentences.md` 6절).
+* 새 SQL `supabase/migrations/20261022000000_class_delete.sql`(추가만 — `admin_class_delete_preview`·`admin_delete_class`, 학생이 1명이라도 있으면 거부, 과제 → 학급 순서로 지움, 담임 연결·선생님 글은 cascade, 학급 정리 기록은 남음). 화면: 학급 카드 [학급 삭제](학생이 남으면 꺼짐 + 설명), 학급 정리 끝 창 [이어서 학급 삭제], 삭제 확인 창(이름 입력). 로컬 커밋 `c52f0c1`.
+* 사용자 "이대로 배포"(10-23) → **배포 순서: 사용자 SQL 실행 → Claude 공개 키 확인(비로그인 42501) → push → 두 사이트 확인 → 사용자가 빈 연습용 학급으로 확인.**
+* 남은 낮은 점(`review.md`): L1 보조 담임도 지울 수 있음(먼저 맡은 담임의 과제·선생님 글도 함께 — 사용자 결정대로, 지금 학급은 모두 총괄 혼자), L2·L3 창을 닫은 뒤 키보드 초점이 페이지 처음으로, L6 다른 학급 학생 제출물도 함께 지워짐(드묾), L7 탈퇴 처리된 학생만 남은 학급은 카드 단추가 켜져 보이나 창에서 막힘. 정보: 총괄이 정리를 마친 다른 담임의 빈 학급·보관된 학급을 나중에 지울 화면 경로가 없음(서버는 허용), 누가 학급을 지웠는지 기록 없음.
+* 구현 담당이 저장소에 없는 `prettier`를 `npx`로 한 번 실행함(이 Mac에 남은 사본, 레지스트리 조회 가능성 — 규칙 위반, 결과는 쓰지 않음, 사용자에게 알림).
+
 ### ▶ 이어서 할 일 (2026-10-20 세션 압축 전 — 여기부터 본다)
 **진행 중: 개인정보 처리방침 · 구글 가입 교사 인증 코드 · 보호자 동의**(2026-10-20 사용자 요청 — "selectio-game 개인정보 처리방침과 확인팝업 설정한 거처럼")
 * 문서: 설계 `docs/privacy/spec.md`(머리말 개정 1~4·'4 보충'이 본문보다 우선, **4.11 = 학생 아이디·별명 가리기**), 화면 글 원문 `docs/privacy/privacy-policy.md`(개정 1~4·4 보충 — 사용자 승인), 구현하며 더한 문장 `docs/privacy/new-sentences.md`(사용자 "모두 그대로"), 지침 `build-common.md`·`build-1~6-*-instructions.md`·`fix-1-sql/ui-instructions.md`·`fix-2-sql-instructions.md`, 보고 `build-1~6-report.md`·`fix-1-sql-report.md`·`fix-1-ui-report.md`·`fix-2-sql-report.md`, 검토 `review-sql.md`(R1 — 중간 4 → 고침 1 → 재확인 N1 → 고침 2 → **배포해도 됨**)·`review-ui.md`(R2 — 중간 4 → 고침 1).
